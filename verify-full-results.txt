@@ -1,0 +1,39 @@
+=== FULL SUPABASE VERIFICATION ===
+Project URL: https://zmqvjtenuxlvwfopfroc.supabase.co
+
+--- 1. Supabase Client Library Queries ---
+courses: OK
+system_settings: OK
+users: OK
+leads: OK
+students: OK
+fees: OK
+follow_ups: OK
+batches: OK
+lead_activities: OK
+attendance: OK
+fee_payments: OK
+installments: OK
+tasks: OK
+notifications: OK
+audit_logs: OK
+documents: OK
+
+--- 2. Seed Data Check ---
+Courses: 0 found
+System Settings: 0 found
+
+--- 3. Auth Configuration ---
+Existing session: NO
+
+--- 4. Test Auth Signup ---
+Signup error: Email address "test@test123.com" is invalid
+This likely means email confirmation is required in Auth settings.
+Please go to: Authentication > Settings > Disable "Confirm email" for testing.
+
+=== SUMMARY ===
+If schema cache is still stale, please run in SQL Editor:
+  NOTIFY pgrst, 'reload schema';
+
+If auth signup fails, check:
+  Authentication > Settings > Email Confirmations = OFF (for testing)

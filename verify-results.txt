@@ -1,0 +1,25 @@
+=== TABLE EXISTENCE CHECK (via REST API) ===
+users: EXISTS
+courses: EXISTS
+leads: EXISTS
+students: EXISTS
+fees: EXISTS
+follow_ups: EXISTS
+batches: EXISTS
+system_settings: EXISTS
+lead_activities: EXISTS
+attendance: EXISTS
+fee_payments: EXISTS
+installments: EXISTS
+tasks: EXISTS
+notifications: EXISTS
+audit_logs: EXISTS
+documents: EXISTS
+
+=== ATTEMPTING DIRECT SQL VIA SUPABASE MANAGEMENT API ===
+The Management API requires a PAT token. To verify the full DB state:
+1. Go to https://supabase.com/dashboard/project/zmqvjtenuxlvwfopfroc
+2. Open SQL Editor
+3. Run the verification queries in verify-supabase.sql
+
+Verification SQL written to verify-supabase.sql

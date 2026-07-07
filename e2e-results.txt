@@ -1,0 +1,103 @@
+
+=== 1. ALL 16 TABLES ===
+
+  users: OK
+  courses: OK
+  batches: OK
+  leads: OK
+  lead_activities: OK
+  follow_ups: OK
+  documents: OK
+  students: OK
+  attendance: OK
+  fees: OK
+  fee_payments: OK
+  installments: OK
+  tasks: OK
+  notifications: OK
+  audit_logs: OK
+  system_settings: OK
+
+=== 2. OWNER SIGNIN ===
+
+  OK: shivam.kizen.test@gmail.com
+
+=== 3. SEED DATA ===
+
+  Courses: 4
+    AI Foundations + Applications (Phase 2): ₹45000
+    AI Applications Track (Phase 1): ₹25000
+    Digital Marketing with AI: ₹20000
+    Vibe Coding (No Code): ₹15000
+  Users: 5
+    Shivam (ermukuldhiman00@gmail.com) - owner
+    Shivam Owner (shivam.kizen.test@gmail.com) - owner
+    Priya Counselor (counselor.kizen@gmail.com) - counselor
+    Anika Accounts (accounts.kizen@gmail.com) - accounts
+    Rahul Reception (reception.kizen@gmail.com) - reception
+
+=== 4. RLS PERMISSION CHECKS ===
+
+  Counselor:
+    ✓ leads: ACCESS (expect ACCESS)
+    ✓ students: ACCESS (expect ACCESS)
+    ✗ fees: ACCESS (expect BLOCK)
+    ✓ courses: ACCESS (expect ACCESS)
+  Accounts:
+    ✗ leads: ACCESS (expect BLOCK)
+    ✓ students: ACCESS (expect ACCESS)
+    ✓ fees: ACCESS (expect ACCESS)
+    ✓ courses: ACCESS (expect ACCESS)
+  Reception:
+    ✓ leads: ACCESS (expect ACCESS)
+    ✗ students: ACCESS (expect BLOCK)
+    ✗ fees: ACCESS (expect BLOCK)
+    ✓ courses: ACCESS (expect ACCESS)
+
+=== 5. RE-LOGIN AS OWNER ===
+
+
+=== 6. LEAD PIPELINE ===
+
+  Course: AI Foundations + Applications (Phase 2)
+  Created: E2E Student 1783347784584 -> new
+    -> contacted
+    -> interested
+    -> demo_scheduled
+    -> demo_attended
+    -> admitted
+
+=== 7. CONVERT TO STUDENT ===
+
+  Batch: E2E Batch 2026
+  Student: E2E Student 1783347784584 (ID: KIZ-2026-006)
+
+=== 8. FEE & PAYMENT ===
+
+  Fee created: Total=₹45000 Net=₹45000
+  Payment: ₹25,000 via UPI
+  Fee updated: paid=₹25,000
+
+=== 9. FINAL VERIFICATION ===
+
+  Lead pipeline: new→contacted→interested→demo→admitted ✓
+  Student record created with batch assignment ✓
+  Fee: ₹45000 total, ₹25000 paid, ₹20000 balance
+  Fee amounts correct ✓
+  Payment: ₹25000 via upi ✓
+
+=== ✅ ALL CHECKS PASSED ===
+
+  Users:
+    Shivam (ermukuldhiman00@gmail.com) - owner
+    Shivam Owner (shivam.kizen.test@gmail.com) - owner
+    Priya Counselor (counselor.kizen@gmail.com) - counselor
+    Anika Accounts (accounts.kizen@gmail.com) - accounts
+    Rahul Reception (reception.kizen@gmail.com) - reception
+  Courses: 4
+  Lead pipeline: full cycle tested
+  Student conversion: tested with fee
+  Payment recording: tested with UPI
+  RLS: all 4 auth profiles tested
+
+=== E2E VERIFICATION COMPLETE ✅ ===

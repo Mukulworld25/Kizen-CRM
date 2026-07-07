@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1E3A8A;
+  --color-primary-light: #3B5CB8;
+  --color-primary-dark: #152C6B;
+  --color-accent: #F59E0B;
+  --color-accent-light: #FBBF24;
+  --color-accent-dark: #D97706;
+  --color-success: #10B981;
+  --color-success-light: #34D399;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-background: #F1F5F9;
+  --color-card: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-muted: #94A3B8;
+  --color-muted-foreground: #64748B;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 1rem;
+  --radius-button: 0.75rem;
+  --radius-badge: 9999px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-slate-800 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .card-premium {
+    @apply bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  .btn-primary {
+    @apply bg-primary text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-primary-light transition-colors duration-150;
+  }
+  .btn-accent {
+    @apply bg-accent text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-accent-dark transition-colors duration-150;
+  }
+  .badge-premium {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

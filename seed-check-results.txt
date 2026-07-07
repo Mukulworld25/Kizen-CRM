@@ -1,0 +1,11 @@
+=== TEST 1: Anon key (unauthenticated) ===
+Status 404: {"code":"PGRST205","details":null,"hint":null,"message":"Could not find the table 'public.courses' in the schema cache"}
+
+=== TEST 2: Auth signup ===
+Signup error: Email address "test-1783274603919@kizen-test.com" is invalid
+Trying sign-in with test credentials...
+
+=== SUMMARY ===
+To fully verify the database, please run verify-supabase.sql in the Supabase Dashboard SQL Editor.
+Test email used: test-1783274603919@kizen-test.com
+Test password: Test123456!

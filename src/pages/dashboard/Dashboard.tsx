@@ -10,7 +10,7 @@ import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import {
   Users, TrendingUp, GraduationCap, IndianRupee,
-  AlertTriangle, Clock, Target,
+  AlertTriangle, Clock, Target, BarChart3,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -28,13 +28,12 @@ export default function Dashboard() {
     return <CounselorDashboard stats={stats} isLoading={isLoading} />
   }
 
-  if (!isOwner && profile?.role !== 'admin') {
-    return (
-      <div>
-        <PageHeader title="Dashboard" description={`Welcome back, ${profile?.name}`} />
-        <p className="text-muted-foreground">Use the sidebar to navigate to your assigned modules.</p>
-      </div>
-    )
+  if (profile?.role === 'accounts') {
+    return <AccountsDashboard stats={stats} isLoading={isLoading} />
+  }
+
+  if (profile?.role === 'reception') {
+    return <ReceptionDashboard stats={stats} isLoading={isLoading} />
   }
 
   const leadsDelta = (stats?.leadsToday ?? 0) - (stats?.leadsYesterday ?? 0)
@@ -215,6 +214,87 @@ function CounselorDashboard({ stats, isLoading }: { stats: ReturnType<typeof use
                 <p className="mt-3 text-2xl font-bold text-slate-800">—</p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function AccountsDashboard({ stats, isLoading }: { stats: ReturnType<typeof useDashboardStats>['data']; isLoading: boolean }) {
+  return (
+    <div>
+      <PageHeader title="Finance Dashboard" description="Revenue, fees, and payment overview" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <StatsCard title="Revenue Collected" value={formatCurrency(stats?.revenue ?? 0)} icon={IndianRupee} color="bg-success" loading={isLoading} />
+        <StatsCard title="Pending Fees" value={formatCurrency(stats?.pending ?? 0)} icon={AlertTriangle} color="bg-accent" loading={isLoading} alert={(stats?.pending ?? 0) > 0} />
+        <StatsCard title="Admissions This Month" value={stats?.admissionsMonth ?? 0} icon={GraduationCap} color="bg-primary-light" loading={isLoading} />
+        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
+      </div>
+      <Card>
+        <CardHeader className="border-b border-border/50 pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-success" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <IndianRupee className="h-8 w-8 mx-auto text-success mb-2" />
+              <p className="font-medium text-sm">Record Payment</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Fees → select student → Record Payment</p>
+            </div>
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <AlertTriangle className="h-8 w-8 mx-auto text-accent mb-2" />
+              <p className="font-medium text-sm">View Overdue</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Fees → Overdue tab → follow up</p>
+            </div>
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <BarChart3 className="h-8 w-8 mx-auto text-primary mb-2" />
+              <p className="font-medium text-sm">Generate Report</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Reports → Export to Excel</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ReceptionDashboard({ stats, isLoading }: { stats: ReturnType<typeof useDashboardStats>['data']; isLoading: boolean }) {
+  return (
+    <div>
+      <PageHeader title="Front Desk Dashboard" description="Walk-in leads and today's activity" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+        <StatsCard title="Leads Today" value={stats?.leadsToday ?? 0} icon={Users} loading={isLoading} />
+        <StatsCard title="Leads This Week" value={stats?.leadsWeek ?? 0} icon={TrendingUp} color="bg-primary-light" loading={isLoading} />
+        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
+      </div>
+      <Card>
+        <CardHeader className="border-b border-border/50 pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-primary" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <Users className="h-8 w-8 mx-auto text-primary mb-2" />
+              <p className="font-medium text-sm">Add New Lead</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Leads → Add Lead → fill details</p>
+            </div>
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <Clock className="h-8 w-8 mx-auto text-accent mb-2" />
+              <p className="font-medium text-sm">Schedule Follow-up</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Follow-ups → Schedule → set date/time</p>
+            </div>
+            <div className="rounded-xl border border-border bg-slate-50/50 p-4 text-center hover:shadow-sm transition-shadow cursor-pointer">
+              <GraduationCap className="h-8 w-8 mx-auto text-success mb-2" />
+              <p className="font-medium text-sm">View Courses</p>
+              <p className="text-xs text-muted-foreground mt-1">Go to Leads → course catalog for walk-ins</p>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,5 @@
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardStats, useFollowUps } from '@/hooks/useStudents'
-import { useRealtime } from '@/hooks/useRealtime'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +21,6 @@ const COLORS = ['#1E3A8A', '#F59E0B', '#10B981', '#3B5CB8', '#FBBF24', '#34D399'
 
 export default function Dashboard() {
   const { isOwner, profile } = useAuth()
-  useRealtime()
   const { data: stats, isLoading } = useDashboardStats()
   const { data: todayFollowUps = [] } = useFollowUps('today')
 

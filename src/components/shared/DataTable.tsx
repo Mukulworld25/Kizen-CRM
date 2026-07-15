@@ -131,7 +131,7 @@ export function DataTable<T>({
         <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
       ) : (
         <>
-          <div className="rounded-xl border border-border bg-white shadow-sm">
+          <div className="rounded-xl border border-border shadow-sm" style={{ background: 'var(--card)' }}>
             <Table>
               <TableHeader>
                 <TableRow>

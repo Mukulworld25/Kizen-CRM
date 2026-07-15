@@ -42,15 +42,16 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
   return (
     <aside
       className={cn(
-        'flex h-full flex-col bg-primary text-white transition-all duration-300',
+        'flex h-full flex-col transition-all duration-300',
         collapsed && !mobile ? 'w-16' : 'w-64'
       )}
+      style={{ backgroundColor: 'var(--sidebar)', color: 'var(--sidebar-foreground)' }}
     >
-      <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
+      <div className="flex h-16 items-center justify-between border-b px-4" style={{ borderColor: 'var(--sidebar-border)' }}>
         {(!collapsed || mobile) && (
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-sm font-bold shadow-sm">K</div>
-            <span className="font-semibold text-sm tracking-wide">Kizen Education</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold shadow-sm" style={{ backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' }}>K</div>
+            <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--sidebar-foreground)' }}>Kizen Education</span>
           </div>
         )}
         {!mobile && (
@@ -72,9 +73,13 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               className={cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 active
-                  ? 'bg-accent text-white shadow-sm'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  ? 'shadow-sm'
+                  : 'hover:bg-white/10'
               )}
+              style={{
+                backgroundColor: active ? 'var(--sidebar-primary)' : 'transparent',
+                color: active ? 'var(--sidebar-primary-foreground)' : 'var(--sidebar-accent-foreground)',
+              }}
             >
               <Icon className="h-5 w-5 shrink-0" />
               {(!collapsed || mobile) && (
@@ -91,17 +96,17 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
       </nav>
 
       {profile && (
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t p-4" style={{ borderColor: 'var(--sidebar-border)' }}>
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 ring-2 ring-white/20">
-              <AvatarFallback className="bg-accent text-white text-xs font-semibold">
+            <Avatar className="h-9 w-9" style={{ boxShadow: '0 0 0 2px var(--sidebar-accent)' }}>
+              <AvatarFallback className="text-xs font-semibold" style={{ backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' }}>
                 {profile.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             {(!collapsed || mobile) && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{profile.name}</p>
-                <p className="text-xs text-white/60">{roleLabels[profile.role]}</p>
+                <p className="truncate text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>{profile.name}</p>
+                <p className="text-xs" style={{ color: 'var(--sidebar-accent-foreground)', opacity: 0.7 }}>{roleLabels[profile.role]}</p>
               </div>
             )}
           </div>

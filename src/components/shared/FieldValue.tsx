@@ -12,10 +12,11 @@ export function FieldValue({ value, className, placeholder = 'No data', mono = f
   return (
     <span
       className={cn(
-        isEmpty ? 'text-muted-foreground/50 italic text-sm' : 'text-slate-800',
+        isEmpty ? 'text-muted-foreground/50 italic text-sm' : '',
         mono && !isEmpty && 'font-mono',
         className,
       )}
+      style={!isEmpty ? { color: 'var(--foreground)' } : undefined}
     >
       {isEmpty ? placeholder : value}
     </span>

@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { roleLabels } from '@/lib/permissions'
+import { FieldValue } from '@/components/shared/FieldValue'
 import ExportData from '@/components/shared/ExportData'
 import TrashView from '@/components/shared/TrashView'
 import type { UserRole } from '@/types'
@@ -147,20 +148,20 @@ export default function Settings() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-primary/80 font-medium">Name</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Email</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Role</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Active</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Name</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Email</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Role</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Active</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.id} className="hover:bg-slate-50 transition-colors">
                       <TableCell className="font-medium">
-                        {u.name}
+                        <FieldValue value={u.name} />
                         {u.is_owner && <Badge className="ml-2">Owner</Badge>}
                       </TableCell>
-                      <TableCell>{u.email}</TableCell>
+                      <TableCell><FieldValue value={u.email} /></TableCell>
                       <TableCell>
                         {u.is_owner ? (
                           roleLabels.owner
@@ -204,9 +205,9 @@ export default function Settings() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-primary/80 font-medium">Name</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Duration</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Fee</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Name</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Duration</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Fee</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -247,10 +248,10 @@ export default function Settings() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-primary/80 font-medium">Batch</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Course</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Seats</TableHead>
-                    <TableHead className="text-primary/80 font-medium">Faculty</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Batch</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Course</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Seats</TableHead>
+                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Faculty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

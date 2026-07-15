@@ -206,10 +206,11 @@ export default function ExportData() {
           <Label>Data to Export</Label>
           <div className="flex flex-wrap gap-3">
             {ENTITIES.map((entity) => (
-              <label key={entity.value} className="flex items-center gap-2 text-sm cursor-pointer">
+              <label key={entity.value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--foreground)' }}>
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded focus:ring-primary"
+                  style={{ borderColor: 'var(--border)', accentColor: '#F5A623' }}
                   checked={selected.has(entity.value)}
                   onChange={() => toggleEntity(entity.value)}
                 />

@@ -1,0 +1,10 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "env": {
+    "VITE_SUPABASE_URL": "https://zmqvjtenuxlvwfopfroc.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_ezZ7_UyticpI7aeLKY3Rew_i_FaZBDh"
+  }
+}

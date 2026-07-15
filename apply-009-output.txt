@@ -1,0 +1,35 @@
+=== APPLYING 009_schema_ai_features.sql ===
+Signed in as shivam.kizen.test@gmail.com
+
+1. Adding lead_score column...
+  ✗ {"error":"requested path is invalid"}
+
+2. Adding ai_summary column...
+  ✗ {"error":"requested path is invalid"}
+
+3. Creating indexes...
+  ✗ {"error":"requested path is invalid"}
+  ✗ {"error":"requested path is invalid"}
+  ✗ {"error":"requested path is invalid"}
+
+4. Creating compute_lead_scores RPC...
+  ✗ {"error":"requested path is invalid"}
+
+5. Running compute_lead_scores...
+  ✓ executed successfully
+
+6. VERIFYING COLUMNS...
+  ✗ leads.lead_score: column leads.lead_score does not exist
+  ✗ lead_activities.ai_summary: column lead_activities.ai_summary does not exist
+
+7. SAMPLE LEAD SCORES:
+
+=== EDGE FUNCTION DEPLOY ===
+Supabase CLI not available on this machine.
+To deploy, run from your terminal:
+  cd kizen-crm
+  npx supabase functions deploy ai-summary
+  npx supabase secrets set CLAUDE_API_KEY=your-key-here
+The function code is ready at: supabase/functions/ai-summary/index.ts
+
+=== VERIFICATION COMPLETE ===

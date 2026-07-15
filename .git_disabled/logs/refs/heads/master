@@ -1,0 +1,3 @@
+0000000000000000000000000000000000000000 e5594dee3d0cfe928b6f9fe36a24990273276ca8 Mukul Dhiman <sagedoai00@gmail.com> 1783421151 +0530	commit (initial): Initial commit: Kizen Education CRM - full build
+e5594dee3d0cfe928b6f9fe36a24990273276ca8 805e81704adef11e47c88e899af94e4b905a3d45 Mukul Dhiman <sagedoai00@gmail.com> 1783427935 +0530	commit: Fix: remove duplicate useRealtime() call from Dashboard to prevent postgres_changes subscription error
+805e81704adef11e47c88e899af94e4b905a3d45 80e076942dc745d003d0475c721346f80316afa5 Mukul Dhiman <sagedoai00@gmail.com> 1783434715 +0530	commit: Add role-specific dashboards for Accounts & Reception, fix duplicate functions, add BarChart3 import

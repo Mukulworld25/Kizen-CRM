@@ -1,0 +1,14 @@
+
+=== STEP 1: RELOAD SCHEMA CACHE & CHECK SEED DATA ===
+
+  Schema reload: 404 Not Found
+  Courses (anon): 0 rows
+  System settings (anon): 0 rows
+
+=== STEP 2: SIGN UP OWNER ACCOUNT ===
+
+  Trying owner signup...
+  Signup response: Email address "shivam@kizen-crm.com" is invalid
+  Signup error: Email address "shivam@kizen-crm.com" is invalid
+  Attempting signin as fallback...
+  All auth methods failed. Need email confirmation OFF.

@@ -25,8 +25,8 @@ export function SoftDeleteDialog({ open, onOpenChange, title, entityType, entity
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: 'rgba(239,83,80,0.15)' }}>
+              <AlertTriangle className="h-5 w-5" style={{ color: '#ef5350' }} />
             </div>
             <div>
               <DialogTitle>{title}</DialogTitle>
@@ -38,10 +38,10 @@ export function SoftDeleteDialog({ open, onOpenChange, title, entityType, entity
         </DialogHeader>
 
         <div className="py-2">
-          <p className="text-sm font-medium mb-1">
-            Type <span className="font-bold text-red-600">DELETE</span> to confirm deletion of:
+          <p className="text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+            Type <span className="font-bold" style={{ color: '#ef5350' }}>DELETE</span> to confirm deletion of:
           </p>
-          <p className="text-sm bg-slate-100 rounded p-2 mb-3 font-mono">“{entityName}”</p>
+          <p className="text-sm rounded p-2 mb-3 font-mono" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>“{entityName}”</p>
           <Label htmlFor="delete-confirm">Confirmation</Label>
           <Input
             id="delete-confirm"

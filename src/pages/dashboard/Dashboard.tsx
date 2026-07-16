@@ -4,10 +4,9 @@ import { useDashboardStats, useFollowUps, useDashboardInsights, useExpenses } fr
 import { useBdmDashboardStats } from '@/hooks/useInstitutions'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/input'
+import { Label as UiLabel } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -19,7 +18,7 @@ import {
   Building2, CalendarRange, Handshake, Thermometer,
   ArrowUpRight, ArrowDownRight, MoreHorizontal,
   Zap, Award, CalendarDays, Settings2,
-  DollarSign, Activity,
+  DollarSign, Activity, Star,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -44,8 +43,8 @@ const ALL_WIDGETS: WidgetDef[] = [
   { key: 'overdue_fees', label: 'Overdue Fees', defaultVisible: true, defaultPosition: 7 },
   { key: 'batch_capacity', label: 'Batch Capacity', defaultVisible: true, defaultPosition: 8 },
   { key: 'cycle_countdown', label: 'Admissions Cycle Countdown', defaultVisible: false, defaultPosition: 9 },
-  { key: 'lead_sources', label: 'Lead Sources Chart', defaultVisible: false, defaultPosition: 10 },
-  { key: 'today_followups', label: "Today's Follow-ups", defaultVisible: false, defaultPosition: 11 },
+  { key: 'lead_sources', label: 'Lead Sources Chart', defaultVisible: true, defaultPosition: 10 },
+  { key: 'today_followups', label: "Today's Follow-ups", defaultVisible: true, defaultPosition: 11 },
   { key: 'insight_alerts', label: 'Insight Alerts', defaultVisible: false, defaultPosition: 12 },
 ]
 
@@ -72,6 +71,59 @@ function useCountUp(target: number, duration = 1400, delay = 0, trigger = true) 
   }, [target, duration, delay, trigger])
 
   return value
+}
+
+/* ── Animated score ring (from original design) ── */
+function ScoreRing({ score, size = 40, animate = true }: { score: number; size?: number; animate?: boolean }) {
+  const r = (size - 6) / 2
+  const circ = 2 * Math.PI * r
+  // Cap visual fill at 100% so values > 100 show a full ring, not an overflowing arc
+  const clamped = Math.min(score, 100)
+  const offset = circ - (clamped / 100) * circ
+  const color = score >= 85 ? '#22c55e' : score >= 70 ? '#F5A623' : '#7A90B0'
+
+  return (
+    <svg width={size} height={size} aria-label={`Score ${score}`} style={{ flexShrink: 0 }}>
+      <circle cx={size/2} cy={size/2} r={r}
+        fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={3} />
+      <circle
+        cx={size/2} cy={size/2} r={r}
+        fill="none" stroke={color} strokeWidth={3} strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={animate ? circ : offset}
+        className="score-ring"
+        style={{
+          transition: animate ? `stroke-dashoffset 0.9s cubic-bezier(0.16,1,0.3,1) 0.1s` : 'none',
+          filter: `drop-shadow(0 0 4px ${color}55)`,
+        }}
+        ref={(el) => {
+          if (el && animate) {
+            requestAnimationFrame(() => {
+              el.style.strokeDashoffset = String(offset)
+            })
+          }
+        }}
+      />
+      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
+        fontSize={size * 0.26} fontWeight="700" fill={color}>
+        {score}
+      </text>
+    </svg>
+  )
+}
+
+/* ── Achievement badge (from original design) ── */
+function AchievementBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+      style={{
+        background: 'linear-gradient(100deg, #C8871A 0%, #F5A623 50%, #FFC84A 100%)',
+        color: '#111D30',
+      }}>
+      <Star style={{ width: 8, height: 8 }} />
+      {label}
+    </span>
+  )
 }
 
 /* ── Live badge ── */
@@ -182,6 +234,7 @@ function useDashboardPreferences(userId: string | undefined) {
     supabase
       .from('dashboard_preferences')
       .select('widget_key, visible, position')
+      .eq('user_id', userId)
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
           const map: Record<string, { visible: boolean; position: number }> = {}
@@ -190,7 +243,6 @@ function useDashboardPreferences(userId: string | undefined) {
           }
           setPrefs(map)
         } else {
-          // Use defaults
           const map: Record<string, { visible: boolean; position: number }> = {}
           for (const w of ALL_WIDGETS) {
             map[w.key] = { visible: w.defaultVisible, position: w.defaultPosition }
@@ -209,7 +261,6 @@ function useDashboardPreferences(userId: string | undefined) {
       visible: p.visible,
       position: p.position,
     }))
-    // Upsert all
     const { error } = await supabase.from('dashboard_preferences').upsert(rows, {
       onConflict: 'user_id,widget_key',
       ignoreDuplicates: false,
@@ -221,9 +272,90 @@ function useDashboardPreferences(userId: string | undefined) {
   return { prefs, loading, savePrefs }
 }
 
-/* ── Owner Dashboard (new priority layout) ── */
+/* ── Styled KPI card (high-contrast, matches mockup) ── */
+interface DashboardKpiCardProps {
+  title: string
+  value: string | number
+  icon: React.ElementType
+  accent?: string
+  subtitle?: React.ReactNode
+  trend?: { value: string; up: boolean }
+  isAlert?: boolean
+  rightSlot?: React.ReactNode
+}
+
+function DashboardKpiCard({
+  title,
+  value,
+  icon: Icon,
+  accent = 'var(--kizen-gold)',
+  subtitle,
+  trend,
+  isAlert,
+  rightSlot,
+}: DashboardKpiCardProps) {
+  return (
+    <div
+      className="glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full"
+      style={{
+        border: isAlert ? '1px solid rgba(239,83,80,0.35)' : '1px solid var(--glass-border)',
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget
+        el.style.boxShadow = `0 12px 32px ${accent}15`
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget
+        el.style.boxShadow = ''
+      }}
+    >
+      <div className="flex items-start gap-4 min-w-0 flex-1 h-full">
+        {/* Icon Badge */}
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: `${accent}1A`, border: `1px solid ${accent}33` }}
+        >
+          <Icon style={{ width: 22, height: 22, color: accent }} />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1">
+              {title}
+            </span>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums">
+                {value}
+              </span>
+              {trend && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                  style={{
+                    background: trend.up ? 'rgba(34,197,94,0.12)' : 'rgba(239,83,80,0.12)',
+                    color: trend.up ? '#22c55e' : '#ef5350',
+                  }}
+                >
+                  {trend.up ? '▲' : '▼'} {trend.value}
+                </span>
+              )}
+            </div>
+          </div>
+          {subtitle && (
+            <div className="mt-2 text-[11px] text-[var(--muted-foreground)] leading-relaxed font-medium">
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+      {rightSlot && <div className="flex-shrink-0 self-center">{rightSlot}</div>}
+    </div>
+  )
+}
+
+/* ── Owner Dashboard ── */
 function OwnerDashboard() {
-  const { data: stats, isLoading } = useDashboardStats()
+  const { data: stats } = useDashboardStats()
   const { data: insights } = useDashboardInsights()
   const { data: expenses = [] } = useExpenses()
   const { data: todayFollowUps = [] } = useFollowUps('today')
@@ -231,6 +363,9 @@ function OwnerDashboard() {
   const [editOpen, setEditOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<Record<string, { visible: boolean; position: number }>>({})
   const [dirtyPrefs, setDirtyPrefs] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 80); return () => clearTimeout(t) }, [])
 
   const { prefs, loading: prefsLoading, savePrefs } = useDashboardPreferences(profile?.id)
 
@@ -260,116 +395,104 @@ function OwnerDashboard() {
     { name: 'Converted', value: admissions },
   ]
 
-  // Sort widgets by position
   const visibleWidgets = ALL_WIDGETS
     .filter(w => widgetPrefs[w.key]?.visible !== false)
     .sort((a, b) => (widgetPrefs[a.key]?.position ?? a.defaultPosition) - (widgetPrefs[b.key]?.position ?? b.defaultPosition))
 
   const handleToggleWidget = (key: string, visible: boolean) => {
-    setWidgetPrefs(prev => ({
-      ...prev,
-      [key]: { ...prev[key], visible },
-    }))
+    setWidgetPrefs(prev => ({ ...prev, [key]: { ...prev[key], visible } }))
     setDirtyPrefs(true)
   }
 
   const handleMoveUp = (key: string) => {
-    const sorted = ALL_WIDGETS
-      .filter(w => widgetPrefs[w.key]?.visible !== false)
+    const sorted = ALL_WIDGETS.filter(w => widgetPrefs[w.key]?.visible !== false)
       .sort((a, b) => (widgetPrefs[a.key]?.position ?? a.defaultPosition) - (widgetPrefs[b.key]?.position ?? b.defaultPosition))
     const idx = sorted.findIndex(w => w.key === key)
     if (idx <= 0) return
     const prevKey = sorted[idx - 1].key
     setWidgetPrefs(prev => {
-      const curPos = prev[key]?.position ?? 0
-      const prevPos = prev[prevKey]?.position ?? 0
-      return {
-        ...prev,
-        [key]: { ...prev[key], position: prevPos },
-        [prevKey]: { ...prev[prevKey], position: curPos },
-      }
+      const curPos = prev[key]?.position ?? 0; const prevPos = prev[prevKey]?.position ?? 0
+      return { ...prev, [key]: { ...prev[key], position: prevPos }, [prevKey]: { ...prev[prevKey], position: curPos } }
     })
     setDirtyPrefs(true)
   }
 
   const handleMoveDown = (key: string) => {
-    const sorted = ALL_WIDGETS
-      .filter(w => widgetPrefs[w.key]?.visible !== false)
+    const sorted = ALL_WIDGETS.filter(w => widgetPrefs[w.key]?.visible !== false)
       .sort((a, b) => (widgetPrefs[a.key]?.position ?? a.defaultPosition) - (widgetPrefs[b.key]?.position ?? b.defaultPosition))
     const idx = sorted.findIndex(w => w.key === key)
     if (idx < 0 || idx >= sorted.length - 1) return
     const nextKey = sorted[idx + 1].key
     setWidgetPrefs(prev => {
-      const curPos = prev[key]?.position ?? 0
-      const nextPos = prev[nextKey]?.position ?? 0
-      return {
-        ...prev,
-        [key]: { ...prev[key], position: nextPos },
-        [nextKey]: { ...prev[nextKey], position: curPos },
-      }
+      const curPos = prev[key]?.position ?? 0; const nextPos = prev[nextKey]?.position ?? 0
+      return { ...prev, [key]: { ...prev[key], position: nextPos }, [nextKey]: { ...prev[nextKey], position: curPos } }
     })
     setDirtyPrefs(true)
   }
 
-  const handleSavePrefs = () => {
-    savePrefs(widgetPrefs)
-    setEditOpen(false)
-    setDirtyPrefs(false)
+  const handleSavePrefs = () => { savePrefs(widgetPrefs); setEditOpen(false); setDirtyPrefs(false) }
+
+  const statusStyle: Record<string, { bg: string; color: string }> = {
+    'New Lead':  { bg: 'rgba(122,144,176,0.15)', color: '#7A90B0' },
+    Contacted:   { bg: 'rgba(245,166,35,0.13)',  color: '#F5A623' },
+    Qualified:   { bg: 'rgba(34,197,94,0.13)',   color: '#22c55e' },
+    Applied:     { bg: 'rgba(255,200,74,0.13)',  color: '#FFC84A' },
+    Enrolled:    { bg: 'rgba(56,189,248,0.13)',  color: '#38bdf8' },
   }
 
   const renderWidget = (widgetKey: string) => {
     switch (widgetKey) {
       case 'revenue_collected':
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in">
-            <div className="flex items-center gap-2 mb-3">
-              <IndianRupee style={{ width: 16, height: 16, color: 'var(--kizen-gold)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Revenue Collected</span>
-            </div>
-            <p className="text-2xl font-extrabold tracking-tight tabular-nums" style={{ color: 'var(--foreground)' }}>
-              {formatCurrency(revenue)}
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>Total revenue from all fees</p>
-          </div>
+          <DashboardKpiCard
+            title="Revenue Collected"
+            value={formatCurrency(revenue)}
+            icon={IndianRupee}
+            accent="#22c55e"
+            subtitle="Total revenue from all fees"
+          />
         )
       case 'admissions_goal':
+        const goalPct = Math.round((admissions / admissionsGoal) * 100)
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in">
-            <div className="flex items-center gap-2 mb-3">
-              <Target style={{ width: 16, height: 16, color: 'var(--kizen-gold)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Admissions vs Goal</span>
-            </div>
-            <p className="text-2xl font-extrabold tracking-tight tabular-nums" style={{ color: 'var(--foreground)' }}>
-              {admissions}<span className="text-lg font-normal" style={{ color: 'var(--muted-foreground)' }}>/{admissionsGoal}</span>
-            </p>
-            <div className="mt-2 h-2 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-              <div className="h-full rounded-full" style={{ width: `${Math.min(100, (admissions / admissionsGoal) * 100)}%`, background: 'linear-gradient(90deg, #C8871A, #F5A623)', transition: 'width 1s' }} />
-            </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>{Math.round((admissions / admissionsGoal) * 100)}% of goal reached</p>
-          </div>
+          <DashboardKpiCard
+            title="Admissions vs Goal"
+            value={`${admissions}/${admissionsGoal}`}
+            icon={Target}
+            accent="var(--kizen-gold)"
+            subtitle={
+              <div className="mt-1">
+                <div className="flex justify-between text-[10px] text-muted-foreground mb-1 font-semibold">
+                  <span>Progress</span>
+                  <span>{goalPct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
+                  <div className="h-full rounded-full animate-bar-fill" style={{ width: `${Math.min(100, goalPct)}%`, background: 'linear-gradient(90deg, #C8871A, #F5A623)', transition: 'width 1s' }} />
+                </div>
+              </div>
+            }
+          />
         )
       case 'conversion_rate':
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp style={{ width: 16, height: 16, color: 'var(--kizen-gold)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Conversion Rate</span>
-            </div>
-            <p className="text-2xl font-extrabold tracking-tight tabular-nums" style={{ color: 'var(--foreground)' }}>
-              {conversionRate}%
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>Leads → Admissions this month</p>
-          </div>
+          <DashboardKpiCard
+            title="Conversion Rate"
+            value={`${conversionRate}%`}
+            icon={TrendingUp}
+            accent="var(--kizen-gold)"
+            subtitle="Leads → Admissions"
+            rightSlot={mounted && <ScoreRing score={conversionRate} size={50} />}
+          />
         )
       case 'pipeline_chart':
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in">
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
             <div className="flex items-center gap-2 mb-3">
               <Activity style={{ width: 16, height: 16, color: 'var(--kizen-gold)' }} />
               <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Pipeline Stages</span>
             </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={pipelineData}>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={pipelineData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.1} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7A90B0' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#7A90B0' }} />
@@ -380,68 +503,127 @@ function OwnerDashboard() {
           </div>
         )
       case 'cash_expense':
+        const netValue = revenue - totalExpenses
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign style={{ width: 16, height: 16, color: 'var(--kizen-gold)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Cash / Expense Snapshot</span>
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+              <DollarSign style={{ width: 22, height: 22, color: 'var(--kizen-gold)' }} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Revenue In</p>
-                <p className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{formatCurrency(revenue)}</p>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1">
+                Cash / Expense Snapshot
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums">
+                    {formatCurrency(netValue)}
+                  </span>
+                  <p className="text-[10px] text-muted-foreground mt-1 font-semibold">Net Balance</p>
+                </div>
+                <div className="flex flex-col justify-center space-y-1 pl-0 sm:pl-4 sm:border-l border-border">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Revenue In</span>
+                    <span className="font-bold text-success">{formatCurrency(revenue)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Expenses Out</span>
+                    <span className="font-bold text-danger">{formatCurrency(totalExpenses)}</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Expenses Out</p>
-                <p className="text-lg font-bold" style={{ color: '#ef5350' }}>{formatCurrency(totalExpenses)}</p>
-              </div>
-            </div>
-            <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Net</p>
-              <p className="text-lg font-bold" style={{ color: revenue >= totalExpenses ? '#22c55e' : '#ef5350' }}>
-                {formatCurrency(revenue - totalExpenses)}
-              </p>
             </div>
           </div>
         )
       case 'cold_leads':
         return (
-          <StatsCard title="Cold Leads (5d no activity)" value={coldLeads} icon={Thermometer} color="bg-accent" loading={isLoading} alert={coldLeads > 0} />
+          <DashboardKpiCard
+            title="Cold Leads (5d no activity)"
+            value={coldLeads}
+            icon={Thermometer}
+            accent="#7A90B0"
+            subtitle="Leads with no updates"
+            isAlert={coldLeads > 0}
+          />
         )
       case 'overdue_followups':
         return (
-          <StatsCard title="Overdue Follow-ups" value={overdueFus} icon={Clock} color="bg-destructive" loading={isLoading} alert={overdueFus > 0} />
+          <DashboardKpiCard
+            title="Overdue Follow-ups"
+            value={overdueFus}
+            icon={Clock}
+            accent="#EF5350"
+            subtitle="Missed action items"
+            isAlert={overdueFus > 0}
+          />
         )
       case 'overdue_fees':
         return (
-          <StatsCard title="Overdue Installments" value={overdueInstallments} icon={AlertTriangle} color="bg-destructive" loading={isLoading} alert={overdueInstallments > 0} />
+          <DashboardKpiCard
+            title="Overdue Installments"
+            value={overdueInstallments}
+            icon={AlertTriangle}
+            accent="#EF5350"
+            subtitle="Pending fee collection"
+            isAlert={overdueInstallments > 0}
+          />
         )
       case 'batch_capacity':
         return (
-          <StatsCard title="Batches >= 90% Capacity" value={fullBatches.length} icon={GraduationCap} color="bg-accent" loading={isLoading} />
+          <DashboardKpiCard
+            title="Batches >= 90% Capacity"
+            value={fullBatches.length}
+            icon={GraduationCap}
+            accent="#22c55e"
+            subtitle="Filled cohorts"
+          />
         )
       case 'cycle_countdown':
         return <CycleCountdown enrolled={admissions} goal={admissionsGoal} />
       case 'lead_sources':
         return (
-          <div className="xl:col-span-2 glass-card rounded-2xl overflow-hidden animate-card-in" style={{ animationDelay: '320ms' }}>
+          <div className="glass-card rounded-2xl overflow-hidden animate-card-in h-full flex flex-col" style={{ animationDelay: '320ms' }}>
             <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2">
                 <Award style={{ width: 13, height: 13, color: 'var(--kizen-gold)' }} />
                 <h2 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Lead Sources</h2>
               </div>
             </div>
-            <div className="p-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stats?.sourceBreakdown ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.1} />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', background: 'var(--popover)', border: '1px solid var(--border)' }} />
-                  <Bar dataKey="value" fill="#F5A623" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {stats?.sourceBreakdown && stats.sourceBreakdown.length > 0 ? (
+              <ul className="divide-y divide-border">
+                {stats.sourceBreakdown.map((src: { name: string; value: number }, i: number) => {
+                  const total = stats.sourceBreakdown.reduce((s: number, x: { value: number }) => s + x.value, 0)
+                  const pct = total > 0 ? Math.round((src.value / total) * 100) : 0
+                  return (
+                    <li key={src.name} className="px-5 py-3 transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
+                      style={{ animationDelay: `${400 + i * 60}ms` }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[9px] font-mono w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)', opacity: 0.4 }}>0{i + 1}</span>
+                          <span className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>{src.name}</span>
+                        </div>
+                        <span className="text-[11px] font-bold tabular-nums flex-shrink-0 ml-2" style={{ color: 'var(--foreground)' }}>{src.value}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
+                          <div className="h-full rounded-full" style={{
+                            width: mounted ? `${pct}%` : '0%',
+                            background: 'linear-gradient(90deg, #C8871A 0%, #F5A623 60%, #FFC84A 100%)',
+                            transition: `width 1.1s cubic-bezier(0.16,1,0.3,1) ${400 + i * 80}ms`,
+                          }} />
+                        </div>
+                        <span className="text-[10px] tabular-nums w-7 text-right" style={{ color: 'var(--muted-foreground)' }}>{pct}%</span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center flex-1">
+                <Award style={{ width: 30, height: 30, color: 'var(--muted-foreground)', opacity: 0.3 }} />
+                <p className="text-sm mt-3 font-semibold" style={{ color: 'var(--muted-foreground)' }}>No Source Data</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)', opacity: 0.5 }}>Add source details to your leads.</p>
+              </div>
+            )}
           </div>
         )
       case 'today_followups':
@@ -461,36 +643,86 @@ function OwnerDashboard() {
               </div>
             ) : (
               <ul>
-                {todayFollowUps.slice(0, 8).map((fu, i) => (
-                  <li key={fu.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer group transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
-                    style={{ borderBottom: i < Math.min(todayFollowUps.length, 8) - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${320 + i * 55}ms` }}>
-                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
-                      style={{ background: 'linear-gradient(135deg, #1C2D4E 0%, #243d6e 100%)', border: '1.5px solid rgba(245,166,35,0.28)', color: 'var(--kizen-gold)' }}>
-                      {fu.lead?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) ?? '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-semibold transition-colors group-hover:text-[var(--kizen-gold)]" style={{ color: 'var(--foreground)' }}>{fu.lead?.full_name}</span>
+                {todayFollowUps.slice(0, 8).map((fu, i) => {
+                  const initials = fu.lead?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? '?'
+                  const score = fu.lead?.lead_score ?? 0
+                  const isHighScore = score >= 85
+                  return (
+                    <li key={fu.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer group transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
+                      style={{ borderBottom: i < Math.min(todayFollowUps.length, 8) - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${320 + i * 55}ms` }}>
+                      <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                        style={{ background: 'linear-gradient(135deg, #1C2D4E 0%, #243d6e 100%)', border: '1.5px solid rgba(245,166,35,0.28)', color: 'var(--kizen-gold)' }}>
+                        {initials}
                       </div>
-                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{fu.type} &middot; {format(new Date(fu.scheduled_at), 'h:mm a')}</p>
-                    </div>
-                    <Badge variant={fu.type === 'call' ? 'default' : fu.type === 'demo' ? 'success' : 'warning'} className="capitalize">{fu.type}</Badge>
-                  </li>
-                ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-semibold transition-colors group-hover:text-[var(--kizen-gold)]" style={{ color: 'var(--foreground)' }}>{fu.lead?.full_name}</span>
+                          {isHighScore && <AchievementBadge label="Top Prospect" />}
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{fu.type} &middot; {format(new Date(fu.scheduled_at), 'h:mm a')}</p>
+                      </div>
+                      {mounted && score > 0 && <ScoreRing score={score} size={30} animate={i < 3} />}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize"
+                          style={{ background: (statusStyle[fu.type] ?? statusStyle['New Lead']).bg, color: (statusStyle[fu.type] ?? statusStyle['New Lead']).color }}>
+                          {fu.type}
+                        </span>
+                        <span className="text-[10px] tabular-nums" style={{ color: 'var(--muted-foreground)', opacity: 0.55 }}>
+                          {format(new Date(fu.scheduled_at), 'h:mm a')}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
         )
       case 'insight_alerts':
         return (
-          <div className="grid gap-4 sm:grid-cols-3 mb-2">
-            <StatsCard title="Cold Leads (5d no activity)" value={coldLeads} icon={Thermometer} color="bg-accent" loading={isLoading} alert={coldLeads > 0} />
-            <StatsCard title="Batches >= 90% Capacity" value={fullBatches.length} icon={GraduationCap} color="bg-accent" loading={isLoading} />
-            <StatsCard title="Overdue Installments" value={overdueInstallments} icon={AlertTriangle} color="bg-destructive" loading={isLoading} alert={overdueInstallments > 0} />
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+            <DashboardKpiCard
+              title="Cold Leads (5d no activity)"
+              value={coldLeads}
+              icon={Thermometer}
+              accent="#7A90B0"
+              subtitle="Leads with no updates"
+              isAlert={coldLeads > 0}
+            />
+            <DashboardKpiCard
+              title="Batches >= 90% Capacity"
+              value={fullBatches.length}
+              icon={GraduationCap}
+              accent="#22c55e"
+              subtitle="Filled cohorts"
+            />
+            <DashboardKpiCard
+              title="Overdue Installments"
+              value={overdueInstallments}
+              icon={AlertTriangle}
+              accent="#EF5350"
+              subtitle="Pending fee collection"
+              isAlert={overdueInstallments > 0}
+            />
           </div>
         )
       default:
         return null
+    }
+  }
+
+  const getWidgetSpan = (key: string) => {
+    switch (key) {
+      case 'cycle_countdown':
+      case 'insight_alerts':
+        return 'col-span-1 md:col-span-2 xl:col-span-4'
+      case 'pipeline_chart':
+      case 'lead_sources':
+      case 'today_followups':
+      case 'cash_expense':
+        return 'col-span-1 md:col-span-2'
+      default:
+        return 'col-span-1'
     }
   }
 
@@ -517,45 +749,18 @@ function OwnerDashboard() {
           {[...Array(4)].map((_, i) => <SkeletonKPI key={i} />)}
         </div>
       ) : (
-        <>
-          {/* TOP ROW: Revenue, Admissions, Conversion, Pipeline */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            {visibleWidgets.filter(w => ['revenue_collected', 'admissions_goal', 'conversion_rate', 'pipeline_chart'].includes(w.key)).map(w => (
-              <div key={w.key}>{renderWidget(w.key)}</div>
-            ))}
-          </div>
-
-          {/* SECOND ROW: Cash/Expense Snapshot */}
-          {visibleWidgets.some(w => w.key === 'cash_expense') && (
-            <div className="grid grid-cols-1 gap-3">
-              {visibleWidgets.filter(w => w.key === 'cash_expense').map(w => (
-                <div key={w.key}>{renderWidget(w.key)}</div>
-              ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          {visibleWidgets.map(w => (
+            <div key={w.key} className={getWidgetSpan(w.key)}>
+              {renderWidget(w.key)}
             </div>
-          )}
-
-          {/* THIRD ROW: Small widgets */}
-          {visibleWidgets.some(w => ['cold_leads', 'overdue_followups', 'overdue_fees', 'batch_capacity'].includes(w.key)) && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {visibleWidgets.filter(w => ['cold_leads', 'overdue_followups', 'overdue_fees', 'batch_capacity'].includes(w.key)).map(w => (
-                <div key={w.key}>{renderWidget(w.key)}</div>
-              ))}
-            </div>
-          )}
-
-          {/* Extra widgets */}
-          {visibleWidgets.filter(w => !['revenue_collected', 'admissions_goal', 'conversion_rate', 'pipeline_chart', 'cash_expense', 'cold_leads', 'overdue_followups', 'overdue_fees', 'batch_capacity'].includes(w.key)).map(w => (
-            <div key={w.key}>{renderWidget(w.key)}</div>
           ))}
-        </>
+        </div>
       )}
 
-      {/* Edit Dashboard Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Customize Dashboard</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Customize Dashboard</DialogTitle></DialogHeader>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Toggle widgets on/off and reorder them.</p>
             {ALL_WIDGETS.map((w) => (
@@ -564,13 +769,8 @@ function OwnerDashboard() {
                   <button onClick={() => handleMoveUp(w.key)} className="text-[10px] opacity-60 hover:opacity-100" style={{ color: 'var(--foreground)' }}>▲</button>
                   <button onClick={() => handleMoveDown(w.key)} className="text-[10px] opacity-60 hover:opacity-100" style={{ color: 'var(--foreground)' }}>▼</button>
                 </div>
-                <Switch
-                  checked={widgetPrefs[w.key]?.visible !== false}
-                  onCheckedChange={(checked) => handleToggleWidget(w.key, checked)}
-                />
-                <Label className="flex-1 cursor-pointer" onClick={() => handleToggleWidget(w.key, widgetPrefs[w.key]?.visible === false)}>
-                  {w.label}
-                </Label>
+                <Switch checked={widgetPrefs[w.key]?.visible !== false} onCheckedChange={(checked) => handleToggleWidget(w.key, checked)} />
+                <UiLabel className="flex-1 cursor-pointer" onClick={() => handleToggleWidget(w.key, widgetPrefs[w.key]?.visible === false)}>{w.label}</UiLabel>
               </div>
             ))}
           </div>
@@ -605,10 +805,10 @@ export default function Dashboard() {
 
   const leadsDelta = (stats?.leadsToday ?? 0) - (stats?.leadsYesterday ?? 0)
   const kpiData = [
-    { label: 'Total Leads', value: stats?.totalLeads ?? 0, display: (v: number) => v.toLocaleString(), delta: leadsDelta >= 0 ? `+${leadsDelta}` : `${leadsDelta}`, up: leadsDelta >= 0, icon: Users, accent: '#F5A623', bg: 'rgba(245,166,35,0.08)' },
-    { label: 'Leads Today', value: stats?.leadsToday ?? 0, display: (v: number) => v.toLocaleString(), delta: leadsDelta >= 0 ? `+${leadsDelta}` : `${leadsDelta}`, up: leadsDelta >= 0, icon: TrendingUp, accent: '#22c55e', bg: 'rgba(34,197,94,0.07)' },
-    { label: 'Admissions', value: stats?.admissionsMonth ?? 0, display: (v: number) => v.toString(), delta: 'this month', up: true, icon: GraduationCap, accent: '#FFC84A', bg: 'rgba(255,200,74,0.08)' },
-    { label: 'Follow-ups Due', value: stats?.followUpsDue ?? 0, display: (v: number) => v.toString(), delta: `${stats?.followUpsOverdue ?? 0} overdue`, up: (stats?.followUpsOverdue ?? 0) === 0, icon: Clock, accent: '#38bdf8', bg: 'rgba(56,189,248,0.07)' },
+    { label: 'Total Leads', value: stats?.totalLeads ?? 0, display: (v: number) => v.toLocaleString(), delta: leadsDelta >= 0 ? `+${leadsDelta}` : `${leadsDelta}`, up: leadsDelta >= 0, icon: Users, accent: '#F5A623', bg: 'linear-gradient(135deg, rgba(245,166,35,0.38) 0%, rgba(245,166,35,0.10) 100%)' },
+    { label: 'Leads Today', value: stats?.leadsToday ?? 0, display: (v: number) => v.toLocaleString(), delta: leadsDelta >= 0 ? `+${leadsDelta}` : `${leadsDelta}`, up: leadsDelta >= 0, icon: TrendingUp, accent: '#22c55e', bg: 'linear-gradient(135deg, rgba(34,197,94,0.32) 0%, rgba(34,197,94,0.08) 100%)' },
+    { label: 'Admissions', value: stats?.admissionsMonth ?? 0, display: (v: number) => v.toString(), delta: 'this month', up: true, icon: GraduationCap, accent: '#FFC84A', bg: 'linear-gradient(135deg, rgba(255,200,74,0.38) 0%, rgba(255,200,74,0.10) 100%)' },
+    { label: 'Follow-ups Due', value: stats?.followUpsDue ?? 0, display: (v: number) => v.toString(), delta: `${stats?.followUpsOverdue ?? 0} overdue`, up: (stats?.followUpsOverdue ?? 0) === 0, icon: Clock, accent: '#38bdf8', bg: 'linear-gradient(135deg, rgba(56,189,248,0.32) 0%, rgba(56,189,248,0.08) 100%)' },
   ]
 
   return (
@@ -635,6 +835,7 @@ export default function Dashboard() {
       <CycleCountdown enrolled={stats?.admissionsMonth ?? 0} goal={500} />
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Today's Follow-ups - styled like original activity feed */}
         <div className="xl:col-span-3 glass-card rounded-2xl overflow-hidden animate-card-in" style={{ animationDelay: '260ms' }}>
           <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
             <div className="flex items-center gap-2">
@@ -650,26 +851,44 @@ export default function Dashboard() {
             </div>
           ) : (
             <ul>
-              {todayFollowUps.slice(0, 8).map((fu, i) => (
-                <li key={fu.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer group transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
-                  style={{ borderBottom: i < Math.min(todayFollowUps.length, 8) - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${320 + i * 55}ms` }}>
-                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
-                    style={{ background: 'linear-gradient(135deg, #1C2D4E 0%, #243d6e 100%)', border: '1.5px solid rgba(245,166,35,0.28)', color: 'var(--kizen-gold)' }}>
-                    {fu.lead?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) ?? '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-semibold transition-colors group-hover:text-[var(--kizen-gold)]" style={{ color: 'var(--foreground)' }}>{fu.lead?.full_name}</span>
+              {todayFollowUps.slice(0, 8).map((fu, i) => {
+                const initials = fu.lead?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? '?'
+                const score = fu.lead?.lead_score ?? 0
+                const isHighScore = score >= 85
+                const statusColors: Record<string, { bg: string; color: string }> = {
+                  call: { bg: 'rgba(56,189,248,0.13)', color: '#38bdf8' },
+                  demo: { bg: 'rgba(245,166,35,0.13)', color: '#F5A623' },
+                  meeting: { bg: 'rgba(34,197,94,0.13)', color: '#22c55e' },
+                  follow_up: { bg: 'rgba(122,144,176,0.15)', color: '#7A90B0' },
+                }
+                const sc = statusColors[fu.type] ?? { bg: 'rgba(122,144,176,0.15)', color: '#7A90B0' }
+                return (
+                  <li key={fu.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer group transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
+                    style={{ borderBottom: i < Math.min(todayFollowUps.length, 8) - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${320 + i * 55}ms` }}>
+                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: 'linear-gradient(135deg, #1C2D4E 0%, #243d6e 100%)', border: '1.5px solid rgba(245,166,35,0.28)', color: 'var(--kizen-gold)' }}>
+                      {initials}
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{fu.type} &middot; {format(new Date(fu.scheduled_at), 'h:mm a')}</p>
-                  </div>
-                  <Badge variant={fu.type === 'call' ? 'default' : fu.type === 'demo' ? 'success' : 'warning'} className="capitalize">{fu.type}</Badge>
-                </li>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-semibold transition-colors group-hover:text-[var(--kizen-gold)]" style={{ color: 'var(--foreground)' }}>{fu.lead?.full_name}</span>
+                        {isHighScore && <AchievementBadge label="Top Prospect" />}
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{fu.type} &middot; {format(new Date(fu.scheduled_at), 'h:mm a')}</p>
+                    </div>
+                    {mounted && score > 0 && <ScoreRing score={score} size={30} animate={i < 3} />}
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize" style={{ background: sc.bg, color: sc.color }}>{fu.type}</span>
+                      <span className="text-[10px] tabular-nums" style={{ color: 'var(--muted-foreground)', opacity: 0.55 }}>{format(new Date(fu.scheduled_at), 'h:mm a')}</span>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
 
+        {/* Lead Sources - styled like original Top Programs */}
         <div className="xl:col-span-2 glass-card rounded-2xl overflow-hidden animate-card-in" style={{ animationDelay: '320ms' }}>
           <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
             <div className="flex items-center gap-2">
@@ -677,17 +896,48 @@ export default function Dashboard() {
               <h2 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Lead Sources</h2>
             </div>
           </div>
-          <div className="p-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={stats?.sourceBreakdown ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.1} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                <Tooltip contentStyle={{ borderRadius: '12px', background: 'var(--popover)', border: '1px solid var(--border)' }} />
-                <Bar dataKey="value" fill="#F5A623" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {stats?.sourceBreakdown && stats.sourceBreakdown.length > 0 ? (
+            <ul>
+              {stats.sourceBreakdown.map((src: { name: string; value: number }, i: number) => {
+                const total = stats.sourceBreakdown.reduce((s: number, x: { value: number }) => s + x.value, 0)
+                const pct = total > 0 ? Math.round((src.value / total) * 100) : 0
+                return (
+                  <li key={src.name} className="px-5 py-3 transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
+                    style={{ borderBottom: i < stats.sourceBreakdown.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${400 + i * 60}ms` }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[9px] font-mono w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)', opacity: 0.4 }}>0{i + 1}</span>
+                        <span className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>{src.name}</span>
+                      </div>
+                      <span className="text-[11px] font-bold tabular-nums flex-shrink-0 ml-2" style={{ color: 'var(--foreground)' }}>{src.value}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
+                        <div className="h-full rounded-full" style={{
+                          width: mounted ? `${pct}%` : '0%',
+                          background: 'linear-gradient(90deg, #C8871A 0%, #F5A623 60%, #FFC84A 100%)',
+                          transition: `width 1.1s cubic-bezier(0.16,1,0.3,1) ${400 + i * 80}ms`,
+                        }} />
+                      </div>
+                      <span className="text-[10px] tabular-nums w-7 text-right" style={{ color: 'var(--muted-foreground)' }}>{pct}%</span>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={stats?.sourceBreakdown ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.1} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7A90B0' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#7A90B0' }} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', background: 'var(--popover)', border: '1px solid var(--border)' }} />
+                  <Bar dataKey="value" fill="#F5A623" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
     </div>

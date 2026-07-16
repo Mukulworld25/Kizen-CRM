@@ -76,7 +76,7 @@ export default function FeeDetail() {
                 </TableHeader>
                 <TableBody>
                   {installments.map((inst) => (
-                    <TableRow key={inst.id} className="hover:bg-slate-50 transition-colors">
+                    <TableRow key={inst.id}>
                       <TableCell>{inst.installment_number}</TableCell>
                       <TableCell>{format(new Date(inst.due_date), 'MMM d, yyyy')}</TableCell>
                       <TableCell>{formatCurrency(inst.amount)}</TableCell>

@@ -1,4 +1,5 @@
-import { Bell, LogOut, Menu } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Bell, LogOut, Menu, Sun, Moon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useStudents'
@@ -22,8 +23,28 @@ export function Header({ onMenuClick }: HeaderProps) {
   const markRead = useMarkNotificationRead()
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
+  // Dark/Light mode
+  const [isDark, setIsDark] = useState(() => {
+    const stored = localStorage.getItem('kizen-theme')
+    if (stored) return stored === 'dark'
+    return document.documentElement.classList.contains('dark')
+  })
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.remove('light')
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
+    }
+    localStorage.setItem('kizen-theme', isDark ? 'dark' : 'light')
+  }, [isDark])
+
+  const toggleTheme = () => setIsDark((prev) => !prev)
+
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-white px-4 lg:px-6 shadow-sm">
+    <header className="flex h-16 items-center justify-between border-b border-border px-4 lg:px-6 shadow-sm" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />
@@ -32,6 +53,10 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl" title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative rounded-xl">
@@ -71,14 +96,14 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-slate-50 transition-colors border border-transparent hover:border-border">
+            <button type="button" className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-border">
               <Avatar className="h-8 w-8 ring-2 ring-primary/10">
                 <AvatarFallback className="bg-primary text-white text-xs font-semibold">
                   {profile?.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden text-left sm:block">
-                <p className="text-sm font-medium text-slate-800">{profile?.name}</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{profile?.name}</p>
                 <Badge variant="secondary" className="text-[10px]">{profile ? roleLabels[profile.role] : ''}</Badge>
               </div>
             </button>

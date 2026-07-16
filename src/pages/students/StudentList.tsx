@@ -46,7 +46,7 @@ export default function StudentList() {
     <div>
       <PageHeader title="Students" description="Manage enrolled students" />
 
-      <div className="mb-4 flex gap-2 bg-white rounded-xl border border-border p-3 shadow-sm">
+      <div className="mb-4 flex gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
         <Select value={courseId ?? 'all'} onValueChange={(v) => setCourseId(v === 'all' ? undefined : v)}>
           <SelectTrigger className="w-48"><SelectValue placeholder="All Courses" /></SelectTrigger>
           <SelectContent>

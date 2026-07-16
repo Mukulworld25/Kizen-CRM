@@ -111,7 +111,7 @@ export default function FacultyDashboard() {
             ) : (
               <div className="space-y-2">
                 {batches.map((b) => (
-                  <div key={b.id} className="rounded-lg border border-border p-3 hover:bg-slate-50 transition-colors">
+                  <div key={b.id} className="rounded-lg border border-border p-3 hover:bg-[var(--muted)] transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{b.batch_name}</p>

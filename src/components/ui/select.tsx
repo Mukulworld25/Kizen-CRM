@@ -10,9 +10,10 @@ export function SelectTrigger({ className, children, ...props }: React.Component
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        'flex h-10 w-full items-center justify-between rounded-xl border border-border bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-150',
+        'flex h-10 w-full items-center justify-between rounded-xl border border-border px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-150',
         className
       )}
+      style={{ background: 'var(--card)', color: 'var(--foreground)' }}
       {...props}
     >
       {children}
@@ -27,7 +28,8 @@ export function SelectContent({ className, children, ...props }: React.Component
   return (
     <SelectPrimitive.Portal>
     <SelectPrimitive.Content
-      className={cn('relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-white text-slate-950 shadow-lg', className)}
+      className={cn('relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border shadow-lg', className)}
+      style={{ background: 'var(--popover)', color: 'var(--popover-foreground)' }}
       position="popper"
       {...props}
     >
@@ -44,6 +46,7 @@ export function SelectItem({ className, children, ...props }: React.ComponentPro
         'relative flex w-full cursor-default select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-primary/5 focus:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors',
         className
       )}
+      style={{ color: 'var(--popover-foreground)' }}
       {...props}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

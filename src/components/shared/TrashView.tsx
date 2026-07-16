@@ -71,7 +71,7 @@ export default function TrashView() {
                 const isExpired = expiresDate < new Date()
 
                 return (
-                  <TableRow key={`${record.table}-${record.id}`} className="hover:bg-slate-50 transition-colors">
+                  <TableRow key={`${record.table}-${record.id}`}>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {tableLabels[record.table] ?? record.table}

@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
+import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { useLeads, useCounselors, useCourses } from '@/hooks/useLeads'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { DataTable, type Column } from '@/components/shared/DataTable'
+import { DataTable, type Column, type BulkAction } from '@/components/shared/DataTable'
 import { LeadStatusBadge, PriorityBadge, TemperatureBadge } from '@/components/shared/LeadStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -27,6 +28,15 @@ export default function LeadList() {
   const softDelete = useSoftDelete()
   const { data: counselors = [] } = useCounselors()
   const { data: courses = [] } = useCourses()
+
+  const handleBulkDelete = useCallback(async (selected: Lead[]) => {
+    const confirmed = window.confirm(`Delete ${selected.length} leads?`)
+    if (!confirmed) return
+    for (const lead of selected) {
+      await softDelete.mutateAsync({ table: 'leads', id: lead.id })
+    }
+    toast.success(`${selected.length} leads moved to trash`)
+  }, [softDelete])
 
   const columns: Column<Lead>[] = [
     { key: 'full_name', header: 'Name', sortable: true, exportValue: (r) => r.full_name },
@@ -58,6 +68,14 @@ export default function LeadList() {
     },
   ]
 
+  const bulkActions: BulkAction<Lead>[] = [
+    {
+      label: 'Delete',
+      variant: 'destructive',
+      onClick: handleBulkDelete,
+    },
+  ]
+
   const handleExport = async () => {
     const { data: all } = await supabase.from('leads').select('*, course:courses(name), counselor:users!leads_assigned_counselor_id_fkey(name)')
     return (all ?? []) as Lead[]
@@ -71,7 +89,7 @@ export default function LeadList() {
         )}
       </PageHeader>
 
-      <div className="mb-4 flex flex-wrap gap-2 bg-white rounded-xl border border-border p-3 shadow-sm">
+      <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
         <Select value={filters.status ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, status: v === 'all' ? undefined : v as LeadStatus }))}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
@@ -98,7 +116,6 @@ export default function LeadList() {
           </SelectContent>
         </Select>
         <Button size="sm" variant="outline" className="text-xs" onClick={() => {
-          // Recompute scores via RPC
           supabase.rpc('compute_lead_scores').then(() => window.location.reload())
         }}>
           Refresh Scores
@@ -135,6 +152,9 @@ export default function LeadList() {
         data={data?.leads ?? []}
         loading={isLoading}
         searchable
+        selectable
+        bulkActions={bulkActions}
+        tableKey="leads"
         showExport={isOwner}
         onExport={handleExport}
         exportFilename="kizen-leads"

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import { useUsers, useBatches } from '@/hooks/useStudents'
 import { useCourses } from '@/hooks/useLeads'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -22,22 +23,29 @@ import { roleLabels } from '@/lib/permissions'
 import { FieldValue } from '@/components/shared/FieldValue'
 import ExportData from '@/components/shared/ExportData'
 import TrashView from '@/components/shared/TrashView'
-import type { UserRole } from '@/types'
+import ActivityLog from '@/components/shared/ActivityLog'
+import type { User, UserRole } from '@/types'
+
+const ALL_ROLES = ['admin', 'counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
 
 const inviteSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  role: z.enum(['admin', 'counselor', 'faculty', 'accounts', 'reception']),
+  role: z.enum(ALL_ROLES),
 })
 
 type InviteForm = z.infer<typeof inviteSchema>
 
 export default function Settings() {
+  const { profile } = useAuth()
   const { data: users = [], refetch: refetchUsers } = useUsers()
   const { data: courses = [], refetch: refetchCourses } = useCourses()
   const { data: batches = [], refetch: refetchBatches } = useBatches()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
+  const [editUser, setEditUser] = useState<User | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [newCourse, setNewCourse] = useState('')
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
 
@@ -70,6 +78,23 @@ export default function Settings() {
       refetchUsers()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Invite failed')
+    }
+  }
+
+  const handleUpdateUser = async () => {
+    if (!editUser) return
+    const updates: Record<string, unknown> = { name: editName }
+    // Save role and active status from the edit dialog state
+    if (!editUser.is_owner) {
+      updates.role = editUser.role
+      updates.is_active = editUser.is_active
+    }
+    const { error } = await supabase.from('users').update(updates).eq('id', editUser.id)
+    if (error) toast.error(error.message)
+    else {
+      toast.success('User updated')
+      setEditUser(null)
+      refetchUsers()
     }
   }
 
@@ -130,6 +155,8 @@ export default function Settings() {
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="trash">Trash</TabsTrigger>
+          {profile?.is_owner && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
+          {profile?.is_owner && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -156,12 +183,18 @@ export default function Settings() {
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
-                    <TableRow key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <TableRow key={u.id}>
                       <TableCell className="font-medium">
-                        <FieldValue value={u.name} />
+                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
+                          <FieldValue value={u.name} />
+                        </button>
                         {u.is_owner && <Badge className="ml-2">Owner</Badge>}
                       </TableCell>
-                      <TableCell><FieldValue value={u.email} /></TableCell>
+                      <TableCell>
+                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
+                          <FieldValue value={u.email} />
+                        </button>
+                      </TableCell>
                       <TableCell>
                         {u.is_owner ? (
                           roleLabels.owner
@@ -169,7 +202,7 @@ export default function Settings() {
                           <Select value={u.role} onValueChange={(v) => handleRoleChange(u.id, v as UserRole)}>
                             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {(['admin','counselor','faculty','accounts','reception'] as UserRole[]).map((r) => (
+                              {(ALL_ROLES as unknown as UserRole[]).map((r) => (
                                 <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
                               ))}
                             </SelectContent>
@@ -196,7 +229,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="courses" className="mt-4">
-          <div className="mb-4 flex gap-2 bg-white rounded-xl border border-border p-3 shadow-sm">
+          <div className="mb-4 flex gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
             <Input placeholder="Course name" value={newCourse} onChange={(e) => setNewCourse(e.target.value)} />
             <Button onClick={handleAddCourse}>Add Course</Button>
           </div>
@@ -211,13 +244,22 @@ export default function Settings() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {courses.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-slate-50 transition-colors">
+                  {courses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-12">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <p className="text-sm font-medium">No courses added yet</p>
+                          <p className="text-xs">Add your first course above.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (courses.map((c) => (
+                    <TableRow key={c.id}>
                       <TableCell>{c.name}</TableCell>
                       <TableCell>{c.duration_days ? `${c.duration_days} days` : '—'}</TableCell>
                       <TableCell>{c.total_fee ? `₹${c.total_fee}` : '—'}</TableCell>
                     </TableRow>
-                  ))}
+                  )))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -225,7 +267,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="batches" className="mt-4">
-          <div className="mb-4 grid gap-2 sm:grid-cols-4 bg-white rounded-xl border border-border p-3 shadow-sm">
+          <div className="mb-4 grid gap-2 sm:grid-cols-4 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
             <Input placeholder="Batch name" value={newBatch.name} onChange={(e) => setNewBatch((b) => ({ ...b, name: e.target.value }))} />
             <Select value={newBatch.courseId} onValueChange={(v) => setNewBatch((b) => ({ ...b, courseId: v }))}>
               <SelectTrigger><SelectValue placeholder="Course" /></SelectTrigger>
@@ -256,7 +298,7 @@ export default function Settings() {
                 </TableHeader>
                 <TableBody>
                   {batches.map((b) => (
-                    <TableRow key={b.id} className="hover:bg-slate-50 transition-colors">
+                    <TableRow key={b.id}>
                       <TableCell>{b.batch_name}</TableCell>
                       <TableCell>{(b as { course?: { name: string } }).course?.name ?? '—'}</TableCell>
                       <TableCell>{b.enrolled_count}/{b.total_seats}</TableCell>
@@ -294,6 +336,15 @@ export default function Settings() {
         <TabsContent value="trash" className="mt-4">
           <TrashView />
         </TabsContent>
+
+        <TabsContent value="dashboard" className="mt-4">
+          <p className="text-sm text-muted-foreground mb-4">Dashboard widget configuration is available on the Dashboard page via the "Edit Dashboard" button.</p>
+          <p className="text-sm text-muted-foreground">Notification preferences and default landing pages will be added here in a future update.</p>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          <ActivityLog />
+        </TabsContent>
       </Tabs>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -313,7 +364,7 @@ export default function Settings() {
               <Select value={watch('role')} onValueChange={(v) => setValue('role', v as InviteForm['role'])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(['admin','counselor','faculty','accounts','reception'] as const).map((r) => (
+                  {ALL_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -324,6 +375,52 @@ export default function Settings() {
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending...' : 'Send Invite'}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Name</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input value={editEmail} disabled className="cursor-not-allowed opacity-70" />
+              <p className="text-xs mt-1 text-muted-foreground">Email changes require re-invite via the Invite User flow.</p>
+            </div>
+            {editUser && !editUser.is_owner && (
+              <>
+                <div>
+                  <Label>Role</Label>
+                  <Select value={editUser.role} onValueChange={(v) => {
+                    setEditUser({ ...editUser, role: v as UserRole })
+                  }}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(ALL_ROLES as unknown as UserRole[]).map((r) => (
+                        <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={editUser.is_active}
+                    onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
+                  />
+                  <Label className="cursor-pointer">{editUser.is_active ? 'Active' : 'Inactive'}</Label>
+                </div>
+              </>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
+              <Button onClick={handleUpdateUser}>Save</Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

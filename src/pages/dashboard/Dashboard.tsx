@@ -299,6 +299,7 @@ function DashboardKpiCard({
       className="glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full"
       style={{
         border: isAlert ? '1px solid rgba(239,83,80,0.35)' : '1px solid var(--glass-border)',
+        background: `linear-gradient(135deg, ${accent}26 0%, ${accent}08 100%)`,
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget

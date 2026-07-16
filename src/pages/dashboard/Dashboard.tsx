@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useDashboardStats, useFollowUps, useDashboardInsights, useExpenses } from '@/hooks/useStudents'
 import { useBdmDashboardStats } from '@/hooks/useInstitutions'
 import { StatsCard } from '@/components/shared/StatsCard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -228,14 +228,12 @@ function OwnerDashboard() {
   const { data: expenses = [] } = useExpenses()
   const { data: todayFollowUps = [] } = useFollowUps('today')
   const { profile } = useAuth()
-  const [mounted, setMounted] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<Record<string, { visible: boolean; position: number }>>({})
   const [dirtyPrefs, setDirtyPrefs] = useState(false)
 
   const { prefs, loading: prefsLoading, savePrefs } = useDashboardPreferences(profile?.id)
 
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 80); return () => clearTimeout(t) }, [])
   useEffect(() => {
     if (!prefsLoading && Object.keys(prefs).length > 0) {
       setWidgetPrefs(JSON.parse(JSON.stringify(prefs)))
@@ -560,7 +558,7 @@ function OwnerDashboard() {
           </DialogHeader>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Toggle widgets on/off and reorder them.</p>
-            {ALL_WIDGETS.map((w, idx) => (
+            {ALL_WIDGETS.map((w) => (
               <div key={w.key} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: 'var(--muted)' }}>
                 <div className="flex flex-col gap-0.5">
                   <button onClick={() => handleMoveUp(w.key)} className="text-[10px] opacity-60 hover:opacity-100" style={{ color: 'var(--foreground)' }}>▲</button>

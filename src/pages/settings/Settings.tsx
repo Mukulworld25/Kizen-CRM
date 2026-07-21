@@ -3,7 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Plus } from 'lucide-react'
+import { Plus, Download, Trash2, Loader2, Database } from 'lucide-react'
+import { format } from 'date-fns'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useUsers, useBatches } from '@/hooks/useStudents'
@@ -51,6 +53,40 @@ export default function Settings() {
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
   const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
   const [wiping, setWiping] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+
+  const handleDownloadBackup = async () => {
+    setBackingUp(true)
+    try {
+      const wb = XLSX.utils.book_new()
+
+      const { data: students } = await supabase.from('students').select('*, course:courses(name), batch:batches(batch_name)')
+      if (students?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(students), 'Students')
+
+      const { data: fees } = await supabase.from('fees').select('*, student:students(full_name, mobile), course:courses(name)')
+      if (fees?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fees), 'Fees')
+
+      const { data: payments } = await supabase.from('fee_payments').select('*, student:students(full_name)')
+      if (payments?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payments), 'Payments')
+
+      const { data: installments } = await supabase.from('installments').select('*')
+      if (installments?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(installments), 'Installments')
+
+      const { data: leads } = await supabase.from('leads').select('*')
+      if (leads?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leads), 'Leads')
+
+      const { data: followups } = await supabase.from('follow_ups').select('*')
+      if (followups?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(followups), 'FollowUps')
+
+      const filename = `Kizen_CRM_Full_Backup_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, filename)
+      toast.success('Full system backup downloaded!')
+    } catch (err) {
+      toast.error('Backup failed: ' + (err as Error).message)
+    } finally {
+      setBackingUp(false)
+    }
+  }
 
   const handleWipeTestData = async () => {
     setWiping(true)
@@ -363,16 +399,57 @@ export default function Settings() {
           {profile?.is_owner && (
             <Card className="mt-4 border-red-200 bg-red-50/20 shadow-sm">
               <CardHeader className="border-b border-red-100 pb-3">
-                <CardTitle className="text-base text-red-800 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-red-600" />
-                  Owner Actions — Reset Test Data
+                <CardTitle className="text-base text-red-800 flex items-center gap-2 font-semibold">
+                  <Database className="h-4 w-4 text-red-600" />
+                  Owner Actions — Backup & Reset Data
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 pt-4">
-                <p className="text-sm text-red-700/80">Wipe all old test leads, students, fees, and attendance records before performing a fresh historical import. Courses, Batches, and User accounts will be preserved.</p>
-                <Button variant="destructive" size="sm" onClick={() => setWipeConfirmOpen(true)} disabled={wiping}>
-                  {wiping ? 'Wiping Data...' : 'Wipe All Old Test Data'}
-                </Button>
+              <CardContent className="space-y-4 pt-4">
+                <p className="text-sm text-red-700/80 leading-relaxed">
+                  Before performing a fresh data import, you can download a complete backup of all system data to Excel. Once saved, you can safely wipe old test records. Courses, Batches, and User accounts will remain untouched.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {/* Backup Button */}
+                  <Button
+                    type="button"
+                    onClick={handleDownloadBackup}
+                    disabled={backingUp}
+                    className="bg-slate-900 text-white hover:bg-slate-800 font-medium text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer"
+                  >
+                    {backingUp ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        Generating Backup...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 text-white" />
+                        Download Full System Backup (.xlsx)
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Wipe Button with Explicit Red Background */}
+                  <Button
+                    type="button"
+                    onClick={() => setWipeConfirmOpen(true)}
+                    disabled={wiping}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer border-none"
+                  >
+                    {wiping ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        Wiping Data...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 text-white" />
+                        Wipe All Old Test Data
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

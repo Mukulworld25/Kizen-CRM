@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Plus, Download, Trash2, Loader2, Database } from 'lucide-react'
+import { Plus, Download, Trash2, Loader2, Database, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
@@ -243,21 +243,18 @@ export default function Settings() {
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Email</TableHead>
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Role</TableHead>
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Active</TableHead>
+                    <TableHead className="font-medium text-right" style={{ color: 'var(--muted-foreground)' }}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
-                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
-                          <FieldValue value={u.name} />
-                        </button>
+                        <FieldValue value={u.name} />
                         {u.is_owner && <Badge className="ml-2">Owner</Badge>}
                       </TableCell>
                       <TableCell>
-                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
-                          <FieldValue value={u.email} />
-                        </button>
+                        <FieldValue value={u.email} />
                       </TableCell>
                       <TableCell>
                         {u.is_owner ? (
@@ -283,6 +280,17 @@ export default function Settings() {
                             }}
                           />
                         )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}
+                          className="h-8 px-2 text-xs"
+                          title="Edit User Name & Settings"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -301,9 +301,25 @@ export function useUsers() {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('users').select('*').order('name')
+      const { data, error } = await supabase.from('users').select('*')
       if (error) throw error
-      return data ?? []
+
+      const rolePriority: Record<string, number> = {
+        owner: 1,
+        admin: 2,
+        counselor: 3,
+        reception: 4,
+        accounts: 5,
+        faculty: 6,
+        bdm: 7,
+      }
+
+      return (data ?? []).sort((a, b) => {
+        const priorityA = rolePriority[a.role] ?? 99
+        const priorityB = rolePriority[b.role] ?? 99
+        if (priorityA !== priorityB) return priorityA - priorityB
+        return a.name.localeCompare(b.name)
+      })
     },
     enabled: can('manageUsers'),
   })

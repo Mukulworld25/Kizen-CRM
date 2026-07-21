@@ -24,6 +24,7 @@ import { FieldValue } from '@/components/shared/FieldValue'
 import ExportData from '@/components/shared/ExportData'
 import TrashView from '@/components/shared/TrashView'
 import ActivityLog from '@/components/shared/ActivityLog'
+import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
 import type { User, UserRole } from '@/types'
 
 const ALL_ROLES = ['admin', 'counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
@@ -152,6 +153,7 @@ export default function Settings() {
           <TabsTrigger value="users">Users ({userCount}/10)</TabsTrigger>
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
+          <TabsTrigger value="intake">Data Intake</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="trash">Trash</TabsTrigger>
@@ -309,6 +311,10 @@ export default function Settings() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="intake" className="mt-4">
+          <DataIntakeTab />
         </TabsContent>
 
         <TabsContent value="system" className="mt-4">

@@ -482,13 +482,13 @@ export function useGlobalSearch(query: string) {
       if (!query || query.length < 2) return []
 
       const [leadsRes, studentsRes] = await Promise.all([
-        supabase.from('leads').select('id, full_name, mobile').or(`full_name.ilike.%${query}%,mobile.ilike.%${query}%`).limit(5),
+        supabase.from('leads').select('id, display_id, full_name, mobile').or(`full_name.ilike.%${query}%,mobile.ilike.%${query}%,display_id.ilike.%${query}%`).limit(5),
         supabase.from('students').select('id, full_name, student_id, mobile').or(`full_name.ilike.%${query}%,student_id.ilike.%${query}%,mobile.ilike.%${query}%`).limit(5),
       ])
 
       const results = [
-        ...(leadsRes.data ?? []).map((l) => ({ ...l, type: 'lead' as const })),
-        ...(studentsRes.data ?? []).map((s) => ({ ...s, type: 'student' as const })),
+        ...(leadsRes.data ?? []).map((l) => ({ ...l, display_id: (l as any).display_id, type: 'lead' as const })),
+        ...(studentsRes.data ?? []).map((s) => ({ ...s, display_id: (s as any).student_id, type: 'student' as const })),
       ]
       return results
     },

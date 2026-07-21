@@ -66,6 +66,7 @@ export interface Batch {
 
 export interface Lead {
   id: string
+  display_id?: string | null
   full_name: string
   mobile: string
   email: string | null
@@ -250,6 +251,7 @@ export interface Institution {
   mou_status: MouStatus
   mou_expiry_date: string | null
   assigned_bdm_id: string | null
+  lead_id?: string | null
   created_at: string
   bdm?: User
 }
@@ -281,6 +283,8 @@ export interface InstituteExpense {
   category: ExpenseCategory
   amount: number
   expense_date: string
+  vendor?: string | null
+  lead_id?: string | null
   notes: string | null
   created_by: string | null
   created_at: string

@@ -12,11 +12,13 @@ import { LeadStatusPipeline } from '@/components/shared/LeadStatusPipeline'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton'
 import { ConvertToStudentModal } from '@/pages/leads/ConvertToStudentModal'
+import { LeadDetailView } from '@/components/leads/LeadDetailView'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { LeadStatus, FollowUpType } from '@/types'
 import { Skeleton } from '@/components/ui/table'
 import { FieldRow } from '@/components/shared/FieldValue'
@@ -82,83 +84,96 @@ export default function LeadDetail() {
         <TemperatureBadge temperature={lead.temperature} />
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 space-y-6">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Lead Information</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
-              <FieldRow label="Mobile" value={lead.mobile} />
-              <FieldRow label="Email" value={lead.email} />
-              <FieldRow label="City" value={lead.city} />
-              <FieldRow label="Course" value={lead.course?.name} />
-              <FieldRow label="Source" value={lead.source?.replace('_', ' ')} />
-              <FieldRow label="Temperature" value={lead.temperature} />
-              <FieldRow label="Budget" value={lead.budget ? `₹${lead.budget.toLocaleString()}` : null} mono />
-              <FieldRow label="Expected Joining" value={lead.expected_joining_date ? new Date(lead.expected_joining_date).toLocaleDateString() : null} />
-              <FieldRow label="Counselor" value={lead.counselor?.name} />
-              <FieldRow label="Parent" value={lead.parent_name} />
-              <FieldRow label="School/College" value={lead.school_college} />
-              {lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={lead.notes} /></div>}
-              {!lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={null} /></div>}
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="overview" className="mt-4">
+        <TabsList className="mb-4">
+          <TabsTrigger value="overview">Overview & Activity</TabsTrigger>
+          <TabsTrigger value="360_view">360° Relational View</TabsTrigger>
+        </TabsList>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Status Pipeline</CardTitle></CardHeader>
-            <CardContent>
-              <LeadStatusPipeline
-                currentStatus={lead.status}
-                onStatusChange={can('editLeads') ? handleStatusChange : undefined}
-                readonly={!can('editLeads')}
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="overview">
+          <div className="grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-3 space-y-6">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Lead Information</CardTitle></CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
+                  <FieldRow label="Mobile" value={lead.mobile} />
+                  <FieldRow label="Email" value={lead.email} />
+                  <FieldRow label="City" value={lead.city} />
+                  <FieldRow label="Course" value={lead.course?.name} />
+                  <FieldRow label="Source" value={lead.source?.replace('_', ' ')} />
+                  <FieldRow label="Temperature" value={lead.temperature} />
+                  <FieldRow label="Budget" value={lead.budget ? `₹${lead.budget.toLocaleString()}` : null} mono />
+                  <FieldRow label="Expected Joining" value={lead.expected_joining_date ? new Date(lead.expected_joining_date).toLocaleDateString() : null} />
+                  <FieldRow label="Counselor" value={lead.counselor?.name} />
+                  <FieldRow label="Parent" value={lead.parent_name} />
+                  <FieldRow label="School/College" value={lead.school_college} />
+                  {lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={lead.notes} /></div>}
+                  {!lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={null} /></div>}
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
-            <CardContent>
-              <ActivityTimeline
-                activities={activities}
-                loading={activitiesLoading}
-                onAdd={can('editLeads') ? (a) => addActivity.mutate({ lead_id: lead.id, ...a }) : undefined}
-              />
-            </CardContent>
-          </Card>
-        </div>
+              <Card>
+                <CardHeader><CardTitle className="text-base">Status Pipeline</CardTitle></CardHeader>
+                <CardContent>
+                  <LeadStatusPipeline
+                    currentStatus={lead.status}
+                    onStatusChange={can('editLeads') ? handleStatusChange : undefined}
+                    readonly={!can('editLeads')}
+                  />
+                </CardContent>
+              </Card>
 
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
-            <CardContent className="flex flex-col gap-2">
-                {can('deleteLeads') && (
-                  <Button variant="outline" className="text-danger border-danger/30 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
-                    <Trash2 className="h-4 w-4" /> Delete Lead
-                  </Button>
-                )}
-                {can('editLeads') && (
-                <>
-                  <Button variant="outline" onClick={() => setFollowUpOpen(true)}>Schedule Follow-up</Button>
-                  <Button variant="outline" asChild>
-                    <a href={`tel:${lead.mobile}`}><Phone className="h-4 w-4" /> Call</a>
-                  </Button>
-                  <WhatsAppButton name={lead.full_name} mobile={lead.mobile} course={lead.course?.name} />
-                  {lead.status === 'converted' && (
-                    <Button onClick={() => setConvertOpen(true)}><UserPlus className="h-4 w-4" /> Convert to Student</Button>
+              <Card>
+                <CardHeader><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
+                <CardContent>
+                  <ActivityTimeline
+                    activities={activities}
+                    loading={activitiesLoading}
+                    onAdd={can('editLeads') ? (a) => addActivity.mutate({ lead_id: lead.id, ...a }) : undefined}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  {can('deleteLeads') && (
+                    <Button variant="outline" className="text-danger border-danger/30 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
+                      <Trash2 className="h-4 w-4" /> Delete Lead
+                    </Button>
                   )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  {can('editLeads') && (
+                    <>
+                      <Button variant="outline" onClick={() => setFollowUpOpen(true)}>Schedule Follow-up</Button>
+                      <Button variant="outline" asChild>
+                        <a href={`tel:${lead.mobile}`}><Phone className="h-4 w-4" /> Call</a>
+                      </Button>
+                      <WhatsAppButton name={lead.full_name} mobile={lead.mobile} course={lead.course?.name} />
+                      {lead.status === 'converted' && (
+                        <Button onClick={() => setConvertOpen(true)}><UserPlus className="h-4 w-4" /> Convert to Student</Button>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Assigned Counselor</CardTitle></CardHeader>
-            <CardContent>
-              <p className="font-medium">{lead.counselor?.name ?? 'Unassigned'}</p>
-              <p className="text-sm text-muted-foreground">{lead.counselor?.email}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              <Card>
+                <CardHeader><CardTitle className="text-base">Assigned Counselor</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="font-medium">{lead.counselor?.name ?? 'Unassigned'}</p>
+                  <p className="text-sm text-muted-foreground">{lead.counselor?.email}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="360_view">
+          <LeadDetailView leadId={lead.id} />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={followUpOpen} onOpenChange={setFollowUpOpen}>
         <DialogContent>
@@ -205,5 +220,3 @@ export default function LeadDetail() {
     </div>
   )
 }
-
-// Removed InfoField — using shared FieldRow component

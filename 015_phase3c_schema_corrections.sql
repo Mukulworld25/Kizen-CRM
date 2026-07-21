@@ -1,9 +1,6 @@
--- =================================================================
--- KIZEN CRM — COMPLETE PHASE 3, 3B, 3C MASTER MIGRATION SCRIPT
--- RUN THIS ENTIRE FILE IN SUPABASE SQL EDITOR
--- =================================================================
+-- Kizen CRM — Migration 015: Real Data Model Corrections, Phone Normalization & Analytics-Ready Schema
 
--- 1. Enable pg_trgm Extension for Name Search
+-- 1. Enable pg_trgm extension if not present
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- 2. Phone Normalization Helper Function
@@ -33,8 +30,7 @@ BEGIN
 END;
 $$;
 
--- 3. Leads Table Schema Additions (Display ID, Analytics & Tracking)
-ALTER TABLE IF EXISTS leads ADD COLUMN IF NOT EXISTS display_id TEXT UNIQUE;
+-- 3. Schema Additions for Leads (Analytics & File 1/2 tracking)
 ALTER TABLE IF EXISTS leads ADD COLUMN IF NOT EXISTS counselor_name TEXT;
 ALTER TABLE IF EXISTS leads ADD COLUMN IF NOT EXISTS hot_lead_status TEXT;
 ALTER TABLE IF EXISTS leads ADD COLUMN IF NOT EXISTS pipeline_stage TEXT DEFAULT 'new';
@@ -49,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_leads_stage_city ON leads(pipeline_stage, city);
 CREATE INDEX IF NOT EXISTS idx_leads_stage_counselor ON leads(pipeline_stage, counselor_name);
 CREATE INDEX IF NOT EXISTS idx_leads_name_trgm ON leads USING gin (full_name gin_trgm_ops);
 
--- 4. Fee Payments & Fee Installments Schema (Receivables)
+-- 4. Schema Additions for Fee Payments & Installments (File 3 Fee Receivables)
 ALTER TABLE IF EXISTS fee_payments ADD COLUMN IF NOT EXISTS lead_id UUID REFERENCES leads(id) ON DELETE SET NULL;
 ALTER TABLE IF EXISTS fee_payments ADD COLUMN IF NOT EXISTS student_name TEXT;
 ALTER TABLE IF EXISTS fee_payments ADD COLUMN IF NOT EXISTS contact_no TEXT;
@@ -69,6 +65,16 @@ CREATE TABLE IF NOT EXISTS fee_installments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Display ID Trigger for fee_payments
+DROP TRIGGER IF EXISTS trg_fee_payments_display_id ON fee_payments;
+CREATE TRIGGER trg_fee_payments_display_id BEFORE INSERT ON fee_payments
+  FOR EACH ROW EXECUTE FUNCTION generate_display_id();
+
+-- Indexes for Fee Payments & Installments
+CREATE INDEX IF NOT EXISTS idx_fee_payments_lead ON fee_payments(lead_id);
+CREATE INDEX IF NOT EXISTS idx_fee_payments_contact ON fee_payments(contact_no);
+CREATE INDEX IF NOT EXISTS idx_fee_installments_payment ON fee_installments(fee_payment_id);
+
 -- RLS Policies
 ALTER TABLE fee_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fee_installments ENABLE ROW LEVEL SECURITY;
@@ -79,55 +85,13 @@ CREATE POLICY fee_payments_all ON fee_payments FOR ALL USING (TRUE);
 DROP POLICY IF EXISTS fee_installments_all ON fee_installments;
 CREATE POLICY fee_installments_all ON fee_installments FOR ALL USING (TRUE);
 
--- 5. Dynamic Sequence & Display ID Generator Trigger (LD-YYYY-####, EXP-YYYY-####)
-CREATE OR REPLACE FUNCTION generate_display_id()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_prefix TEXT;
-  v_year TEXT;
-  v_seq_name TEXT;
-  v_nextval INT;
-BEGIN
-  IF NEW.display_id IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-
-  v_year := to_char(CURRENT_DATE, 'YYYY');
-
-  IF TG_TABLE_NAME = 'leads' THEN
-    v_prefix := 'LD';
-  ELSIF TG_TABLE_NAME = 'fee_payments' THEN
-    v_prefix := 'EXP';
-  ELSIF TG_TABLE_NAME = 'institutions' THEN
-    v_prefix := 'INST';
-  ELSE
-    v_prefix := 'REF';
-  END IF;
-
-  v_seq_name := lower('seq_' || v_prefix || '_' || v_year);
-
-  EXECUTE format('CREATE SEQUENCE IF NOT EXISTS %I START 1', v_seq_name);
-  EXECUTE format('SELECT nextval(%L)', v_seq_name) INTO v_nextval;
-
-  NEW.display_id := v_prefix || '-' || v_year || '-' || lpad(v_nextval::text, 4, '0');
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_leads_display_id ON leads;
-CREATE TRIGGER trg_leads_display_id BEFORE INSERT ON leads
-  FOR EACH ROW EXECUTE FUNCTION generate_display_id();
-
-DROP TRIGGER IF EXISTS trg_fee_payments_display_id ON fee_payments;
-CREATE TRIGGER trg_fee_payments_display_id BEFORE INSERT ON fee_payments
-  FOR EACH ROW EXECUTE FUNCTION generate_display_id();
-
--- 6. Trigger Function to Derive pipeline_stage & days_to_first_contact (Updated Step 5)
+-- 5. Trigger Function to Derive pipeline_stage & days_to_first_contact
 CREATE OR REPLACE FUNCTION derive_lead_analytics()
 RETURNS TRIGGER AS $$
 DECLARE
   v_has_payment BOOLEAN;
 BEGIN
+  -- A. Compute days_to_first_contact
   IF NEW.tap_date IS NOT NULL AND NEW.lead_date IS NOT NULL THEN
     NEW.days_to_first_contact := (NEW.tap_date - NEW.lead_date);
     IF NEW.days_to_first_contact < 0 THEN
@@ -135,6 +99,8 @@ BEGIN
     END IF;
   END IF;
 
+  -- B. Derive pipeline_stage by priority order
+  -- Priority 1: Enrolled (fee payment exists for this lead)
   IF NEW.id IS NOT NULL THEN
     SELECT EXISTS (SELECT 1 FROM fee_payments WHERE lead_id = NEW.id) INTO v_has_payment;
   ELSE
@@ -143,14 +109,19 @@ BEGIN
 
   IF v_has_payment IS TRUE THEN
     NEW.pipeline_stage := 'enrolled';
+  -- Priority 2: Warm (Hot lead status from File 2 is populated or Hot/Warm interest level)
   ELSIF (NEW.hot_lead_status IS NOT NULL AND trim(NEW.hot_lead_status) <> '') OR NEW.interest_level ILIKE 'Hot' OR NEW.interest_level ILIKE 'Warm' THEN
     NEW.pipeline_stage := 'warm';
+  -- Priority 3: Cold based on interest_level
   ELSIF NEW.interest_level ILIKE 'Cold' THEN
     NEW.pipeline_stage := 'cold';
+  -- Priority 4: Dead based on disposition / interest_level
   ELSIF NEW.interest_level ILIKE 'Dead' OR NEW.disposition ILIKE '%not interested%' OR NEW.disposition ILIKE '%dead%' OR NEW.disposition ILIKE '%plan dropped%' THEN
     NEW.pipeline_stage := 'dead';
+  -- Priority 5: Contacted (Connected / Not Connected or tap_date populated, attempted call with no final outcome)
   ELSIF NEW.status = 'contacted' OR NEW.status ILIKE 'Not Connected' OR NEW.status ILIKE 'Connected' OR NEW.interest_level ILIKE 'Not Connected' OR NEW.interest_level ILIKE 'Connected' OR NEW.tap_date IS NOT NULL THEN
     NEW.pipeline_stage := 'contacted';
+  -- Priority 6: Default New
   ELSE
     NEW.pipeline_stage := 'new';
   END IF;
@@ -163,11 +134,10 @@ DROP TRIGGER IF EXISTS trg_leads_derive_analytics ON leads;
 CREATE TRIGGER trg_leads_derive_analytics BEFORE INSERT OR UPDATE ON leads
   FOR EACH ROW EXECUTE FUNCTION derive_lead_analytics();
 
--- 7. Live VIEW for Lead Enrollments & Real-time Revenue
+-- 6. Live VIEW for Lead Enrollments & Real-time Revenue (Not stored)
 CREATE OR REPLACE VIEW v_leads_analytics AS
 SELECT
   l.id AS lead_id,
-  l.display_id,
   l.full_name,
   l.mobile,
   l.city,
@@ -180,7 +150,7 @@ SELECT
 FROM leads l
 LEFT JOIN fee_payments fp ON fp.lead_id = l.id;
 
--- 8. Postgres VIEW for Dashboard Summary Metrics
+-- 7. Postgres VIEW for Dashboard Summary Metrics
 CREATE OR REPLACE VIEW dashboard_summary AS
 SELECT
   COUNT(l.id) AS total_leads,
@@ -214,22 +184,3 @@ SELECT
   ) AS leads_by_counselor
 FROM leads l
 LEFT JOIN fee_payments fp ON fp.lead_id = l.id;
-
--- 9. Update data_templates Seed Rows
-INSERT INTO data_templates (section, required_columns, optional_columns, dedup_keys) VALUES
-  (
-    'leads',
-    '["full_name", "mobile"]'::jsonb,
-    '[{"name": "email", "default": null}, {"name": "parent_name", "default": null}, {"name": "parent_contact", "default": null}, {"name": "city", "default": null}, {"name": "school_college", "default": null}, {"name": "class_year", "default": null}, {"name": "graduation_year", "default": null}, {"name": "graduation_degree", "default": null}, {"name": "source", "default": "website"}, {"name": "status", "default": "new_lead"}, {"name": "priority", "default": "medium"}, {"name": "notes", "default": null}, {"name": "lead_date", "default": null}, {"name": "tap_date", "default": null}, {"name": "counselor_name", "default": null}, {"name": "hot_lead_status", "default": null}, {"name": "interest_level", "default": null}, {"name": "disposition", "default": null}]'::jsonb,
-    '["mobile", "email"]'::jsonb
-  ),
-  (
-    'fee_payments',
-    '["student_name", "contact_no", "total_amount"]'::jsonb,
-    '[{"name": "course", "default": null}, {"name": "subject", "default": null}, {"name": "duration", "default": null}, {"name": "pending_amount", "default": null}]'::jsonb,
-    '["contact_no", "total_amount", "student_name"]'::jsonb
-  )
-ON CONFLICT (section) DO UPDATE SET
-  required_columns = EXCLUDED.required_columns,
-  optional_columns = EXCLUDED.optional_columns,
-  dedup_keys = EXCLUDED.dedup_keys;

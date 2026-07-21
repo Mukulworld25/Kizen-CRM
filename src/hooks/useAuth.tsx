@@ -23,13 +23,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (authId: string) => {
-    const { data, error } = await supabase
+    let { data } = await supabase
       .from('users')
       .select('*')
       .eq('auth_id', authId)
-      .single()
+      .maybeSingle()
 
-    if (error || !data) {
+    if (!data) {
+      // Fallback: match by current session user email if auth_id isn't linked yet
+      const userEmail = (await supabase.auth.getUser()).data.user?.email
+      if (userEmail) {
+        const { data: byEmail } = await supabase
+          .from('users')
+          .select('*')
+          .ilike('email', userEmail)
+          .maybeSingle()
+
+        if (byEmail) {
+          // Auto-link auth_id so future queries hit index directly
+          await supabase.from('users').update({ auth_id: authId }).eq('id', byEmail.id)
+          data = { ...byEmail, auth_id: authId }
+        }
+      }
+    }
+
+    if (!data) {
       setProfile(null)
       return
     }

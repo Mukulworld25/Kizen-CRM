@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, ArrowRight, Settings, Info } from 'lucide-react'
+import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, ArrowRight, Settings, Info, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
@@ -148,20 +148,24 @@ export default function DataImport() {
           const lower = h.toLowerCase().trim()
           let schemaField = ''
           
-          if (lower.includes('name') && !lower.includes('parent') && !lower.includes('father') && !lower.includes('course') && !lower.includes('batch')) schemaField = 'full_name'
+          if (lower.includes('lead no') || lower.includes('s.no') || lower.includes('sr.no') || lower.includes('sr no')) {
+            schemaField = '' // Skip serial number column
+          }
+          else if (lower.includes('name') && !lower.includes('parent') && !lower.includes('father') && !lower.includes('course') && !lower.includes('batch')) schemaField = 'full_name'
           else if (lower.includes('phone') || lower.includes('mobile') || lower.includes('contact') && !lower.includes('parent')) schemaField = 'mobile'
           else if (lower.includes('email') || lower.includes('mail')) schemaField = 'email'
           else if (lower.includes('father') || lower.includes('parent') && lower.includes('name')) schemaField = 'parent_name'
           else if (lower.includes('parent') && (lower.includes('phone') || lower.includes('contact') || lower.includes('mobile'))) schemaField = 'parent_contact'
-          else if (lower.includes('course')) schemaField = 'course_name'
+          else if (lower.includes('course') || lower.includes('program') || lower.includes('subject')) schemaField = 'course_name'
           else if (lower.includes('batch')) schemaField = 'batch_name'
-          else if (lower.includes('admission') || lower.includes('date')) schemaField = importType === 'leads' ? 'notes' : 'admission_date'
+          else if (lower.includes('admission') || lower === 'date' || lower === 'lead date' || lower === 'enquiry date') schemaField = importType === 'leads' ? 'notes' : 'admission_date'
           else if (lower.includes('city') || lower.includes('location')) schemaField = 'city'
           else if (lower.includes('college') || lower.includes('school')) schemaField = 'school_college'
           else if (lower.includes('total') || lower.includes('fee')) schemaField = 'total_fee'
           else if (lower.includes('paid') || lower.includes('amount')) schemaField = 'paid_amount'
           else if (lower.includes('dob') || lower.includes('birth')) schemaField = 'dob'
           else if (lower.includes('gender') || lower.includes('sex')) schemaField = 'gender'
+          else if (lower.includes('followup') || lower.includes('notes') || lower.includes('remarks')) schemaField = 'notes'
           
           return { spreadsheetCol: h, schemaField }
         })
@@ -528,6 +532,20 @@ export default function DataImport() {
           <div className="p-4 border-b border-border/50 bg-slate-50/50 flex justify-between items-center">
             <h3 className="font-semibold text-slate-800">Map Columns ({importType === 'leads' ? 'Leads' : 'Students & Fees'})</h3>
             <span className="text-xs text-slate-500 font-medium">Automatic header normalization has been pre-applied</span>
+          </div>
+
+          <div className="m-4 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="font-semibold text-amber-900 text-sm flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-600" /> AI Auto-Header Match Applied!
+              </p>
+              <p className="text-xs text-amber-800/90 mt-0.5">
+                Key required fields (Full Name & Phone) have been matched automatically. You do NOT need to fill out any dropdowns manually! Click the button to import immediately.
+              </p>
+            </div>
+            <Button onClick={validateAndPreview} className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-sm">
+              Proceed to Import Preview →
+            </Button>
           </div>
           <CardContent className="p-0">
             <Table>

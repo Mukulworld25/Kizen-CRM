@@ -19,7 +19,7 @@ import InstitutionList from '@/pages/institutions/InstitutionList'
 import InstitutionDetail from '@/pages/institutions/InstitutionDetail'
 import ExpensesPage from '@/pages/expenses/ExpensesPage'
 import FacultyDashboard from '@/pages/faculty/FacultyDashboard'
-import LeadImport from '@/pages/leads/LeadImport'
+import DataImport from '@/pages/settings/DataImport'
 import { CommandPalette } from '@/components/shared/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -55,7 +55,7 @@ export default function App() {
                 path="import"
                 element={
                   <RoleGuard permission="importData" fallback={<Navigate to="/dashboard" replace />}>
-                    <LeadImport />
+                    <DataImport />
                   </RoleGuard>
                 }
               />

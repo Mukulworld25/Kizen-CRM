@@ -126,7 +126,7 @@ export function useStudent(id: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('students')
-        .select('*, course:courses(*), batch:batches(*)')
+        .select('*, course:courses(*), batch:batches(*, faculty:users(*)), lead:leads(*)')
         .eq('id', id!)
         .single()
       if (error) throw error

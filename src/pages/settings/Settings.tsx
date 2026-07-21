@@ -49,6 +49,32 @@ export default function Settings() {
   const [editEmail, setEditEmail] = useState('')
   const [newCourse, setNewCourse] = useState('')
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
+  const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
+  const [wiping, setWiping] = useState(false)
+
+  const handleWipeTestData = async () => {
+    setWiping(true)
+    try {
+      // Sequence deletion respecting FK dependencies
+      await supabase.from('fee_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('installments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('fees').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('follow_ups').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('lead_activities').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('institute_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('batches').update({ enrolled_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000')
+
+      toast.success('Old test data wiped successfully!')
+      setWipeConfirmOpen(false)
+    } catch (err) {
+      toast.error('Failed to wipe data: ' + (err as Error).message)
+    } finally {
+      setWiping(false)
+    }
+  }
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<InviteForm>({
     resolver: zodResolver(inviteSchema),
@@ -333,6 +359,23 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground">Logo upload available after Supabase Storage is configured.</p>
             </CardContent>
           </Card>
+
+          {profile?.is_owner && (
+            <Card className="mt-4 border-red-200 bg-red-50/20 shadow-sm">
+              <CardHeader className="border-b border-red-100 pb-3">
+                <CardTitle className="text-base text-red-800 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-red-600" />
+                  Owner Actions — Reset Test Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <p className="text-sm text-red-700/80">Wipe all old test leads, students, fees, and attendance records before performing a fresh historical import. Courses, Batches, and User accounts will be preserved.</p>
+                <Button variant="destructive" size="sm" onClick={() => setWipeConfirmOpen(true)} disabled={wiping}>
+                  {wiping ? 'Wiping Data...' : 'Wipe All Old Test Data'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="export" className="mt-4">
@@ -437,6 +480,15 @@ export default function Settings() {
         description="This user will no longer be able to access the CRM."
         destructive
         onConfirm={() => deactivateId && handleDeactivate(deactivateId, false)}
+      />
+
+      <ConfirmDialog
+        open={wipeConfirmOpen}
+        onOpenChange={setWipeConfirmOpen}
+        title="Wipe all test data?"
+        description="This will permanently delete all test leads, students, fees, attendance, and follow-ups. Courses, Batches, and User accounts will be preserved. Are you sure?"
+        destructive
+        onConfirm={handleWipeTestData}
       />
     </div>
   )

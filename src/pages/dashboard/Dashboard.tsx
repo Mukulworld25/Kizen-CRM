@@ -997,14 +997,158 @@ function AccountsDashboard({ stats, isLoading }: { stats: any; isLoading: boolea
 }
 
 function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boolean }) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
+  const [batches, setBatches] = useState<any[]>([])
+  
+  useEffect(() => {
+    async function loadData() {
+      const now = new Date()
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59).toISOString()
+
+      // 1. Today's follow-up tasks
+      const { data: followUps } = await supabase
+        .from('follow_ups')
+        .select('*, lead:leads(full_name, mobile, course:courses(name))')
+        .gte('scheduled_at', todayStart)
+        .lte('scheduled_at', nextWeek)
+        .eq('status', 'pending')
+        .order('scheduled_at', { ascending: true })
+
+      if (followUps) {
+        setTasks(followUps.filter(f => new Date(f.scheduled_at) <= new Date(new Date().setHours(23,59,59))))
+      }
+
+      // 2. Pending payments due this week
+      const { data: insts } = await supabase
+        .from('installments')
+        .select('*, fee:fees(student:students(full_name))')
+        .eq('status', 'pending')
+        .gte('due_date', todayStart)
+        .lte('due_date', nextWeek)
+        .order('due_date', { ascending: true })
+
+      if (insts) setPayments(insts)
+
+      // 3. Active batches & faculty
+      const { data: activeBatches } = await supabase
+        .from('batches')
+        .select('*, course:courses(name), faculty:users(name)')
+        .eq('status', 'ongoing')
+        .order('batch_name')
+      
+      if (activeBatches) setBatches(activeBatches)
+    }
+    loadData()
+  }, [])
+
   return (
-    <div className="space-y-4">
-      <div><h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>Front Desk Dashboard</h1><p className="text-sm mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Walk-in leads and today's activity</p></div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Front Desk Dashboard</h1>
+        <p className="text-sm mt-0.5 text-slate-500">Walk-in leads, today's tasks, and active batches</p>
+      </div>
+      
+      {/* Top Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatsCard title="Leads Today" value={stats?.leadsToday ?? 0} icon={Users} loading={isLoading} />
         <StatsCard title="Leads This Week" value={stats?.leadsWeek ?? 0} icon={TrendingUp} color="bg-primary-light" loading={isLoading} />
         <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Today's Tasks */}
+        <Card className="border-border/50 shadow-sm">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Today's Calls & Tasks</h3>
+            <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">{tasks.length} pending</span>
+          </div>
+          <CardContent className="p-0">
+            {tasks.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No tasks pending for today!</div>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-[300px] overflow-auto">
+                {tasks.map(t => (
+                  <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-1">
+                      <p className="font-semibold text-slate-800 text-sm">{t.lead?.full_name}</p>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{t.type}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-1">{t.lead?.mobile} • {t.lead?.course?.name}</p>
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {format(new Date(t.scheduled_at), 'h:mm a')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Payments Due this Week */}
+        <Card className="border-border/50 shadow-sm">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><IndianRupee className="w-4 h-4 text-warning" /> Payments Due (7 Days)</h3>
+            <span className="text-xs font-medium bg-warning/10 text-warning px-2 py-0.5 rounded-full">{payments.length} pending</span>
+          </div>
+          <CardContent className="p-0">
+            {payments.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No payments due this week.</div>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-[300px] overflow-auto">
+                {payments.map(p => (
+                  <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{p.fee?.student?.full_name}</p>
+                      <p className="text-xs text-danger font-medium mt-0.5 flex items-center gap-1">
+                        <CalendarDays className="w-3 h-3" /> Due: {format(new Date(p.due_date), 'MMM d')}
+                      </p>
+                    </div>
+                    <p className="font-bold text-slate-800">{formatCurrency(p.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Active Batches & Faculty */}
+        <Card className="border-border/50 shadow-sm lg:col-span-2">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><GraduationCap className="w-4 h-4 text-accent" /> Active Batches & Faculty Info</h3>
+          </div>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50/50 text-slate-500 text-xs uppercase border-b border-border/50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Batch Name</th>
+                    <th className="px-4 py-3 font-medium">Course</th>
+                    <th className="px-4 py-3 font-medium">Timing</th>
+                    <th className="px-4 py-3 font-medium">Faculty</th>
+                    <th className="px-4 py-3 font-medium">Seats</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {batches.map(b => (
+                    <tr key={b.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-800">{b.batch_name}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.course?.name}</td>
+                      <td className="px-4 py-3 text-slate-600"><span className="bg-slate-100 px-2 py-0.5 rounded text-xs">{b.timing}</span></td>
+                      <td className="px-4 py-3 text-slate-600 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] text-accent font-bold">{b.faculty?.name?.slice(0,2).toUpperCase()}</div>{b.faculty?.name}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.enrolled_count ?? 0} / {b.max_students}</td>
+                    </tr>
+                  ))}
+                  {batches.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No active batches right now.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
     </div>
-  )
+  </div>
+)
 }

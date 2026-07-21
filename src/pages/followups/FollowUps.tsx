@@ -69,7 +69,7 @@ export default function FollowUps() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">{fu.lead?.mobile}</p>
                       <p className="text-sm text-muted-foreground/70">
-                        {format(new Date(fu.scheduled_at), 'MMM d, yyyy h:mm a')}
+                        {fu.scheduled_at ? format(new Date(fu.scheduled_at), 'MMM d, yyyy h:mm a') : '—'}
                         {fu.notes && ` · ${fu.notes}`}
                       </p>
                     </div>

@@ -61,7 +61,7 @@ export function ActivityTimeline({ activities, onAdd, loading }: ActivityTimelin
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium capitalize">{activity.activity_type.replace('_', ' ')}</span>
                     <span className="text-xs text-muted-foreground">
-                      {format(new Date(activity.created_at), 'MMM d, yyyy h:mm a')}
+                      {activity.created_at ? format(new Date(activity.created_at), 'MMM d, yyyy h:mm a') : '—'}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-700">{activity.description}</p>

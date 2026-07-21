@@ -60,7 +60,7 @@ export function InvoiceModal({ open, onOpenChange, fee, student, payment }: Invo
             </div>
             <div className="text-right">
               {fee.gst_applicable && <span className="gst-badge">GST Applicable @ {fee.gst_percent}%</span>}
-              <p className="text-sm mt-1">Date: {payment ? format(new Date(payment.payment_date), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
+              <p className="text-sm mt-1">Date: {payment?.payment_date ? format(new Date(payment.payment_date), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
             </div>
           </div>
 
@@ -76,7 +76,7 @@ export function InvoiceModal({ open, onOpenChange, fee, student, payment }: Invo
             <div className="text-right">
               <p className="text-muted-foreground">Course Info:</p>
               <p className="font-medium">{fee.course?.name ?? '—'}</p>
-              <p className="text-xs text-muted-foreground">Admission: {format(new Date(student.admission_date), 'dd/MM/yyyy')}</p>
+              <p className="text-xs text-muted-foreground">Admission: {student.admission_date ? format(new Date(student.admission_date), 'dd/MM/yyyy') : '—'}</p>
             </div>
           </div>
 

@@ -86,7 +86,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   </div>
                   <span className="text-xs text-muted-foreground">{n.message}</span>
                   <span className="text-[10px] text-muted-foreground/60">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    {n.created_at ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true }) : '—'}
                   </span>
                 </DropdownMenuItem>
               ))

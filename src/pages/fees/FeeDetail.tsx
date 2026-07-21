@@ -108,7 +108,7 @@ export default function FeeDetail() {
                 <div key={p.id} className="flex items-center justify-between border-b border-border/50 py-3 text-sm last:border-0">
                   <div>
                     <p className="font-medium text-slate-800">{p.receipt_number}</p>
-                    <p className="text-muted-foreground">{format(new Date(p.payment_date), 'MMM d, yyyy')} · {p.payment_method}</p>
+                    <p className="text-muted-foreground">{p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'} · {p.payment_method}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-900">{formatCurrency(p.amount)}</span>

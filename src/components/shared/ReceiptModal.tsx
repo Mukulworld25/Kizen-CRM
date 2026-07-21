@@ -29,7 +29,7 @@ export function ReceiptModal({ open, onOpenChange, payment, student, fee }: Rece
             <span className="text-muted-foreground">Receipt No.</span>
             <span className="font-medium">{payment.receipt_number}</span>
             <span className="text-muted-foreground">Date</span>
-            <span>{format(new Date(payment.payment_date), 'dd MMM yyyy')}</span>
+            <span>{payment.payment_date ? format(new Date(payment.payment_date), 'dd MMM yyyy') : '—'}</span>
             <span className="text-muted-foreground">Student</span>
             <span>{student.full_name}</span>
             <span className="text-muted-foreground">Student ID</span>

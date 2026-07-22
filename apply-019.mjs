@@ -28,6 +28,7 @@ async function apply019() {
     { name: 'Aadya Sharma (Counselor 1)', email: 'counselor1@kizen.edu', role: 'counselor', is_owner: false, is_active: true },
     { name: 'Lakshaya Ma\'am (Counselor 2)', email: 'lakshaya@kizen.edu', role: 'counselor', is_owner: false, is_active: true },
     { name: 'Preeti Verma (Front Desk)', email: 'reception@kizen.edu', role: 'reception', is_owner: false, is_active: true },
+    { name: 'Attender Staff', email: 'attender@kizen.edu', role: 'reception', is_owner: false, is_active: true },
   ]
 
   for (const user of staff) {

@@ -45,12 +45,12 @@ function mapSource(raw) {
 }
 
 function mapStatus(raw) {
-  if (!raw) return 'new_lead'
+  if (!raw) return 'new'
   const s = raw.toLowerCase()
-  if (s.includes('enrol') || s.includes('admit')) return 'converted'
+  if (s.includes('enrol') || s.includes('admit')) return 'enrolled'
   if (s.includes('close') || s.includes('lost') || s.includes('not int') || s.includes('unpicked')) return 'lost'
   if (s.includes('contact') || s.includes('visit') || s.includes('demo') || s.includes('intrest')) return 'contacted'
-  return 'new_lead'
+  return 'new'
 }
 
 async function main() {

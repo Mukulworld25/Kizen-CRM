@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Clock, GraduationCap, IndianRupee,
   BarChart3, Settings, ChevronLeft, ChevronRight,
-  Building2, Wallet, BookOpen, Upload,
+  Building2, Wallet, BookOpen, Upload, CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,6 +17,7 @@ const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'viewDashboard' as const },
   { path: '/leads', label: 'Leads', icon: Users, permission: 'viewLeads' as const },
   { path: '/followups', label: 'Follow-ups', icon: Clock, permission: 'viewFollowUps' as const, badge: true },
+  { path: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'viewFollowUps' as const },
   { path: '/institutions', label: 'Institutions', icon: Building2, permission: 'viewInstitutions' as const },
   { path: '/students', label: 'Students', icon: GraduationCap, permission: 'viewStudents' as const },
   { path: '/fees', label: 'Fee Management', icon: IndianRupee, permission: 'viewFees' as const },

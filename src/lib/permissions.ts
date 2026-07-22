@@ -75,6 +75,7 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
     '/dashboard': 'viewDashboard',
     '/leads': 'viewLeads',
     '/followups': 'viewFollowUps',
+    '/calendar': 'viewFollowUps',
     '/students': 'viewStudents',
     '/fees': 'viewFees',
     '/reports': 'viewReports',

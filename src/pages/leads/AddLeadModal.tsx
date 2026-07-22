@@ -43,7 +43,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   const createLead = useCreateLead()
   const { data: counselors = [] } = useCounselors()
   const { data: courses = [] } = useCourses()
-  const { data: leadsData } = useLeads()
+  const { data: leadsData } = useLeads({ pageSize: 1000 })
   const existingLeads: Lead[] = leadsData?.leads ?? []
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({

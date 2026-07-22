@@ -137,7 +137,7 @@ export default function FeeManagement() {
               <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['cash','upi','bank_transfer','cheque','card','other'].map((m) => (
+                  {['cash', 'upi', 'bank_transfer'].map((m) => (
                     <SelectItem key={m} value={m} className="capitalize">{m.replace('_', ' ')}</SelectItem>
                   ))}
                 </SelectContent>

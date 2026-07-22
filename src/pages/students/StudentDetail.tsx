@@ -37,7 +37,9 @@ export default function StudentDetail() {
   // Payment Status Badge Logic
   let paymentBadge = null
   if (studentFee) {
-    const hasOverdue = installments.some(i => i.status === 'overdue' || (i.status === 'pending' && new Date(i.due_date) < new Date()))
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const hasOverdue = installments.some(i => i.status === 'overdue' || (i.status === 'pending' && new Date(`${i.due_date}T00:00:00`) < todayStart))
     if (hasOverdue) {
       paymentBadge = (
         <Badge variant="destructive" className="ml-2 animate-pulse flex items-center gap-1">
@@ -60,6 +62,12 @@ export default function StudentDetail() {
       paymentBadge = (
         <Badge variant="destructive" className="ml-2 flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
           <CreditCard className="w-3 h-3" /> DUE
+        </Badge>
+      )
+    } else if (studentFee.total_fee === 0) {
+      paymentBadge = (
+        <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+          <CheckCircle className="w-3 h-3" /> NO FEE
         </Badge>
       )
     }

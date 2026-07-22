@@ -9,6 +9,7 @@ import Dashboard from '@/pages/dashboard/Dashboard'
 import LeadList from '@/pages/leads/LeadList'
 import LeadDetail from '@/pages/leads/LeadDetail'
 import FollowUps from '@/pages/followups/FollowUps'
+import CalendarPage from '@/pages/calendar/CalendarPage'
 import StudentList from '@/pages/students/StudentList'
 import StudentDetail from '@/pages/students/StudentDetail'
 import FeeManagement from '@/pages/fees/FeeManagement'
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="leads" element={<LeadList />} />
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="followups" element={<FollowUps />} />
+              <Route path="calendar" element={<CalendarPage />} />
               <Route path="institutions" element={<InstitutionList />} />
               <Route path="institutions/:id" element={<InstitutionDetail />} />
               <Route path="expenses" element={<ExpensesPage />} />

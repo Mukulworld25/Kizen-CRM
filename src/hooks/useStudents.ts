@@ -4,11 +4,11 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense } from '@/types'
 
-export function useFollowUps(tab: string, counselorId?: string) {
+export function useFollowUps(tab: string, counselorId?: string, targetDate?: string) {
   const { profile } = useAuth()
 
   return useQuery({
-    queryKey: ['follow-ups', tab, counselorId, profile?.id],
+    queryKey: ['follow-ups', tab, counselorId, targetDate, profile?.id],
     queryFn: async () => {
       let query = supabase
         .from('follow_ups')
@@ -19,7 +19,12 @@ export function useFollowUps(tab: string, counselorId?: string) {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
 
-      if (tab === 'today') {
+      if (targetDate) {
+        const selected = new Date(targetDate)
+        const dStart = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate()).toISOString()
+        const dEnd = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 23, 59, 59).toISOString()
+        query = query.gte('scheduled_at', dStart).lte('scheduled_at', dEnd)
+      } else if (tab === 'today') {
         query = query.gte('scheduled_at', todayStart).lte('scheduled_at', todayEnd).neq('status', 'completed')
       } else if (tab === 'overdue') {
         query = query.eq('status', 'overdue')
@@ -67,6 +72,7 @@ export function useCompleteFollowUp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up marked complete')
     },
     onError: (err) => toast.error(err.message),
@@ -89,7 +95,30 @@ export function useCreateFollowUp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up scheduled')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useRescheduleFollowUp() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, scheduledAt, notes }: { id: string; scheduledAt: string; notes?: string }) => {
+      const payload: Record<string, any> = { scheduled_at: scheduledAt, status: 'pending' }
+      if (notes !== undefined) payload.notes = notes
+      const { error } = await supabase
+        .from('follow_ups')
+        .update(payload)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      toast.success('Follow-up rescheduled successfully')
     },
     onError: (err) => toast.error(err.message),
   })

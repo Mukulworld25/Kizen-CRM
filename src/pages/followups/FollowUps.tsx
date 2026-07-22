@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Phone, CheckCircle, Calendar as CalendarIcon, ListChecks } from 'lucide-react'
+import { Phone, CheckCircle, Calendar as CalendarIcon, ListChecks, CalendarDays } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFollowUps, useCompleteFollowUp } from '@/hooks/useStudents'
 import { useCounselors } from '@/hooks/useLeads'
@@ -19,8 +20,10 @@ export default function FollowUps() {
   const { can } = useAuth()
   const [tab, setTab] = useState('today')
   const [counselorId, setCounselorId] = useState<string>()
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
-  const { data: followUps = [], isLoading } = useFollowUps(tab, counselorId)
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  
+  const targetDate = tab === 'date' ? selectedDate : undefined
+  const { data: followUps = [], isLoading } = useFollowUps(tab, counselorId, targetDate)
   const completeFollowUp = useCompleteFollowUp()
   const { data: counselors = [] } = useCounselors()
 
@@ -28,18 +31,32 @@ export default function FollowUps() {
   const totalCount = followUps.length
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
+  const handleDateChange = (val: string) => {
+    setSelectedDate(val)
+    if (val) {
+      setTab('date')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Follow-ups & Daily Tasks" description="Manage scheduled follow-ups and track daily task checklists">
-        {can('assignCounselor') && (
-          <Select value={counselorId ?? 'all'} onValueChange={(v) => setCounselorId(v === 'all' ? undefined : v)}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="All Counselors" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Counselors</SelectItem>
-              {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/calendar">
+              <CalendarDays className="h-4 w-4 mr-2 text-primary" /> Full Calendar
+            </Link>
+          </Button>
+          {can('assignCounselor') && (
+            <Select value={counselorId ?? 'all'} onValueChange={(v) => setCounselorId(v === 'all' ? undefined : v)}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="All Counselors" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Counselors</SelectItem>
+                {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </PageHeader>
 
       {/* Daily Task List Overview Card */}
@@ -65,7 +82,7 @@ export default function FollowUps() {
               <Input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="w-36 h-8 text-xs bg-white border-slate-200"
               />
             </div>
@@ -78,6 +95,7 @@ export default function FollowUps() {
           <TabsTrigger value="today">Today ({followUps.filter(f => f.status !== 'completed').length})</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          {selectedDate && <TabsTrigger value="date">Date ({selectedDate})</TabsTrigger>}
           <TabsTrigger value="all">All</TabsTrigger>
         </TabsList>
 

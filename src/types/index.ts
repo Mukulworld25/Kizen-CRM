@@ -17,7 +17,7 @@ export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo'
 
 export type ActivityType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'note' | 'status_change'
 
-export type PaymentMethod = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'card' | 'other'
+export type PaymentMethod = 'cash' | 'upi' | 'bank_transfer'
 
 export type InstitutionType = 'school' | 'college'
 export type MouStatus = 'not_started' | 'in_discussion' | 'signed' | 'expired'
@@ -87,11 +87,13 @@ export interface Lead {
   expected_joining_date: string | null
   lead_score: number | null
   notes: string | null
+  referred_by_lead_id?: string | null
   created_by: string | null
   created_at: string
   updated_at: string
   course?: Course
   counselor?: User
+  referred_by?: Lead
 }
 
 export interface LeadActivity {

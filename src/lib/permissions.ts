@@ -53,7 +53,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',

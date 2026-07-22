@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { Phone, CheckCircle } from 'lucide-react'
+import { Phone, CheckCircle, Calendar as CalendarIcon, ListChecks } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFollowUps, useCompleteFollowUp } from '@/hooks/useStudents'
 import { useCounselors } from '@/hooks/useLeads'
@@ -12,19 +12,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 export default function FollowUps() {
   const { can } = useAuth()
   const [tab, setTab] = useState('today')
   const [counselorId, setCounselorId] = useState<string>()
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
   const { data: followUps = [], isLoading } = useFollowUps(tab, counselorId)
   const completeFollowUp = useCompleteFollowUp()
   const { data: counselors = [] } = useCounselors()
 
+  const completedCount = followUps.filter((f) => f.status === 'completed').length
+  const totalCount = followUps.length
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
   return (
-    <div>
-      <PageHeader title="Follow-ups" description="Manage scheduled follow-ups">
+    <div className="space-y-6">
+      <PageHeader title="Follow-ups & Daily Tasks" description="Manage scheduled follow-ups and track daily task checklists">
         {can('assignCounselor') && (
           <Select value={counselorId ?? 'all'} onValueChange={(v) => setCounselorId(v === 'all' ? undefined : v)}>
             <SelectTrigger className="w-44"><SelectValue placeholder="All Counselors" /></SelectTrigger>
@@ -36,9 +42,40 @@ export default function FollowUps() {
         )}
       </PageHeader>
 
+      {/* Daily Task List Overview Card */}
+      <Card className="border-border/60 shadow-sm bg-gradient-to-br from-amber-500/5 to-slate-50">
+        <CardContent className="p-5 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+              <ListChecks className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800 text-sm">Daily Follow-up Task Checklist</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {completedCount} of {totalCount} tasks completed today ({progressPercent}%)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex-1 sm:w-36 h-2 rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-slate-500" />
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-36 h-8 text-xs bg-white border-slate-200"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="today">Today</TabsTrigger>
+          <TabsTrigger value="today">Today ({followUps.filter(f => f.status !== 'completed').length})</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           <TabsTrigger value="all">All</TabsTrigger>

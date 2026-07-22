@@ -10,6 +10,8 @@ import { useOverdueCount } from '@/hooks/useStudents'
 import { roleLabels } from '@/lib/permissions'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import kizenLogo from '@/assets/kizen-logo.jpg'
+import sagedoLogo from '@/assets/sagedo-logo.jpeg'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'viewDashboard' as const },
@@ -49,8 +51,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     >
       <div className="flex h-16 items-center justify-between border-b px-4" style={{ borderColor: 'var(--sidebar-border)' }}>
         {(!collapsed || mobile) && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold shadow-sm" style={{ backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' }}>K</div>
+          <div className="flex items-center gap-2.5">
+            <img src={kizenLogo} alt="Kizen Education" className="h-9 w-9 rounded-xl object-cover shadow-sm border border-white/20" />
             <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--sidebar-foreground)' }}>Kizen Education</span>
           </div>
         )}
@@ -104,12 +106,18 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               </AvatarFallback>
             </Avatar>
             {(!collapsed || mobile) && (
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>{profile.name}</p>
                 <p className="text-xs" style={{ color: 'var(--sidebar-accent-foreground)', opacity: 0.7 }}>{roleLabels[profile.role]}</p>
               </div>
             )}
           </div>
+          {(!collapsed || mobile) && (
+            <div className="mt-3 flex items-center justify-center gap-1.5 pt-2 border-t border-white/10 opacity-80">
+              <span className="text-[10px] tracking-wide font-medium" style={{ color: 'var(--sidebar-foreground)' }}>Powered by</span>
+              <img src={sagedoLogo} alt="SAGE DO" className="h-4 object-contain rounded" />
+            </div>
+          )}
         </div>
       )}
     </aside>

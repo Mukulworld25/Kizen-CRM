@@ -2,12 +2,12 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateLead, useCounselors, useCourses } from '@/hooks/useLeads'
+import { useCreateLead, useCounselors, useCourses, useLeads } from '@/hooks/useLeads'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { LEAD_SOURCES } from '@/types'
+import { LEAD_SOURCES, type Lead } from '@/types'
 
 const schema = z.object({
   full_name: z.string().min(2, 'Name required'),
@@ -22,6 +22,7 @@ const schema = z.object({
   graduation_degree: z.string().optional(),
   interested_course_id: z.string().optional(),
   source: z.string().optional(),
+  referred_by_lead_id: z.string().optional(),
   assigned_counselor_id: z.string().optional(),
   priority: z.enum(['high', 'medium', 'low']),
   temperature: z.enum(['hot', 'warm', 'cold']).optional(),
@@ -42,6 +43,8 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   const createLead = useCreateLead()
   const { data: counselors = [] } = useCounselors()
   const { data: courses = [] } = useCourses()
+  const { data: leadsData } = useLeads()
+  const existingLeads: Lead[] = leadsData?.leads ?? []
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -52,6 +55,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     await createLead.mutateAsync({
       ...data,
       email: data.email || null,
+      referred_by_lead_id: data.referred_by_lead_id || null,
       assigned_counselor_id: data.assigned_counselor_id || profile?.id || null,
       budget: data.budget ? parseFloat(data.budget) : null,
       expected_joining_date: data.expected_joining_date || null,
@@ -116,6 +120,15 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
               <SelectContent>
                 {LEAD_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Referred By (Existing Lead)</Label>
+            <Select value={watch('referred_by_lead_id') ?? ''} onValueChange={(v) => setValue('referred_by_lead_id', v)}>
+              <SelectTrigger><SelectValue placeholder="Select referring lead" /></SelectTrigger>
+              <SelectContent>
+                {existingLeads.map((l) => <SelectItem key={l.id} value={l.id}>{l.full_name} ({l.mobile})</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

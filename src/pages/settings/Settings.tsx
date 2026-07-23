@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Plus, Download, Trash2, Loader2, Database, Pencil } from 'lucide-react'
+import { Plus, Download, Trash2, Loader2, Database, Pencil, Key, ShieldCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
@@ -27,9 +27,10 @@ import ExportData from '@/components/shared/ExportData'
 import TrashView from '@/components/shared/TrashView'
 import ActivityLog from '@/components/shared/ActivityLog'
 import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
+import { PasswordResetModal } from '@/components/shared/PasswordResetModal'
 import type { User, UserRole } from '@/types'
 
-const ALL_ROLES = ['admin', 'counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
+const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
 
 const inviteSchema = z.object({
   name: z.string().min(2),
@@ -48,6 +49,8 @@ export default function Settings() {
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [editName, setEditName] = useState('')
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetTargetUser, setResetTargetUser] = useState<User | null>(null)
   const [editEmail, setEditEmail] = useState('')
   const [newCourse, setNewCourse] = useState('')
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
@@ -281,7 +284,18 @@ export default function Settings() {
                           />
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right flex items-center justify-end gap-1.5">
+                        {(profile?.is_owner || profile?.role === 'admin') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { setResetTargetUser(u); setResetModalOpen(true) }}
+                            className="h-8 px-2 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200"
+                            title="Reset User Password"
+                          >
+                            <Key className="h-3.5 w-3.5 mr-1" /> Reset Password
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -387,7 +401,7 @@ export default function Settings() {
           <DataIntakeTab />
         </TabsContent>
 
-        <TabsContent value="system" className="mt-4">
+        <TabsContent value="system" className="mt-4 space-y-4">
           <Card className="shadow-sm">
             <CardHeader className="border-b border-border/50 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -400,7 +414,32 @@ export default function Settings() {
                 <Label>CRM Name</Label>
                 <Input defaultValue="Kizen Education CRM" />
               </div>
-              <p className="text-sm text-muted-foreground">Logo upload available after Supabase Storage is configured.</p>
+              <p className="text-xs text-muted-foreground">System Name: Kizen Education CRM (Production)</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="border-b border-border/50 pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-amber-500" />
+                Security & Credentials
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Password Management</p>
+                  <p className="text-xs text-muted-foreground">Update password credentials for your account ({profile?.email})</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setResetTargetUser(profile); setResetModalOpen(true) }}
+                  className="rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50 font-medium"
+                >
+                  <Key className="h-3.5 w-3.5 mr-1.5" /> Change My Password
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -574,6 +613,13 @@ export default function Settings() {
         description="This will permanently delete all test leads, students, fees, attendance, and follow-ups. Courses, Batches, and User accounts will be preserved. Are you sure?"
         destructive
         onConfirm={handleWipeTestData}
+      />
+
+      <PasswordResetModal
+        open={resetModalOpen}
+        onOpenChange={setResetModalOpen}
+        targetUser={resetTargetUser}
+        currentUser={profile}
       />
     </div>
   )

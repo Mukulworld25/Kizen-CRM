@@ -7,10 +7,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) {
+  if (loading || (session && !profile)) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-9 w-9 animate-spin rounded-full border-4 border-accent border-t-transparent shadow-md" />
+          <p className="text-xs font-medium text-muted-foreground animate-pulse">Authenticating...</p>
+        </div>
       </div>
     )
   }

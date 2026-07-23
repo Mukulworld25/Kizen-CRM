@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = useCallback(async (authId: string) => {
+  const fetchProfile = useCallback(async (authId: string): Promise<User | null> => {
     let { data } = await supabase
       .from('users')
       .select('*')
@@ -49,16 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!data) {
       setProfile(null)
-      return
+      return null
     }
 
     if (!data.is_active) {
       await supabase.auth.signOut()
       setProfile(null)
-      return
+      return null
     }
 
-    setProfile(data as User)
+    const userObj = data as User
+    setProfile(userObj)
+    return userObj
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -78,9 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
       if (s?.user?.id) {
-        fetchProfile(s.user.id)
+        fetchProfile(s.user.id).finally(() => setLoading(false))
       } else {
         setProfile(null)
+        setLoading(false)
       }
     })
 
@@ -88,8 +91,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile])
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      if (data.user?.id) {
+        setSession(data.session)
+        const u = await fetchProfile(data.user.id)
+        if (u?.id) {
+          try {
+            await supabase.from('audit_logs').insert({
+              user_id: u.id,
+              action: 'user_login',
+              entity_type: 'auth',
+              new_data: { email: u.email, role: u.role, login_at: new Date().toISOString() }
+            })
+          } catch {}
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const signOut = async () => {

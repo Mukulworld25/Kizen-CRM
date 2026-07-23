@@ -23,7 +23,7 @@ async function apply019() {
   // Seed staff users directly into public.users table
   const staff = [
     { name: 'Shivam Owner', email: 'shivam.kizen.test@gmail.com', role: 'owner', is_owner: true, is_active: true },
-    { name: 'Shivam Owner (Edu)', email: 'shivam@kizen.edu', role: 'owner', is_owner: true, is_active: true },
+    { name: 'SAGEDO Test Account', email: 'test@sagedo.com', role: 'admin', is_owner: false, is_active: true },
     { name: 'Megha Owner', email: 'megha@kizen.edu', role: 'owner', is_owner: true, is_active: true },
     { name: 'Aadya Sharma (Counselor 1)', email: 'counselor1@kizen.edu', role: 'counselor', is_owner: false, is_active: true },
     { name: 'Lakshaya Ma\'am (Counselor 2)', email: 'lakshaya@kizen.edu', role: 'counselor', is_owner: false, is_active: true },

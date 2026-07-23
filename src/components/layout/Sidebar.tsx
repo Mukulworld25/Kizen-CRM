@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Clock, GraduationCap, IndianRupee,
@@ -39,6 +40,13 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
   const location = useLocation()
   const { profile, can } = useAuth()
   const { data: overdueCount = 0 } = useOverdueCount()
+  const [, setPermTick] = useState(0)
+
+  useEffect(() => {
+    const handleUpdate = () => setPermTick(t => t + 1)
+    window.addEventListener('kizen_permissions_updated', handleUpdate)
+    return () => window.removeEventListener('kizen_permissions_updated', handleUpdate)
+  }, [])
 
   const visibleItems = navItems.filter((item) => can(item.permission))
 

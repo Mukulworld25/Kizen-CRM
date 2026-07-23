@@ -28,6 +28,7 @@ import TrashView from '@/components/shared/TrashView'
 import ActivityLog from '@/components/shared/ActivityLog'
 import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
 import { PasswordResetModal } from '@/components/shared/PasswordResetModal'
+import { RolePermissionsTab } from '@/components/settings/RolePermissionsTab'
 import type { User, UserRole } from '@/types'
 
 const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
@@ -222,6 +223,7 @@ export default function Settings() {
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="trash">Trash</TabsTrigger>
+          {profile?.is_owner && <TabsTrigger value="permissions">Role Access Matrix</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
@@ -518,6 +520,12 @@ export default function Settings() {
         <TabsContent value="activity" className="mt-4">
           <ActivityLog />
         </TabsContent>
+
+        {profile?.is_owner && (
+          <TabsContent value="permissions" className="mt-4">
+            <RolePermissionsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>

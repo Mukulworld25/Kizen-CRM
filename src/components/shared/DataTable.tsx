@@ -47,6 +47,12 @@ interface DataTableProps<T> {
   bulkActions?: BulkAction<T>[]
   /** Unique key for localStorage column visibility (e.g. 'leads', 'students') */
   tableKey?: string
+  /** Total count for server-side pagination */
+  totalCount?: number
+  /** Current page for server-side pagination */
+  page?: number
+  /** Callback for page change in server-side pagination */
+  onPageChange?: (page: number) => void
 }
 
 const VISIBILITY_STORAGE_KEY = 'kizen-column-visibility'
@@ -81,12 +87,18 @@ export function DataTable<T>({
   selectable,
   bulkActions,
   tableKey,
+  totalCount,
+  page: serverPage,
+  onPageChange,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [page, setPage] = useState(1)
+  const [clientPage, setClientPage] = useState(1)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  const isServerPagination = totalCount !== undefined && onPageChange !== undefined
+  const activePage = isServerPagination ? (serverPage ?? 1) : clientPage
 
   // Column visibility
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() => {
@@ -107,7 +119,7 @@ export function DataTable<T>({
 
   const filtered = useMemo(() => {
     let result = [...data]
-    if (search) {
+    if (search && !isServerPagination) {
       const q = search.toLowerCase()
       result = result.filter((row) =>
         visibleColumns.some((col) => {
@@ -116,7 +128,7 @@ export function DataTable<T>({
         })
       )
     }
-    if (sortKey) {
+    if (sortKey && !isServerPagination) {
       result.sort((a, b) => {
         const av = (a as Record<string, unknown>)[sortKey]
         const bv = (b as Record<string, unknown>)[sortKey]
@@ -125,10 +137,11 @@ export function DataTable<T>({
       })
     }
     return result
-  }, [data, search, sortKey, sortDir, visibleColumns])
+  }, [data, search, sortKey, sortDir, visibleColumns, isServerPagination])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const effectiveTotal = isServerPagination ? (totalCount ?? 0) : filtered.length
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / pageSize))
+  const paginated = isServerPagination ? data : filtered.slice((clientPage - 1) * pageSize, clientPage * pageSize)
 
   const handleSort = (key: string) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -327,12 +340,22 @@ export function DataTable<T>({
             </Table>
           </div>
           <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            <span>{filtered.length} records · Page {page} of {totalPages}</span>
+            <span>{effectiveTotal.toLocaleString()} records · Page {activePage} of {totalPages}</span>
             <div className="flex gap-1">
-              <Button variant="outline" size="icon" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={activePage <= 1}
+                onClick={() => isServerPagination ? onPageChange!(activePage - 1) : setClientPage((p) => p - 1)}
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={activePage >= totalPages}
+                onClick={() => isServerPagination ? onPageChange!(activePage + 1) : setClientPage((p) => p + 1)}
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

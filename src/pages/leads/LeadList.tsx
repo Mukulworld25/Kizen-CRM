@@ -163,6 +163,9 @@ export default function LeadList() {
         showExport={isOwner}
         onExport={handleExport}
         exportFilename="kizen-leads"
+        totalCount={data?.total}
+        page={filters.page ?? 1}
+        onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
         rowKey={(r) => r.id}
         onRowClick={(r) => navigate(`/leads/${r.id}`)}
         emptyTitle="No leads yet"

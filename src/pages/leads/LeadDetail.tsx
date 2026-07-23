@@ -96,7 +96,7 @@ export default function LeadDetail() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Lead Information</CardTitle></CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
-                  <FieldRow label="Mobile" value={lead.mobile} />
+                  <FieldRow label="Mobile" value={(lead.mobile && lead.mobile !== '9999999999') ? lead.mobile : '—'} />
                   <FieldRow label="Email" value={lead.email} />
                   <FieldRow label="City" value={lead.city} />
                   <FieldRow label="Course" value={lead.course?.name} />

@@ -40,7 +40,12 @@ export default function LeadList() {
 
   const columns: Column<Lead>[] = [
     { key: 'full_name', header: 'Name', sortable: true, exportValue: (r) => r.full_name },
-    { key: 'mobile', header: 'Mobile', exportValue: (r) => r.mobile },
+    { 
+      key: 'mobile', 
+      header: 'Mobile', 
+      render: (r) => (r.mobile && r.mobile !== '9999999999') ? r.mobile : <span className="text-slate-400 italic text-xs font-normal">— No Phone —</span>, 
+      exportValue: (r) => (r.mobile && r.mobile !== '9999999999') ? r.mobile : '' 
+    },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—', exportValue: (r) => r.course?.name ?? '' },
     { key: 'source', header: 'Source', render: (r) => r.source?.replace('_', ' ') ?? '—', exportValue: (r) => r.source ?? '' },
     { key: 'status', header: 'Status', render: (r) => <LeadStatusBadge status={r.status} /> },

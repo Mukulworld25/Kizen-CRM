@@ -25,6 +25,7 @@ const navItems = [
   { path: '/expenses', label: 'Expenses', icon: Wallet, permission: 'viewExpenses' as const },
   { path: '/faculty', label: 'Faculty', icon: BookOpen, permission: 'viewFacultyDashboard' as const },
   { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'viewReports' as const },
+  { path: '/knowledge', label: 'Knowledge Base', icon: BookOpen, permission: 'viewKnowledgeBase' as const },
   { path: '/settings', label: 'Settings', icon: Settings, permission: 'manageUsers' as const },
   { path: '/import', label: 'Import', icon: Upload, permission: 'importData' as const },
 ]

@@ -21,6 +21,7 @@ import InstitutionDetail from '@/pages/institutions/InstitutionDetail'
 import ExpensesPage from '@/pages/expenses/ExpensesPage'
 import FacultyDashboard from '@/pages/faculty/FacultyDashboard'
 import DataImport from '@/pages/settings/DataImport'
+import KnowledgeBase from '@/pages/knowledge/KnowledgeBase'
 import { CommandPalette } from '@/components/shared/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ export default function App() {
                   </RoleGuard>
                 }
               />
+              <Route path="knowledge" element={<KnowledgeBase />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

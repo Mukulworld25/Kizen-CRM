@@ -27,6 +27,7 @@ export type Permission =
   | 'viewBdmDashboard'
   | 'generateInvoices'
   | 'importData'
+  | 'viewKnowledgeBase'
 
 const rolePermissions: Record<UserRole, Permission[]> = {
   owner: [
@@ -35,29 +36,29 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewFees', 'recordPayments', 'viewReports', 'viewRevenue',
     'manageUsers', 'manageCourses', 'viewAuditLogs', 'assignCounselor',
     'viewInstitutions', 'editInstitutions', 'viewExpenses', 'manageExpenses',
-    'viewBdmDashboard', 'generateInvoices', 'importData',
+    'viewBdmDashboard', 'generateInvoices', 'importData', 'viewKnowledgeBase',
   ],
   admin: [
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads',
     'viewFollowUps', 'viewStudents', 'editStudents', 'markAttendance',
-    'viewFees', 'assignCounselor',
+    'viewFees', 'assignCounselor', 'viewKnowledgeBase',
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents',
+    'viewFollowUps', 'viewStudents', 'editStudents', 'viewKnowledgeBase',
   ],
   faculty: [
-    'viewDashboard', 'viewStudents', 'markAttendance',
+    'viewDashboard', 'viewStudents', 'markAttendance', 'viewKnowledgeBase',
   ],
   accounts: [
-    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
+    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments', 'viewKnowledgeBase',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewKnowledgeBase',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',
-    'viewFollowUps', 'viewDashboard',
+    'viewFollowUps', 'viewDashboard', 'viewKnowledgeBase',
   ],
 }
 

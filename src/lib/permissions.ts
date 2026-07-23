@@ -41,24 +41,24 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   admin: [
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads',
     'viewFollowUps', 'viewStudents', 'editStudents', 'markAttendance',
-    'viewFees', 'assignCounselor', 'viewKnowledgeBase',
+    'viewFees', 'assignCounselor',
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents', 'viewKnowledgeBase',
+    'viewFollowUps', 'viewStudents', 'editStudents',
   ],
   faculty: [
-    'viewDashboard', 'viewStudents', 'markAttendance', 'viewKnowledgeBase',
+    'viewDashboard', 'viewStudents', 'markAttendance',
   ],
   accounts: [
-    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments', 'viewKnowledgeBase',
+    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewKnowledgeBase',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',
-    'viewFollowUps', 'viewDashboard', 'viewKnowledgeBase',
+    'viewFollowUps', 'viewDashboard',
   ],
 }
 

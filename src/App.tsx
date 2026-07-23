@@ -82,7 +82,14 @@ export default function App() {
                   </RoleGuard>
                 }
               />
-              <Route path="knowledge" element={<KnowledgeBase />} />
+              <Route
+                path="knowledge"
+                element={
+                  <RoleGuard permission="viewKnowledgeBase" fallback={<Navigate to="/dashboard" replace />}>
+                    <KnowledgeBase />
+                  </RoleGuard>
+                }
+              />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

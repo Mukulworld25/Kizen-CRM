@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { isSupabaseConfigured } from '@/lib/supabase'
-import kizenLogo from '@/assets/kizen-logo.jpg'
+import kizenLogo from '@/assets/kizen-logo-transparent.png'
 import sagedoLogo from '@/assets/sagedo-logo.jpeg'
 import { Lock, Mail, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react'
 
@@ -51,13 +51,12 @@ export default function Login() {
         <div className="h-2 w-full bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-600 shadow-md" />
 
         <div className="p-8 text-center pb-4">
-          {/* Royal Seamless Emblem Logo Badge (No stark white box) */}
-          <div className="mx-auto mb-4 flex h-20 w-full max-w-[240px] items-center justify-center rounded-2xl bg-[#060B18] p-2.5 border border-amber-400/50 shadow-[0_0_25px_rgba(245,166,35,0.25)] group transition-all duration-300 hover:border-amber-300">
+          {/* 100% Transparent Logo — Completely free-floating, NO box, NO border */}
+          <div className="mx-auto mb-3 flex items-center justify-center pt-2">
             <img
               src={kizenLogo}
               alt="Kizen Education"
-              className="h-full w-full object-contain rounded-xl mix-blend-screen filter contrast-125"
-              style={{ mixBlendMode: 'screen' }}
+              className="h-16 w-auto max-w-[260px] object-contain filter drop-shadow-[0_0_18px_rgba(245,166,35,0.45)]"
             />
           </div>
 
@@ -136,7 +135,7 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* SAGEDO Partner Footer Logo - Royal Emblem */}
+          {/* SAGEDO Partner Footer Logo */}
           <div className="mt-8 pt-4 border-t border-amber-500/20 flex items-center justify-center gap-2.5 text-xs text-slate-300 font-semibold">
             <span className="text-slate-400">Powered by</span>
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#060B18] border border-amber-500/30 shadow-sm">

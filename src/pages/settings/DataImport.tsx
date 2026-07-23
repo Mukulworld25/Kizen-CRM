@@ -22,6 +22,8 @@ interface ImportRow {
 interface FieldMapping {
   spreadsheetCol: string
   schemaField: string
+  confidence?: number
+  reason?: string
 }
 
 export default function DataImport() {
@@ -119,10 +121,103 @@ export default function DataImport() {
   const parsePhoneNumber = (val: any): string => {
     if (!val) return ''
     let str = String(val).trim()
-    // Remove .0 suffix often added by Excel float parsing
     if (str.endsWith('.0')) str = str.slice(0, -2)
-    // Strip everything except digits
     return str.replace(/\D/g, '').slice(-10) // standard 10 digit
+  }
+
+  // Dual-Engine Cell Content & Header Analyzer
+  const analyzeColumn = (header: string, sampleRows: Record<string, string>[]): { schemaField: string; confidence: number; reason: string } => {
+    const lowerHeader = header.toLowerCase().trim()
+
+    // Extract sample non-empty values
+    const samples = sampleRows.map(r => String(r[header] ?? '').trim()).filter(Boolean).slice(0, 25)
+
+    if (samples.length === 0) {
+      return { schemaField: '', confidence: 0, reason: 'Empty Column' }
+    }
+
+    // Skip Serial Number columns
+    if (lowerHeader.includes('lead no') || lowerHeader.includes('s.no') || lowerHeader.includes('sr.no') || lowerHeader.includes('sr no')) {
+      return { schemaField: '', confidence: 100, reason: 'Skipped Serial Column' }
+    }
+
+    // Value Pattern Counters
+    let phoneMatches = 0
+    let emailMatches = 0
+    let feeMatches = 0
+
+    for (const val of samples) {
+      const digits = val.replace(/\D/g, '')
+      if (digits.length >= 10 && digits.length <= 12) phoneMatches++
+      if (val.includes('@') && val.includes('.')) emailMatches++
+      if (/\d/.test(val) && (val.includes('₹') || val.includes(',') || val.includes('rs') || /^\d+(\.\d+)?$/.test(val))) feeMatches++
+    }
+
+    const total = samples.length
+    const phoneRatio = phoneMatches / total
+    const emailRatio = emailMatches / total
+    const feeRatio = feeMatches / total
+
+    // 1. PHONE MATCH (Value inspect > 50% OR Header match)
+    const isPhoneHeader = lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('contact')
+    const isParentHeader = lowerHeader.includes('parent') || lowerHeader.includes('father')
+
+    if ((phoneRatio > 0.5 || isPhoneHeader) && !isParentHeader) {
+      return { schemaField: 'mobile', confidence: Math.round(Math.max(phoneRatio * 100, 95)), reason: 'Detected 10-digit mobile numbers in cells' }
+    }
+    if ((phoneRatio > 0.5 || isPhoneHeader) && isParentHeader) {
+      return { schemaField: 'parent_contact', confidence: 95, reason: 'Detected parent contact numbers' }
+    }
+
+    // 2. EMAIL MATCH
+    if (emailRatio > 0.4 || lowerHeader.includes('email') || lowerHeader.includes('mail')) {
+      return { schemaField: 'email', confidence: 99, reason: 'Detected email addresses in cells' }
+    }
+
+    // 3. NAME MATCH
+    if (lowerHeader.includes('name') && !isParentHeader && !lowerHeader.includes('course') && !lowerHeader.includes('batch')) {
+      return { schemaField: 'full_name', confidence: 99, reason: 'Matched Candidate Name header' }
+    }
+    if (isParentHeader && (lowerHeader.includes('name') || lowerHeader.includes('father'))) {
+      return { schemaField: 'parent_name', confidence: 95, reason: 'Matched Parent Name header' }
+    }
+
+    // 4. COURSE & BATCH
+    if (lowerHeader.includes('course') || lowerHeader.includes('program') || lowerHeader.includes('subject')) {
+      return { schemaField: 'course_name', confidence: 95, reason: 'Matched Course/Program header' }
+    }
+    if (lowerHeader.includes('batch')) {
+      return { schemaField: 'batch_name', confidence: 95, reason: 'Matched Batch Name header' }
+    }
+
+    // 5. FEE & AMOUNT MATCH
+    const isFeeHeader = lowerHeader.includes('total') || lowerHeader.includes('fee') || lowerHeader.includes('paid') || lowerHeader.includes('amount')
+    if (isFeeHeader || (feeRatio > 0.7 && !isPhoneHeader)) {
+      if (lowerHeader.includes('paid') || lowerHeader.includes('received')) {
+        return { schemaField: 'paid_amount', confidence: 95, reason: 'Detected paid monetary values' }
+      }
+      return { schemaField: 'total_fee', confidence: 95, reason: 'Detected total fee structure values' }
+    }
+
+    // 6. LOCATION / SCHOOL
+    if (lowerHeader.includes('city') || lowerHeader.includes('location')) {
+      return { schemaField: 'city', confidence: 90, reason: 'Matched City/Location header' }
+    }
+    if (lowerHeader.includes('college') || lowerHeader.includes('school')) {
+      return { schemaField: 'school_college', confidence: 90, reason: 'Matched School/College header' }
+    }
+
+    // 7. DATE MATCH
+    if (lowerHeader.includes('admission') || lowerHeader === 'date' || lowerHeader === 'lead date' || lowerHeader === 'enquiry date') {
+      return { schemaField: importType === 'leads' ? 'notes' : 'admission_date', confidence: 90, reason: 'Matched Date header' }
+    }
+
+    // 8. NOTES
+    if (lowerHeader.includes('followup') || lowerHeader.includes('notes') || lowerHeader.includes('remarks')) {
+      return { schemaField: 'notes', confidence: 85, reason: 'Matched Notes/Remarks header' }
+    }
+
+    return { schemaField: '', confidence: 0, reason: 'Unrecognized column' }
   }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,36 +238,15 @@ export default function DataImport() {
         const headers = Object.keys(json[0])
         setRawRows(json)
 
-        // Auto-mapping columns based on database normalized helpers
-        const initialMapping = headers.map(h => {
-          const lower = h.toLowerCase().trim()
-          let schemaField = ''
-          
-          if (lower.includes('lead no') || lower.includes('s.no') || lower.includes('sr.no') || lower.includes('sr no')) {
-            schemaField = '' // Skip serial number column
-          }
-          else if (lower.includes('name') && !lower.includes('parent') && !lower.includes('father') && !lower.includes('course') && !lower.includes('batch')) schemaField = 'full_name'
-          else if (lower.includes('phone') || lower.includes('mobile') || lower.includes('contact') && !lower.includes('parent')) schemaField = 'mobile'
-          else if (lower.includes('email') || lower.includes('mail')) schemaField = 'email'
-          else if (lower.includes('father') || lower.includes('parent') && lower.includes('name')) schemaField = 'parent_name'
-          else if (lower.includes('parent') && (lower.includes('phone') || lower.includes('contact') || lower.includes('mobile'))) schemaField = 'parent_contact'
-          else if (lower.includes('course') || lower.includes('program') || lower.includes('subject')) schemaField = 'course_name'
-          else if (lower.includes('batch')) schemaField = 'batch_name'
-          else if (lower.includes('admission') || lower === 'date' || lower === 'lead date' || lower === 'enquiry date') schemaField = importType === 'leads' ? 'notes' : 'admission_date'
-          else if (lower.includes('city') || lower.includes('location')) schemaField = 'city'
-          else if (lower.includes('college') || lower.includes('school')) schemaField = 'school_college'
-          else if (lower.includes('total') || lower.includes('fee')) schemaField = 'total_fee'
-          else if (lower.includes('paid') || lower.includes('amount')) schemaField = 'paid_amount'
-          else if (lower.includes('dob') || lower.includes('birth')) schemaField = 'dob'
-          else if (lower.includes('gender') || lower.includes('sex')) schemaField = 'gender'
-          else if (lower.includes('followup') || lower.includes('notes') || lower.includes('remarks')) schemaField = 'notes'
-          
-          return { spreadsheetCol: h, schemaField }
+        // Run Dual-Engine Auto-Mapping
+        const initialMapping: FieldMapping[] = headers.map(h => {
+          const res = analyzeColumn(h, json)
+          return { spreadsheetCol: h, schemaField: res.schemaField, confidence: res.confidence, reason: res.reason }
         })
 
         setMapping(initialMapping)
         setStep('map')
-        toast.success(`Loaded ${json.length} rows from ${file.name}`)
+        toast.success(`Loaded ${json.length} rows. Dual-Engine Content Classifier applied!`)
       } catch (err) {
         toast.error('Failed to parse file: ' + (err as Error).message)
       }
@@ -573,9 +647,16 @@ export default function DataImport() {
                       </select>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      {activeFields.find(f => f.field === m.schemaField)?.required && (
-                        <Badge variant="destructive" className="bg-red-50 text-red-700 border-red-100">Required</Badge>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {activeFields.find(f => f.field === m.schemaField)?.required && (
+                          <Badge variant="destructive" className="bg-red-50 text-red-700 border-red-100">Required</Badge>
+                        )}
+                        {m.confidence && m.confidence > 0 ? (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                            {m.confidence}% Confidence ({m.reason})
+                          </Badge>
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

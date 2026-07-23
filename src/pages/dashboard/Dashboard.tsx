@@ -401,10 +401,6 @@ function OwnerDashboard() {
     { name: 'Converted', value: admissions },
   ]
 
-  const visibleWidgets = ALL_WIDGETS
-    .filter(w => widgetPrefs[w.key]?.visible !== false)
-    .sort((a, b) => (widgetPrefs[a.key]?.position ?? a.defaultPosition) - (widgetPrefs[b.key]?.position ?? b.defaultPosition))
-
   const handleToggleWidget = (key: string, visible: boolean) => {
     setWidgetPrefs(prev => ({ ...prev, [key]: { ...prev[key], visible } }))
     setDirtyPrefs(true)
@@ -864,25 +860,6 @@ function OwnerDashboard() {
     }
   }
 
-  const getWidgetSpan = (key: string) => {
-    switch (key) {
-      case 'risk_radar':
-      case 'cycle_countdown':
-      case 'insight_alerts':
-        return 'col-span-1 md:col-span-2 xl:col-span-4'
-      case 'pipeline_chart':
-      case 'lead_temperature':
-      case 'course_goal_pacing':
-      case 'counselor_leaderboard':
-      case 'lead_sources':
-      case 'today_followups':
-      case 'cash_expense':
-        return 'col-span-1 md:col-span-2'
-      default:
-        return 'col-span-1'
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between animate-card-in">
@@ -906,12 +883,49 @@ function OwnerDashboard() {
           {[...Array(4)].map((_, i) => <SkeletonKPI key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-          {visibleWidgets.map(w => (
-            <div key={w.key} className={getWidgetSpan(w.key)}>
-              {renderWidget(w.key)}
-            </div>
-          ))}
+        <div className="space-y-4">
+          {/* Row 0: Operational Risk Radar */}
+          {widgetPrefs['risk_radar']?.visible !== false && (
+            <div>{renderWidget('risk_radar')}</div>
+          )}
+
+          {/* Row 1: Primary Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {widgetPrefs['revenue_collected']?.visible !== false && renderWidget('revenue_collected')}
+            {widgetPrefs['admissions_goal']?.visible !== false && renderWidget('admissions_goal')}
+            {widgetPrefs['conversion_rate']?.visible !== false && renderWidget('conversion_rate')}
+            {widgetPrefs['cash_expense']?.visible !== false && renderWidget('cash_expense')}
+          </div>
+
+          {/* Row 2: Lead Quality & Target Pacing Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['lead_temperature']?.visible !== false && renderWidget('lead_temperature')}
+            {widgetPrefs['course_goal_pacing']?.visible !== false && renderWidget('course_goal_pacing')}
+          </div>
+
+          {/* Row 3: Pipeline & Counselor Performance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['pipeline_chart']?.visible !== false && renderWidget('pipeline_chart')}
+            {widgetPrefs['counselor_leaderboard']?.visible !== false && renderWidget('counselor_leaderboard')}
+          </div>
+
+          {/* Row 4: Acquisition Sources & Today's Follow-ups */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['lead_sources']?.visible !== false && renderWidget('lead_sources')}
+            {widgetPrefs['today_followups']?.visible !== false && renderWidget('today_followups')}
+          </div>
+
+          {/* Row 5: Operational Risk & Capacity Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {widgetPrefs['cold_leads']?.visible !== false && renderWidget('cold_leads')}
+            {widgetPrefs['batch_capacity']?.visible !== false && renderWidget('batch_capacity')}
+            {widgetPrefs['overdue_fees']?.visible !== false && renderWidget('overdue_fees')}
+          </div>
+
+          {/* Row 6: Cycle Countdown Footer Banner */}
+          {widgetPrefs['cycle_countdown']?.visible !== false && (
+            <div>{renderWidget('cycle_countdown')}</div>
+          )}
         </div>
       )}
 

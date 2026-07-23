@@ -203,7 +203,7 @@ export function DataTable<T>({
               <Input
                 placeholder={searchPlaceholder}
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                onChange={(e) => { setSearch(e.target.value); setClientPage(1) }}
                 className="pl-9"
               />
             </div>

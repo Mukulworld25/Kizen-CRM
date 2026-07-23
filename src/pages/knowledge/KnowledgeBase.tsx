@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { BookOpen, Search, Sparkles, CheckCircle2, ShieldCheck, IndianRupee, HelpCircle, FileText, CreditCard, Award } from 'lucide-react'
+import { BookOpen, Search, Sparkles, CheckCircle2, ShieldCheck, IndianRupee, FileText, CreditCard, Award } from 'lucide-react'
 
 interface FeeRule {
   course: string

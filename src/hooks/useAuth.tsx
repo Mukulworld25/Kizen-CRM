@@ -23,44 +23,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (authId: string): Promise<User | null> => {
-    let { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authId)
-      .maybeSingle()
+    try {
+      let { data } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', authId)
+        .maybeSingle()
 
-    if (!data) {
-      // Fallback: match by current session user email if auth_id isn't linked yet
-      const userEmail = (await supabase.auth.getUser()).data.user?.email
-      if (userEmail) {
-        const { data: byEmail } = await supabase
-          .from('users')
-          .select('*')
-          .ilike('email', userEmail)
-          .maybeSingle()
+      if (!data) {
+        // Fallback: match by current session user email if auth_id isn't linked yet
+        const { data: userData } = await supabase.auth.getUser()
+        const userEmail = userData?.user?.email
+        if (userEmail) {
+          const { data: byEmail } = await supabase
+            .from('users')
+            .select('*')
+            .ilike('email', userEmail)
+            .maybeSingle()
 
-        if (byEmail) {
-          // Auto-link auth_id so future queries hit index directly
-          await supabase.from('users').update({ auth_id: authId }).eq('id', byEmail.id)
-          data = { ...byEmail, auth_id: authId }
+          if (byEmail) {
+            // Auto-link auth_id so future queries hit index directly
+            await supabase.from('users').update({ auth_id: authId }).eq('id', byEmail.id)
+            data = { ...byEmail, auth_id: authId }
+          }
         }
       }
-    }
 
-    if (!data) {
+      if (!data || !data.is_active) {
+        setProfile(null)
+        return null
+      }
+
+      const userObj = data as User
+      setProfile(userObj)
+      return userObj
+    } catch (err) {
+      console.error('fetchProfile error:', err)
       setProfile(null)
       return null
     }
-
-    if (!data.is_active) {
-      await supabase.auth.signOut()
-      setProfile(null)
-      return null
-    }
-
-    const userObj = data as User
-    setProfile(userObj)
-    return userObj
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -68,26 +69,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, fetchProfile])
 
   useEffect(() => {
+    let mounted = true
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (!mounted) return
       setSession(s)
       if (s?.user?.id) {
-        fetchProfile(s.user.id).finally(() => setLoading(false))
+        fetchProfile(s.user.id).finally(() => {
+          if (mounted) setLoading(false)
+        })
       } else {
         setLoading(false)
       }
+    }).catch(() => {
+      if (mounted) setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!mounted) return
       setSession(s)
       if (s?.user?.id) {
-        fetchProfile(s.user.id).finally(() => setLoading(false))
+        fetchProfile(s.user.id).finally(() => {
+          if (mounted) setLoading(false)
+        })
       } else {
         setProfile(null)
         setLoading(false)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [fetchProfile])
 
   const signIn = async (email: string, password: string) => {

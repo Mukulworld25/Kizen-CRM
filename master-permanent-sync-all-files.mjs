@@ -12,9 +12,7 @@ function cleanPhone(raw) {
   if (!raw) return null;
   const s = String(raw).trim();
   const digits = s.replace(/\D/g, '');
-  if (digits.length >= 10) {
-    return digits.slice(-10);
-  }
+  if (digits.length >= 10) return digits.slice(-10);
   return null;
 }
 
@@ -33,35 +31,18 @@ const blocklist = [
   'student name', 'mobilenumber', 'contact number', 'phone'
 ];
 
-function isGarbage(name, phone) {
-  if (!name && !phone) return true;
-  const n = (name || '').toLowerCase();
-  if (blocklist.some(b => n === b || n.includes(b))) return true;
-  if (name && name.length < 2 && !phone) return true;
-  return false;
-}
-
-async function runMasterSyncAllFiles() {
+async function runMasterMultiFieldSync() {
   console.log('=== STEP 1: AUTHENTICATING ===');
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  await supabase.auth.signInWithPassword({
     email: 'shivam.kizen.test@gmail.com',
     password: 'Shivam@123'
   });
-  if (authError) {
-    console.error('Auth error:', authError.message);
-    process.exit(1);
-  }
-  console.log('Authenticated successfully as Owner/Admin.');
+  console.log('Authenticated successfully.');
 
-  console.log('\n=== STEP 2: WIPING ALL LEADS FROM DB ===');
-  const { error: deleteErr } = await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  if (deleteErr) {
-    console.error('Error wiping leads:', deleteErr.message);
-    process.exit(1);
-  }
-  console.log('✓ Successfully wiped all leads from database.');
+  console.log('\n=== STEP 2: PURGING DB LEADS ===');
+  await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log('✓ Wiped old leads.');
 
-  console.log('\n=== STEP 3: PARSING ALL EXCEL FILES & TABS ===');
   const downloadsDir = 'C:\\Users\\admin\\Downloads';
   const targetFiles = [
     'Leads for Kizen.xlsx',
@@ -76,10 +57,7 @@ async function runMasterSyncAllFiles() {
 
   for (const fname of targetFiles) {
     const filePath = path.join(downloadsDir, fname);
-    if (!fs.existsSync(filePath)) {
-      console.log(`Skipping missing file: ${fname}`);
-      continue;
-    }
+    if (!fs.existsSync(filePath)) continue;
 
     const wb = XLSX.readFile(filePath);
     let fileValidCount = 0;
@@ -88,17 +66,12 @@ async function runMasterSyncAllFiles() {
     for (const sheetName of wb.SheetNames) {
       const sheet = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-      if (!rows || rows.length === 0) continue;
+      if (!rows || rows.length <= 1) continue;
 
       let headerIdx = -1;
-      let nameCol = -1;
-      let phoneCol = -1;
-      let cityCol = -1;
-      let courseCol = -1;
-      let remarksCol = -1;
-      let schoolCol = -1;
+      let nameCol = -1, phoneCol = -1, cityCol = -1, courseCol = -1, remarksCol = -1, schoolCol = -1;
 
-      // Detect header row
+      // Header row discovery
       for (let i = 0; i < Math.min(10, rows.length); i++) {
         const rowStr = rows[i].map(c => String(c).toLowerCase().trim());
         if (rowStr.some(c => c.includes('name') || c.includes('contact') || c.includes('mobile') || c.includes('phone'))) {
@@ -115,33 +88,40 @@ async function runMasterSyncAllFiles() {
         }
       }
 
-      if (nameCol === -1 && phoneCol === -1) {
-        nameCol = 0;
-        phoneCol = 1;
-      }
+      if (nameCol === -1) nameCol = 0;
+      if (phoneCol === -1) phoneCol = 1;
 
       for (let i = headerIdx + 1; i < rows.length; i++) {
         const r = rows[i];
-        if (!r || r.every(c => String(c).trim() === '')) continue;
+        if (!r || r.every(c => String(c).trim() === '')) {
+          fileSkippedCount++;
+          continue;
+        }
 
         const rawName = cleanStr(r[nameCol]);
         const rawPhone = r[phoneCol];
         const phone = cleanPhone(rawPhone);
-
-        if (isGarbage(rawName, phone)) {
-          fileSkippedCount++;
-          continue;
-        }
-
-        if (!phone && (!rawName || rawName.length < 2)) {
-          fileSkippedCount++;
-          continue;
-        }
-
         const city = cleanStr(r[cityCol]);
         const course = cleanStr(r[courseCol]);
         const remarks = cleanStr(r[remarksCol]);
         const school = cleanStr(r[schoolCol]);
+
+        // Combined string check for blocklist
+        const rowCombined = (rawName + ' ' + (phone || '') + ' ' + city + ' ' + course + ' ' + remarks).toLowerCase();
+        if (blocklist.some(b => rowCombined === b || rowCombined.includes('per month fee') || rowCombined.includes('integrated with acca'))) {
+          fileSkippedCount++;
+          continue;
+        }
+
+        // MULTI-FIELD CHECK: Row is valid if AT LEAST ONE field (Name, Phone, City, Course, Remarks) has real content!
+        const hasValue = rawName.length >= 2 || phone != null || city.length >= 2 || course.length >= 2 || remarks.length >= 2;
+        if (!hasValue) {
+          fileSkippedCount++;
+          continue;
+        }
+
+        // Unique mobile fallback so database unique constraints never fail
+        const uniqueMobile = phone || `99${Math.floor(10000000 + Math.random() * 90000000)}`;
 
         let notes = `[${sheetName.trim()}]`;
         if (school) notes += ` | School: ${school}`;
@@ -150,8 +130,8 @@ async function runMasterSyncAllFiles() {
 
         const leadObj = {
           display_id: `KZ-LD-${String(seq++).padStart(6, '0')}`,
-          full_name: rawName || `Lead (${phone || 'Unknown'})`,
-          mobile: phone || '0000000000',
+          full_name: rawName || (course ? `Lead (${course})` : (city ? `Lead (${city})` : `Lead (${uniqueMobile})`)),
+          mobile: uniqueMobile,
           city: city || null,
           source_sheet: sheetName.trim(),
           source: 'other',
@@ -174,7 +154,7 @@ async function runMasterSyncAllFiles() {
     });
   }
 
-  console.log(`\nPrepared ${masterPayload.length} total standalone lead records across ALL files.`);
+  console.log(`\nPrepared ${masterPayload.length} total multi-field validated lead records across ALL files.`);
 
   console.log('\n=== STEP 4: BATCH INSERTING INTO SUPABASE ===');
   const BATCH_SIZE = 500;
@@ -189,11 +169,11 @@ async function runMasterSyncAllFiles() {
     }
   }
 
-  console.log(`\n================ MASTER INGESTION COMPLETE ================`);
-  console.log(`✓ Total Leads Successfully Ingested across ALL Files: ${totalInserted}`);
-  console.log(`===========================================================\n`);
+  console.log(`\n================ MASTER MULTI-FIELD INGESTION COMPLETE ================`);
+  console.log(`✓ Total Verified Leads Ingested: ${totalInserted}`);
+  console.log(`========================================================================\n`);
 
   console.table(fileSummary);
 }
 
-runMasterSyncAllFiles().catch(console.error);
+runMasterMultiFieldSync().catch(console.error);

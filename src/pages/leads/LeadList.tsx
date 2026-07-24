@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase'
 export default function LeadList() {
   const navigate = useNavigate()
   const { can, isOwner } = useAuth()
-  const [filters, setFilters] = useState<LeadFilters>({ page: 1 })
+  const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 15 })
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [flaggedOnly, setFlaggedOnly] = useState(false)

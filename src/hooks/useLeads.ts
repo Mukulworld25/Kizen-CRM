@@ -9,7 +9,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 export function useLeads(filters: LeadFilters = {}) {
   const { profile } = useAuth()
   const page = filters.page ?? 1
-  const pageSize = filters.pageSize ?? 25
+  const pageSize = filters.pageSize ?? 15
 
   return useQuery({
     queryKey: ['leads', filters, profile?.id],
@@ -22,7 +22,12 @@ export function useLeads(filters: LeadFilters = {}) {
 
       if (filters.status) query = query.eq('status', filters.status)
       if (filters.source) query = query.eq('source', filters.source)
-      if (filters.sheetSource) query = query.or(`source_sheet.ilike.%${filters.sheetSource}%,notes.ilike.%${filters.sheetSource}%`)
+      if (filters.sheetSource) {
+        let term = filters.sheetSource
+        if (term === 'ACCA (April)' || term === 'ACCA SL') term = 'ACCA'
+        else if (term.includes('NEW ACCA')) term = 'PAN IND'
+        query = query.or(`source_sheet.ilike.%${term}%,notes.ilike.%${term}%`)
+      }
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)

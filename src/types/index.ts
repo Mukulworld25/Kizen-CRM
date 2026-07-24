@@ -55,6 +55,7 @@ export interface Batch {
   start_date: string | null
   end_date: string | null
   timing: string | null
+  days_of_week?: string | null
   total_seats: number
   enrolled_count: number
   faculty_id: string | null

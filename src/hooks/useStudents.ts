@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense } from '@/types'
+import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Batch } from '@/types'
 
 export function useFollowUps(tab: string, counselorId?: string, targetDate?: string) {
   const { profile } = useAuth()
@@ -338,10 +338,34 @@ export function useBatches() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('batches')
-        .select('*, course:courses(name), faculty:users(name)')
+        .select('*, course:courses(name), faculty:users(id, name, email)')
+        .order('created_at', { ascending: false })
       if (error) throw error
       return data ?? []
     },
+  })
+}
+
+export function useUpdateBatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Batch> }) => {
+      const { data, error } = await supabase
+        .from('batches')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] })
+      queryClient.invalidateQueries({ queryKey: ['faculty-students'] })
+      toast.success('Batch schedule & faculty updated')
+    },
+    onError: (err) => toast.error(err.message),
   })
 }
 

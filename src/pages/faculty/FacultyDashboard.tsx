@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
 import type { Student, Batch } from '@/types'
 
 export default function FacultyDashboard() {
@@ -30,6 +31,7 @@ export default function FacultyDashboard() {
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [editBatchModal, setEditBatchModal] = useState<Batch | null>(null)
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0])
+  const [addFacultyOpen, setAddFacultyOpen] = useState(false)
 
   // Edit Batch State
   const [editFacultyId, setEditFacultyId] = useState<string>('')
@@ -122,7 +124,7 @@ export default function FacultyDashboard() {
           description={isManagementView ? 'Manage faculty assignments, course timetables, class days, and batch rosters' : 'Manage your batches and enrolled students'}
         />
         {isManagementView && (
-          <Button onClick={() => navigate('/settings')} className="shrink-0 bg-primary hover:bg-primary/90 text-white shadow-md">
+          <Button onClick={() => setAddFacultyOpen(true)} className="shrink-0 bg-primary hover:bg-primary/90 text-white shadow-md">
             <Plus className="mr-2 h-4 w-4" /> Add Faculty Member
           </Button>
         )}
@@ -390,7 +392,7 @@ export default function FacultyDashboard() {
         </DialogContent>
       </Dialog>
 
-
+      <AddFacultyModal open={addFacultyOpen} onOpenChange={setAddFacultyOpen} />
     </div>
   )
 }

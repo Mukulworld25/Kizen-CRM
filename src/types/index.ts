@@ -360,8 +360,8 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
 
 export const SHEET_SOURCES: { value: string; label: string }[] = [
   { value: 'ACCA (April)', label: 'Sheet: ACCA (April)' },
-  { value: 'NEW ACCA PM IND', label: 'Sheet: NEW ACCA PM IND' },
-  { value: 'ACCA SL', label: 'Sheet: ACCA SL' },
+  { value: 'NEW ACCA PAN IND', label: 'Sheet: NEW ACCA PAN IND' },
+  { value: 'Free ACCA Classes', label: 'Sheet: Free ACCA Classes' },
   { value: 'Ai Sensy', label: 'Sheet: Ai Sensy' },
   { value: 'SMART PREP', label: 'Sheet: SMART PREP' },
   { value: 'Warm leads', label: 'Sheet: Warm leads' },
@@ -369,11 +369,21 @@ export const SHEET_SOURCES: { value: string; label: string }[] = [
   { value: 'PU', label: 'Sheet: PU' },
   { value: '11 - 12 demo class', label: 'Sheet: 11 - 12 demo class' },
   { value: '12 Pass out CHD', label: 'Sheet: 12 Pass out CHD' },
+  { value: 'SD Leads', label: 'Sheet: SD Leads' },
+  { value: '12th and 1st year data', label: 'Sheet: 12th and 1st year data' },
+  { value: 'AI Leads', label: 'Sheet: AI Leads' },
   { value: 'College List', label: 'Sheet: College List' },
   { value: '11th 12th - April', label: 'Sheet: 11th 12th - April' },
   { value: 'Hindi Course', label: 'Sheet: Hindi Course' },
   { value: 'CUET 1', label: 'Sheet: CUET 1' },
   { value: 'CUET 2', label: 'Sheet: CUET 2' },
+  { value: "SATINDER'S SESSION", label: "Sheet: SATINDER'S SESSION" },
+  { value: 'Simrat Leads', label: 'Sheet: Simrat Leads' },
+  { value: 'New leads', label: 'Sheet: New leads' },
+  { value: 'Sourav Lists', label: 'Sheet: Sourav Lists' },
+  { value: 'Simrat (Bcom)', label: 'Sheet: Simrat (Bcom)' },
+  { value: '11th & 12th', label: 'Sheet: 11th & 12th' },
+  { value: 'Vaibhav Leads', label: 'Sheet: Vaibhav Leads' },
 ]
 
 export const FEE_COURSE_LEVELS: { value: string; label: string }[] = [

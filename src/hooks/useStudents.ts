@@ -202,7 +202,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
     queryFn: async () => {
       let query = supabase
         .from('fees')
-        .select('*, student:students(full_name, student_id, mobile), course:courses(name)')
+        .select('*, student:students(full_name, student_id, mobile, address), course:courses(name)')
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)
@@ -218,7 +218,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       if (filters.courseLevel && filters.courseLevel !== 'all') {
         rawFees = rawFees.filter((f) => {
           const cName = (f.course?.name || '').toLowerCase()
-          const sheet = ((f as any).source_sheet || '').toLowerCase()
+          const sheet = ((f as any).source_sheet || f.student?.address || '').toLowerCase()
           const level = filters.courseLevel!.toLowerCase()
           if (sheet && (sheet === level || sheet.includes(level))) return true
           if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl') || sheet.includes('kl')
@@ -227,6 +227,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
           if (level === 'fia') return cName.includes('fia') || sheet.includes('fia')
           if (level === '11th & 12th') return cName.includes('11') || cName.includes('12') || sheet.includes('11')
           if (level === 'b.com') return cName.includes('b.com') || cName.includes('bba') || sheet.includes('b.com')
+          if (level === 'others') return sheet.includes('others') || cName.includes('other')
           return false
         })
       }

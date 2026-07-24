@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
 import AddLeadModal from '@/pages/leads/AddLeadModal'
+import FlagDot from '@/components/ui/FlagDot'
 import type { Lead, LeadFilters, LeadStatus, LeadSource, Priority, LeadTemperature } from '@/types'
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_STATUS_LABELS, SHEET_SOURCES } from '@/types'
 import { supabase } from '@/lib/supabase'
@@ -23,11 +24,15 @@ export default function LeadList() {
   const [filters, setFilters] = useState<LeadFilters>({ page: 1 })
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
 
   const { data, isLoading } = useLeads(filters)
   const softDelete = useSoftDelete()
   const { data: counselors = [] } = useCounselors()
   const { data: courses = [] } = useCourses()
+
+  const rawLeads = data?.leads ?? []
+  const leads = flaggedOnly ? rawLeads.filter((l) => l.flag_color != null) : rawLeads
 
   const handleBulkDelete = useCallback(async (selected: Lead[]) => {
     const confirmed = window.confirm(`Delete ${selected.length} leads?`)
@@ -39,6 +44,15 @@ export default function LeadList() {
   }, [softDelete])
 
   const columns: Column<Lead>[] = [
+    {
+      key: 'flag',
+      header: '',
+      render: (r) => (
+        <div className="flex items-center justify-center w-4">
+          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+        </div>
+      ),
+    },
     { key: 'full_name', header: 'Name', sortable: true, exportValue: (r) => r.full_name },
     { 
       key: 'mobile', 
@@ -157,11 +171,20 @@ export default function LeadList() {
             <SelectItem value="low">Low</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button
+          variant={flaggedOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setFlaggedOnly((prev) => !prev)}
+        >
+          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
+        </Button>
       </div>
 
       <DataTable
         columns={columns}
-        data={data?.leads ?? []}
+        data={leads}
         loading={isLoading}
         searchable
         selectable

@@ -6,19 +6,23 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import FlagDot from '@/components/ui/FlagDot'
 import type { Student } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
+import { Button } from '@/components/ui/button'
 
 export default function StudentList() {
   const navigate = useNavigate()
   const [courseId, setCourseId] = useState<string>()
   const [batchId, setBatchId] = useState<string>()
   const [courseLevel, setCourseLevel] = useState<string>('all')
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
   const { data: rawStudents = [], isLoading } = useStudents({ courseId, batchId })
   const { data: courses = [] } = useCourses()
   const { data: batches = [] } = useBatches()
 
   const students = rawStudents.filter((s) => {
+    if (flaggedOnly && !s.flag_color) return false
     if (courseLevel === 'all') return true
     const cName = (s.course?.name || '').toLowerCase()
     const lvl = courseLevel.toLowerCase()
@@ -32,6 +36,15 @@ export default function StudentList() {
   })
 
   const columns: Column<Student>[] = [
+    {
+      key: 'flag',
+      header: '',
+      render: (r) => (
+        <div className="flex items-center justify-center w-4">
+          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+        </div>
+      ),
+    },
     {
       key: 'photo',
       header: '',
@@ -85,6 +98,15 @@ export default function StudentList() {
             {batches.map((b) => <SelectItem key={b.id} value={b.id}>{b.batch_name}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        <Button
+          variant={flaggedOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setFlaggedOnly((prev) => !prev)}
+        >
+          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
+        </Button>
       </div>
 
       <DataTable

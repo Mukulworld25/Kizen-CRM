@@ -143,7 +143,19 @@ export function useStudents(filters: { courseId?: string; batchId?: string; sear
 
       const { data, error } = await query
       if (error) throw error
-      return (data ?? []) as Student[]
+      const students = ((data ?? []) as Student[]).map((s) => {
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+        if (!s.is_active || s.certification_status === 'not_started') {
+          flag_color = 'red'
+          flag_reason = 'Certification Not Started / Inactive Status'
+        } else if (s.certification_status === 'in_progress') {
+          flag_color = 'yellow'
+          flag_reason = 'Certification In Progress'
+        }
+        return { ...s, flag_color, flag_reason }
+      })
+      return students
     },
     enabled: !!profile,
   })
@@ -198,13 +210,13 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       const { data, error } = await query
       if (error) throw error
 
-      let fees = (data ?? []) as Fee[]
+      let rawFees = (data ?? []) as Fee[]
       if (filters.overdue) {
-        fees = fees.filter((f) => f.pending_balance > 0)
+        rawFees = rawFees.filter((f) => f.pending_balance > 0)
       }
 
       if (filters.courseLevel && filters.courseLevel !== 'all') {
-        fees = fees.filter((f) => {
+        rawFees = rawFees.filter((f) => {
           const cName = (f.course?.name || '').toLowerCase()
           const level = filters.courseLevel!.toLowerCase()
           if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl')
@@ -218,10 +230,23 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       }
 
       if (filters.paymentStatus) {
-        if (filters.paymentStatus === 'paid') fees = fees.filter((f) => f.pending_balance <= 0)
-        if (filters.paymentStatus === 'pending') fees = fees.filter((f) => f.pending_balance > 0)
-        if (filters.paymentStatus === 'overdue') fees = fees.filter((f) => f.pending_balance > 50000)
+        if (filters.paymentStatus === 'paid') rawFees = rawFees.filter((f) => f.pending_balance <= 0)
+        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.pending_balance > 0)
+        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.pending_balance > 50000)
       }
+
+      const fees = rawFees.map((f) => {
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+        if (f.pending_balance > 50000) {
+          flag_color = 'red'
+          flag_reason = `High Outstanding Balance (₹${f.pending_balance.toLocaleString()})`
+        } else if (f.pending_balance > 0) {
+          flag_color = 'yellow'
+          flag_reason = `Installment Balance Pending (₹${f.pending_balance.toLocaleString()})`
+        }
+        return { ...f, flag_color, flag_reason }
+      })
 
       return fees
     },

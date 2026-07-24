@@ -89,6 +89,8 @@ export interface Lead {
   lead_score: number | null
   notes: string | null
   referred_by_lead_id?: string | null
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -148,6 +150,8 @@ export interface Student {
   faculty_id: string | null
   certification_status: 'not_started' | 'in_progress' | 'completed' | 'issued'
   is_active: boolean
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   updated_at: string
   course?: Course
@@ -167,6 +171,8 @@ export interface Fee {
   pending_balance: number
   gst_applicable: boolean
   gst_percent: number
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   updated_at: string
   student?: Student
@@ -255,6 +261,8 @@ export interface Institution {
   mou_expiry_date: string | null
   assigned_bdm_id: string | null
   lead_id?: string | null
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   bdm?: User
 }
@@ -351,6 +359,13 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
 ]
 
 export const SHEET_SOURCES: { value: string; label: string }[] = [
+  { value: 'ACCA (April)', label: 'Sheet: ACCA (April)' },
+  { value: 'NEW ACCA PM IND', label: 'Sheet: NEW ACCA PM IND' },
+  { value: 'ACCA SL', label: 'Sheet: ACCA SL' },
+  { value: 'Ai Sensy', label: 'Sheet: Ai Sensy' },
+  { value: 'SMART PREP', label: 'Sheet: SMART PREP' },
+  { value: 'Warm leads', label: 'Sheet: Warm leads' },
+  { value: 'Hot Leads', label: 'Sheet: Hot Leads' },
   { value: 'PU', label: 'Sheet: PU' },
   { value: '11 - 12 demo class', label: 'Sheet: 11 - 12 demo class' },
   { value: '12 Pass out CHD', label: 'Sheet: 12 Pass out CHD' },

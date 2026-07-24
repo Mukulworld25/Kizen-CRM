@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { IndianRupee, AlertTriangle, Clock } from 'lucide-react'
+import FlagDot from '@/components/ui/FlagDot'
 import type { Fee, PaymentMethod } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
 import { supabase } from '@/lib/supabase'
@@ -24,7 +25,8 @@ export default function FeeManagement() {
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [courseLevel, setCourseLevel] = useState<string>('all')
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
-  const { data: fees = [], isLoading } = useFees({
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const { data: rawFees = [], isLoading } = useFees({
     overdue: overdueOnly,
     courseLevel,
     paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
@@ -38,11 +40,22 @@ export default function FeeManagement() {
   const [txnId, setTxnId] = useState('')
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
+  const fees = flaggedOnly ? rawFees.filter((f) => f.flag_color != null) : rawFees
+
   const totalCollected = fees.reduce((s, f) => s + Number(f.amount_paid), 0)
   const totalPending = fees.reduce((s, f) => s + Number(f.pending_balance), 0)
   const overdueCount = fees.filter((f) => f.pending_balance > 0).length
 
   const columns: Column<Fee>[] = [
+    {
+      key: 'flag',
+      header: '',
+      render: (r) => (
+        <div className="flex items-center justify-center w-4">
+          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+        </div>
+      ),
+    },
     { key: 'student', header: 'Student', render: (r) => r.student?.full_name ?? '—', exportValue: (r) => r.student?.full_name ?? '' },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—' },
     { key: 'total_fee', header: 'Total', render: (r) => formatCurrency(r.total_fee) },
@@ -125,8 +138,22 @@ export default function FeeManagement() {
           </SelectContent>
         </Select>
 
-        <Button variant={overdueOnly ? 'default' : 'outline'} size="sm" onClick={() => setOverdueOnly((o) => !o)}>
-          {overdueOnly ? 'Showing Overdue' : 'Filter Overdue'}
+        <Button
+          variant={overdueOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setOverdueOnly((prev) => !prev)}
+        >
+          {overdueOnly ? 'Showing Overdue' : 'Overdue Only'}
+        </Button>
+
+        <Button
+          variant={flaggedOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setFlaggedOnly((prev) => !prev)}
+        >
+          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
         </Button>
       </div>
 

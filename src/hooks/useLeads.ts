@@ -36,7 +36,30 @@ export function useLeads(filters: LeadFilters = {}) {
 
       const { data, error, count } = await query
       if (error) throw error
-      return { leads: (data ?? []) as Lead[], total: count ?? 0 }
+
+      const now = new Date().getTime()
+      const leads = ((data ?? []) as Lead[]).map((lead) => {
+        const createdAtTime = new Date(lead.created_at).getTime()
+        const diffHours = (now - createdAtTime) / (1000 * 60 * 60)
+
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+
+        if ((lead.status === 'new_lead' || lead.status === 'follow_up') && diffHours > 48) {
+          flag_color = 'red'
+          flag_reason = `Uncontacted / Pinned >48 hours (${Math.round(diffHours)}h ago)`
+        } else if (lead.status === 'lost') {
+          flag_color = 'red'
+          flag_reason = 'Cold Lead Pool / High Risk'
+        } else if (lead.status === 'follow_up' || lead.status === 'demo_booked') {
+          flag_color = 'yellow'
+          flag_reason = 'Follow-up / Demo Scheduled'
+        }
+
+        return { ...lead, flag_color, flag_reason }
+      })
+
+      return { leads, total: count ?? 0 }
     },
     enabled: !!profile,
   })

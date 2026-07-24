@@ -15,7 +15,23 @@ export function useInstitutions() {
         .order('created_at', { ascending: false })
       const { data, error } = await query
       if (error) throw error
-      return (data ?? []) as Institution[]
+
+      const institutions = ((data ?? []) as Institution[]).map((inst) => {
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+
+        if (inst.mou_status === 'expired') {
+          flag_color = 'red'
+          flag_reason = 'MOU Expired / Action Required'
+        } else if (inst.mou_status === 'in_discussion' || inst.mou_status === 'not_started') {
+          flag_color = 'yellow'
+          flag_reason = 'MOU Partnership Discussion Pending'
+        }
+
+        return { ...inst, flag_color, flag_reason }
+      })
+
+      return institutions
     },
     enabled: !!profile,
   })

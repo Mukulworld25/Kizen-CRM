@@ -350,22 +350,22 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
 ]
 
 export const SHEET_SOURCES: { value: string; label: string }[] = [
-  { value: 'PU', label: 'PU (Punjab University)' },
-  { value: '11 - 12 demo class', label: '11-12 Demo Class' },
-  { value: '12 Pass out CHD', label: '12 Passout CHD' },
-  { value: 'College List', label: 'College List' },
-  { value: '11th 12th - April', label: '11th/12th April Intake' },
-  { value: 'Hindi Course', label: 'Hindi Course' },
-  { value: 'CUET 1', label: 'CUET 1' },
-  { value: 'CUET 2', label: 'CUET 2' },
+  { value: 'PU', label: 'Sheet: PU' },
+  { value: '11 - 12 demo class', label: 'Sheet: 11 - 12 demo class' },
+  { value: '12 Pass out CHD', label: 'Sheet: 12 Pass out CHD' },
+  { value: 'College List', label: 'Sheet: College List' },
+  { value: '11th 12th - April', label: 'Sheet: 11th 12th - April' },
+  { value: 'Hindi Course', label: 'Sheet: Hindi Course' },
+  { value: 'CUET 1', label: 'Sheet: CUET 1' },
+  { value: 'CUET 2', label: 'Sheet: CUET 2' },
 ]
 
 export const FEE_COURSE_LEVELS: { value: string; label: string }[] = [
-  { value: 'ACCA KL', label: 'ACCA Knowledge Level' },
-  { value: 'ACCA SL', label: 'ACCA Skill Level' },
-  { value: 'ACCA PL', label: 'ACCA Professional Level' },
-  { value: 'FIA', label: 'FIA (Foundation)' },
-  { value: '11th & 12th', label: '11th & 12th Commerce' },
-  { value: 'B.Com', label: 'B.Com / BBA' },
-  { value: 'Others', label: 'Others / Certifications' },
+  { value: 'ACCA KL', label: 'Sheet: ACCA KL' },
+  { value: 'ACCA SL', label: 'Sheet: ACCA SL' },
+  { value: 'ACCA PL', label: 'Sheet: ACCA PL' },
+  { value: 'FIA', label: 'Sheet: FIA' },
+  { value: '11th & 12th', label: 'Sheet: 11th & 12th' },
+  { value: 'B.com', label: 'Sheet: B.com' },
+  { value: 'Others', label: 'Sheet: Others' },
 ]

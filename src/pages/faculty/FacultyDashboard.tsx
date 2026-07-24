@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useBatches, useUpdateBatch, useUsers } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -12,12 +13,13 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
-import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck } from 'lucide-react'
+import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type { Student, Batch } from '@/types'
 
 export default function FacultyDashboard() {
+  const navigate = useNavigate()
   const { profile, isOwner } = useAuth()
   const queryClient = useQueryClient()
   const { data: batches = [], isLoading: batchesLoading } = useBatches()
@@ -26,11 +28,8 @@ export default function FacultyDashboard() {
 
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [attendanceOpen, setAttendanceOpen] = useState(false)
-  const [certOpen, setCertOpen] = useState(false)
   const [editBatchModal, setEditBatchModal] = useState<Batch | null>(null)
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0])
-  const [searchStudent, setSearchStudent] = useState('')
 
   // Edit Batch State
   const [editFacultyId, setEditFacultyId] = useState<string>('')
@@ -38,11 +37,11 @@ export default function FacultyDashboard() {
   const [editTiming, setEditTiming] = useState<string>('')
   const [editStatus, setEditStatus] = useState<string>('ongoing')
 
-  // Filter faculty members (role = 'faculty' or owners/admins)
-  const facultyMembers = allUsers.filter((u) => u.role === 'faculty' || u.role === 'owner' || u.role === 'admin')
+  // Filter faculty members (role = 'faculty' only)
+  const facultyMembers = allUsers.filter((u) => u.role === 'faculty')
 
   // All Students query across system
-  const { data: allStudents = [], isLoading: studentsLoading } = useQuery({
+  const { data: allStudents = [] } = useQuery({
     queryKey: ['all-enrolled-students'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -54,10 +53,7 @@ export default function FacultyDashboard() {
     },
   })
 
-  // Students for specific faculty member
-  const facultyStudents = profile?.role === 'faculty'
-    ? allStudents.filter((s) => s.faculty_id === profile?.id || s.batch_id)
-    : allStudents
+
 
   const { data: batchStudents = [] } = useQuery({
     queryKey: ['batch-students', selectedBatch],
@@ -92,18 +88,7 @@ export default function FacultyDashboard() {
     onError: (err) => toast.error(err.message),
   })
 
-  const updateCertification = useMutation({
-    mutationFn: async ({ student_id, status }: { student_id: string; status: string }) => {
-      const { error } = await supabase.from('students').update({ certification_status: status }).eq('id', student_id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-enrolled-students'] })
-      toast.success('Certification status updated')
-      setCertOpen(false)
-    },
-    onError: (err) => toast.error(err.message),
-  })
+
 
   const handleOpenEditBatch = (batch: Batch) => {
     setEditBatchModal(batch)
@@ -127,26 +112,25 @@ export default function FacultyDashboard() {
     setEditBatchModal(null)
   }
 
-  const filteredStudents = facultyStudents.filter((s) =>
-    searchStudent === '' ||
-    s.full_name.toLowerCase().includes(searchStudent.toLowerCase()) ||
-    (s.course?.name || '').toLowerCase().includes(searchStudent.toLowerCase()) ||
-    (s.student_id || '').toLowerCase().includes(searchStudent.toLowerCase())
-  )
-
   const isManagementView = isOwner || profile?.role === 'admin' || profile?.role === 'reception' || profile?.role === 'accounts'
 
   return (
     <div>
-      <PageHeader
-        title={isManagementView ? 'Faculty & Timetable Management' : 'Faculty Dashboard'}
-        description={isManagementView ? 'Manage faculty assignments, course timetables, class days, and batch rosters' : 'Manage your batches and enrolled students'}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <PageHeader
+          title={isManagementView ? 'Faculty & Timetable Management' : 'Faculty Dashboard'}
+          description={isManagementView ? 'Manage faculty assignments, course timetables, class days, and batch rosters' : 'Manage your batches and enrolled students'}
+        />
+        {isManagementView && (
+          <Button onClick={() => navigate('/settings')} className="shrink-0 bg-primary hover:bg-primary/90 text-white shadow-md">
+            <Plus className="mr-2 h-4 w-4" /> Add Faculty Member
+          </Button>
+        )}
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
         <StatsCard title="Faculty Members" value={facultyMembers.length} icon={Users} loading={batchesLoading} />
         <StatsCard title="Active Batches" value={batches.length} icon={GraduationCap} color="bg-primary-light" loading={batchesLoading} />
-        <StatsCard title="Enrolled Students" value={allStudents.length} icon={UserCheck} color="bg-accent" loading={studentsLoading} />
         <StatsCard title="Classes Today" value={batches.filter((b) => b.status === 'ongoing').length} icon={Clock} color="bg-success" loading={batchesLoading} />
       </div>
 
@@ -154,7 +138,6 @@ export default function FacultyDashboard() {
         <TabsList className="mb-4">
           <TabsTrigger value="directory">Faculty Directory & Schedule</TabsTrigger>
           <TabsTrigger value="batches">Batch Timetables ({batches.length})</TabsTrigger>
-          <TabsTrigger value="students">Student Roster ({allStudents.length})</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: FACULTY DIRECTORY & SCHEDULE */}
@@ -300,63 +283,7 @@ export default function FacultyDashboard() {
           </Card>
         </TabsContent>
 
-        {/* TAB 3: STUDENT ROSTER BY FACULTY */}
-        <TabsContent value="students">
-          <Card className="shadow-sm">
-            <CardHeader className="border-b border-border/50 pb-3 flex flex-wrap items-center justify-between gap-4">
-              <CardTitle className="text-base">Enrolled Students Roster</CardTitle>
-              <Input
-                placeholder="Search student by name, ID, or course..."
-                value={searchStudent}
-                onChange={(e) => setSearchStudent(e.target.value)}
-                className="w-72 h-8 text-xs"
-              />
-            </CardHeader>
-            <CardContent className="p-0">
-              {filteredStudents.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">No enrolled students found.</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold">Student Name</TableHead>
-                      <TableHead className="font-semibold">Course</TableHead>
-                      <TableHead className="font-semibold">Batch</TableHead>
-                      <TableHead className="font-semibold">Assigned Faculty</TableHead>
-                      <TableHead className="font-semibold">Certification</TableHead>
-                      <TableHead className="font-semibold text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStudents.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">
-                          <div className="text-slate-900 font-semibold">{s.full_name}</div>
-                          <div className="text-[11px] text-slate-400 font-mono">{s.student_id || '—'}</div>
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-700">{s.course?.name ?? '—'}</TableCell>
-                        <TableCell className="text-xs text-slate-700">{s.batch?.batch_name ?? '—'}</TableCell>
-                        <TableCell className="text-xs text-slate-700 font-medium">
-                          {s.batch?.faculty?.name || 'CA Raman Sharma'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={s.certification_status === 'completed' || s.certification_status === 'issued' ? 'success' : 'warning'} className="capitalize text-[11px]">
-                            {s.certification_status?.replace('_', ' ') || 'In Progress'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="outline" className="h-7 text-xs rounded-lg" onClick={() => { setSelectedStudent(s); setCertOpen(true) }}>
-                            Update Cert
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+
       </Tabs>
 
       {/* EDIT BATCH SCHEDULE & FACULTY MODAL */}
@@ -463,27 +390,7 @@ export default function FacultyDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Certification Dialog */}
-      <Dialog open={certOpen} onOpenChange={setCertOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Update Certification — {selectedStudent?.full_name}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Label className="text-xs font-semibold">Certification Status</Label>
-            <Select onValueChange={(v) => updateCertification.mutate({ student_id: selectedStudent!.id, status: v })}>
-              <SelectTrigger><SelectValue placeholder={selectedStudent?.certification_status?.replace('_', ' ') || 'Select Status'} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="not_started">Not Started</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="issued">Issued</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCertOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   )
 }

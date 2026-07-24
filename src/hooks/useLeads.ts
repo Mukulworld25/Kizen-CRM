@@ -26,7 +26,7 @@ export function useLeads(filters: LeadFilters = {}) {
         let term = filters.sheetSource
         if (term === 'ACCA (April)' || term === 'ACCA SL') term = 'ACCA'
         else if (term.includes('NEW ACCA')) term = 'PAN IND'
-        query = query.or(`source_sheet.ilike.%${term}%,notes.ilike.%${term}%`)
+        query = query.or(`source_sheet.ilike.${term},notes.ilike.%[${term}]%`)
       }
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)

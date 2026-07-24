@@ -1,7 +1,6 @@
 import XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
-import path from 'path';
 
 const SUPABASE_URL = 'https://zmqvjtenuxlvwfopfroc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ezZ7_UyticpI7aeLKY3Rew_i_FaZBDh';
@@ -53,16 +52,15 @@ async function runCleanIngestion() {
   }
   console.log('Authenticated successfully as Owner/Admin.');
 
-  console.log('\n=== STEP 2: WIPING ALL CORRUPTED LEADS FROM DB ===');
-  // Delete all rows from leads where id IS NOT NULL
+  console.log('\n=== STEP 2: WIPING ALL LEADS FROM DB ===');
   const { error: deleteErr } = await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (deleteErr) {
     console.error('Error wiping leads:', deleteErr.message);
     process.exit(1);
   }
-  console.log('✓ Successfully wiped all corrupted leads from database.');
+  console.log('✓ Successfully wiped all leads from database.');
 
-  console.log('\n=== STEP 3: PARSING EXCEL & CLEANING DATA ===');
+  console.log('\n=== STEP 3: PARSING EXCEL & PRESERVING PER-TAB STANDALONE LEADS ===');
   const filePath = 'C:\\Users\\admin\\Downloads\\Leads for Kizen.xlsx';
   if (!fs.existsSync(filePath)) {
     console.error('Excel file not found at:', filePath);
@@ -72,13 +70,9 @@ async function runCleanIngestion() {
   const wb = XLSX.readFile(filePath);
   console.log(`Loaded workbook with ${wb.SheetNames.length} tabs.`);
 
-  const leadsByMobile = new Map();
-  const leadsByName = new Map();
+  const masterPayload = [];
   const tabSummary = [];
-
-  let overallValidCount = 0;
-  let overallSkippedCount = 0;
-  let overallMergedDuplicates = 0;
+  let seq = 1;
 
   for (const sheetName of wb.SheetNames) {
     const sheet = wb.Sheets[sheetName];
@@ -117,7 +111,6 @@ async function runCleanIngestion() {
 
     let validInTab = 0;
     let skippedInTab = 0;
-    let mergedInTab = 0;
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const r = rows[i];
@@ -127,17 +120,14 @@ async function runCleanIngestion() {
       const rawPhone = r[phoneCol];
       const phone = cleanPhone(rawPhone);
 
-      // STRICT VALIDATION: If garbage or missing BOTH name & phone, or missing phone for unnamed lead, skip!
+      // Skip garbage headers or completely empty rows
       if (isGarbage(rawName, phone)) {
         skippedInTab++;
-        overallSkippedCount++;
         continue;
       }
 
-      // Must have at least a valid phone or a non-empty name
       if (!phone && (!rawName || rawName.length < 2)) {
         skippedInTab++;
-        overallSkippedCount++;
         continue;
       }
 
@@ -146,16 +136,17 @@ async function runCleanIngestion() {
       const remarks = cleanStr(r[remarksCol]);
       const school = cleanStr(r[schoolCol]);
 
-      let notes = `[${sheetName}]`;
+      let notes = `[${sheetName.trim()}]`;
       if (school) notes += ` | School: ${school}`;
       if (course) notes += ` | Qual: ${course}`;
       if (remarks) notes += ` | ${remarks}`;
 
       const leadObj = {
-        full_name: rawName || `Lead (${phone})`,
-        mobile: phone || null, // Will use name key if mobile is null
+        display_id: `KZ-LD-${String(seq++).padStart(6, '0')}`,
+        full_name: rawName || `Lead (${phone || 'Unknown'})`,
+        mobile: phone || '0000000000',
         city: city || null,
-        source_sheet: sheetName,
+        source_sheet: sheetName.trim(),
         source: 'other',
         status: 'new_lead',
         priority: 'medium',
@@ -163,58 +154,21 @@ async function runCleanIngestion() {
         notes: notes.slice(0, 500)
       };
 
-      if (phone) {
-        if (leadsByMobile.has(phone)) {
-          // Merge notes for duplicate phone
-          const existing = leadsByMobile.get(phone);
-          if (!existing.notes.includes(`[${sheetName}]`)) {
-            existing.notes = (existing.notes + ` | ${notes}`).slice(0, 500);
-          }
-          mergedInTab++;
-          overallMergedDuplicates++;
-        } else {
-          leadsByMobile.set(phone, leadObj);
-          validInTab++;
-          overallValidCount++;
-        }
-      } else if (rawName) {
-        const nameKey = rawName.toLowerCase();
-        if (leadsByName.has(nameKey)) {
-          const existing = leadsByName.get(nameKey);
-          if (!existing.notes.includes(`[${sheetName}]`)) {
-            existing.notes = (existing.notes + ` | ${notes}`).slice(0, 500);
-          }
-          mergedInTab++;
-          overallMergedDuplicates++;
-        } else {
-          // Note: Database requires mobile TEXT NOT NULL. If mobile is missing, we populate a standard formatted placeholder OR skip.
-          // Wait! Since database has mobile NOT NULL, we MUST filter out leads with NO mobile at all or assign a deterministic clean ID.
-          // Let's check how many have NO mobile:
-          skippedInTab++;
-          overallSkippedCount++;
-        }
-      }
+      masterPayload.push(leadObj);
+      validInTab++;
     }
 
     tabSummary.push({
-      tab: sheetName,
+      tab: sheetName.trim(),
       totalRowsInSheet: rows.length,
-      validUniqueInserted: validInTab,
-      duplicatesMerged: mergedInTab,
-      emptyOrGarbageSkipped: skippedInTab
+      exactValidIngestedCount: validInTab,
+      skippedGarbageCount: skippedInTab
     });
   }
 
-  const finalLeadsToInsert = [...leadsByMobile.values()];
-  console.log(`\nPrepared ${finalLeadsToInsert.length} clean unique lead records for database insertion.`);
+  console.log(`\nPrepared ${masterPayload.length} total standalone lead records across all tabs.`);
 
-  let seq = 1;
-  const masterPayload = finalLeadsToInsert.map(l => ({
-    ...l,
-    display_id: `KZ-LD-${String(seq++).padStart(6, '0')}`
-  }));
-
-  console.log('\n=== STEP 4: BATCH INSERTING CLEAN DATA INTO SUPABASE ===');
+  console.log('\n=== STEP 4: BATCH INSERTING INTO SUPABASE ===');
   const BATCH_SIZE = 500;
   let totalInserted = 0;
   for (let i = 0; i < masterPayload.length; i += BATCH_SIZE) {
@@ -228,9 +182,7 @@ async function runCleanIngestion() {
   }
 
   console.log(`\n================ INGESTION COMPLETE ================`);
-  console.log(`✓ Total Clean Leads Successfully Ingested: ${totalInserted}`);
-  console.log(`✓ Total Duplicates Merged Across Tabs: ${overallMergedDuplicates}`);
-  console.log(`✓ Total Garbage/Blank Rows Skipped: ${overallSkippedCount}`);
+  console.log(`✓ Total Leads Successfully Ingested: ${totalInserted}`);
   console.log(`====================================================\n`);
 
   console.table(tabSummary);

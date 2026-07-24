@@ -7,14 +7,29 @@ import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Student } from '@/types'
+import { FEE_COURSE_LEVELS } from '@/types'
 
 export default function StudentList() {
   const navigate = useNavigate()
   const [courseId, setCourseId] = useState<string>()
   const [batchId, setBatchId] = useState<string>()
-  const { data: students = [], isLoading } = useStudents({ courseId, batchId })
+  const [courseLevel, setCourseLevel] = useState<string>('all')
+  const { data: rawStudents = [], isLoading } = useStudents({ courseId, batchId })
   const { data: courses = [] } = useCourses()
   const { data: batches = [] } = useBatches()
+
+  const students = rawStudents.filter((s) => {
+    if (courseLevel === 'all') return true
+    const cName = (s.course?.name || '').toLowerCase()
+    const lvl = courseLevel.toLowerCase()
+    if (lvl === 'acca kl') return cName.includes('knowledge') || cName.includes('kl')
+    if (lvl === 'acca sl') return cName.includes('skill') || cName.includes('sl')
+    if (lvl === 'acca pl') return cName.includes('professional') || cName.includes('pl')
+    if (lvl === 'fia') return cName.includes('fia')
+    if (lvl === '11th & 12th') return cName.includes('11') || cName.includes('12')
+    if (lvl === 'b.com') return cName.includes('b.com') || cName.includes('bba')
+    return true
+  })
 
   const columns: Column<Student>[] = [
     {
@@ -46,11 +61,20 @@ export default function StudentList() {
     <div>
       <PageHeader title="Students" description="Manage enrolled students" />
 
-      <div className="mb-4 flex gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+      <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+        <Select value={courseLevel} onValueChange={setCourseLevel}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Course Levels</SelectItem>
+            {FEE_COURSE_LEVELS.map((lvl) => (
+              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={courseId ?? 'all'} onValueChange={(v) => setCourseId(v === 'all' ? undefined : v)}>
           <SelectTrigger className="w-48"><SelectValue placeholder="All Courses" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Courses</SelectItem>
+            <SelectItem value="all">All Specific Courses</SelectItem>
             {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>

@@ -15,13 +15,20 @@ import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { IndianRupee, AlertTriangle, Clock } from 'lucide-react'
 import type { Fee, PaymentMethod } from '@/types'
+import { FEE_COURSE_LEVELS } from '@/types'
 import { supabase } from '@/lib/supabase'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
   const { can, isOwner } = useAuth()
   const [overdueOnly, setOverdueOnly] = useState(false)
-  const { data: fees = [], isLoading } = useFees({ overdue: overdueOnly })
+  const [courseLevel, setCourseLevel] = useState<string>('all')
+  const [paymentStatus, setPaymentStatus] = useState<string>('all')
+  const { data: fees = [], isLoading } = useFees({
+    overdue: overdueOnly,
+    courseLevel,
+    paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
+  })
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
   const recordPayment = useRecordPayment()
@@ -97,7 +104,27 @@ export default function FeeManagement() {
         <StatsCard title="Outstanding Accounts" value={overdueCount} icon={AlertTriangle} color="bg-danger" loading={isLoading} />
       </div>
 
-      <div className="mb-4 flex items-center gap-2 bg-white rounded-xl border border-border p-3 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3 bg-white rounded-xl border border-border p-3 shadow-sm">
+        <Select value={courseLevel} onValueChange={setCourseLevel}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Course Levels</SelectItem>
+            {FEE_COURSE_LEVELS.map((lvl) => (
+              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Health" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="paid">Paid in Full</SelectItem>
+            <SelectItem value="pending">Pending Balance</SelectItem>
+            <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button variant={overdueOnly ? 'default' : 'outline'} size="sm" onClick={() => setOverdueOnly((o) => !o)}>
           {overdueOnly ? 'Showing Overdue' : 'Filter Overdue'}
         </Button>

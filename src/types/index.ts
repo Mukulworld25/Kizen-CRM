@@ -306,6 +306,8 @@ export interface FeaturePermission {
 export interface LeadFilters {
   status?: LeadStatus
   source?: LeadSource
+  sheetSource?: string
+  city?: string
   counselorId?: string
   courseId?: string
   priority?: Priority
@@ -345,4 +347,25 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'college_visit', label: 'College Visit' },
   { value: 'other', label: 'Other' },
+]
+
+export const SHEET_SOURCES: { value: string; label: string }[] = [
+  { value: 'PU', label: 'PU (Punjab University)' },
+  { value: '11 - 12 demo class', label: '11-12 Demo Class' },
+  { value: '12 Pass out CHD', label: '12 Passout CHD' },
+  { value: 'College List', label: 'College List' },
+  { value: '11th 12th - April', label: '11th/12th April Intake' },
+  { value: 'Hindi Course', label: 'Hindi Course' },
+  { value: 'CUET 1', label: 'CUET 1' },
+  { value: 'CUET 2', label: 'CUET 2' },
+]
+
+export const FEE_COURSE_LEVELS: { value: string; label: string }[] = [
+  { value: 'ACCA KL', label: 'ACCA Knowledge Level' },
+  { value: 'ACCA SL', label: 'ACCA Skill Level' },
+  { value: 'ACCA PL', label: 'ACCA Professional Level' },
+  { value: 'FIA', label: 'FIA (Foundation)' },
+  { value: '11th & 12th', label: '11th & 12th Commerce' },
+  { value: 'B.Com', label: 'B.Com / BBA' },
+  { value: 'Others', label: 'Others / Certifications' },
 ]

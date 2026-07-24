@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
 import AddLeadModal from '@/pages/leads/AddLeadModal'
 import type { Lead, LeadFilters, LeadStatus, LeadSource, Priority, LeadTemperature } from '@/types'
-import { LEAD_SOURCES, LEAD_STATUSES, LEAD_STATUS_LABELS } from '@/types'
+import { LEAD_SOURCES, LEAD_STATUSES, LEAD_STATUS_LABELS, SHEET_SOURCES } from '@/types'
 import { supabase } from '@/lib/supabase'
 
 export default function LeadList() {
@@ -105,10 +105,17 @@ export default function LeadList() {
           </SelectContent>
         </Select>
         <Select value={filters.source ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, source: v === 'all' ? undefined : v as LeadSource }))}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Source" /></SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Channel" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="all">All Channels</SelectItem>
             {LEAD_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filters.sheetSource ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, sheetSource: v === 'all' ? undefined : v }))}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Source Sheet / Campaign" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sheets / Campaigns</SelectItem>
+            {SHEET_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filters.temperature ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, temperature: v === 'all' ? undefined : v as LeadTemperature }))}>

@@ -22,6 +22,8 @@ export function useLeads(filters: LeadFilters = {}) {
 
       if (filters.status) query = query.eq('status', filters.status)
       if (filters.source) query = query.eq('source', filters.source)
+      if (filters.sheetSource) query = query.ilike('source', `%${filters.sheetSource}%`)
+      if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)
       if (filters.priority) query = query.eq('priority', filters.priority)
@@ -29,7 +31,7 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
       if (filters.dateTo) query = query.lte('created_at', filters.dateTo + 'T23:59:59')
       if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`)
+        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%,city.ilike.%${filters.search}%`)
       }
 
       const { data, error, count } = await query

@@ -182,7 +182,7 @@ export function useCreateStudent() {
   })
 }
 
-export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) {
+export function useFees(filters: { overdue?: boolean; courseId?: string; courseLevel?: string; paymentStatus?: string; counselorId?: string } = {}) {
   const { profile, can } = useAuth()
 
   return useQuery({
@@ -202,6 +202,27 @@ export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) 
       if (filters.overdue) {
         fees = fees.filter((f) => f.pending_balance > 0)
       }
+
+      if (filters.courseLevel && filters.courseLevel !== 'all') {
+        fees = fees.filter((f) => {
+          const cName = (f.course?.name || '').toLowerCase()
+          const level = filters.courseLevel!.toLowerCase()
+          if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl')
+          if (level === 'acca sl') return cName.includes('skill') || cName.includes('sl')
+          if (level === 'acca pl') return cName.includes('professional') || cName.includes('pl')
+          if (level === 'fia') return cName.includes('fia')
+          if (level === '11th & 12th') return cName.includes('11') || cName.includes('12')
+          if (level === 'b.com') return cName.includes('b.com') || cName.includes('bba')
+          return true
+        })
+      }
+
+      if (filters.paymentStatus) {
+        if (filters.paymentStatus === 'paid') fees = fees.filter((f) => f.pending_balance <= 0)
+        if (filters.paymentStatus === 'pending') fees = fees.filter((f) => f.pending_balance > 0)
+        if (filters.paymentStatus === 'overdue') fees = fees.filter((f) => f.pending_balance > 50000)
+      }
+
       return fees
     },
     enabled: !!profile && can('viewFees'),

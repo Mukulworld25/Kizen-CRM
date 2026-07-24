@@ -218,14 +218,16 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       if (filters.courseLevel && filters.courseLevel !== 'all') {
         rawFees = rawFees.filter((f) => {
           const cName = (f.course?.name || '').toLowerCase()
+          const sheet = ((f as any).source_sheet || '').toLowerCase()
           const level = filters.courseLevel!.toLowerCase()
-          if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl')
-          if (level === 'acca sl') return cName.includes('skill') || cName.includes('sl')
-          if (level === 'acca pl') return cName.includes('professional') || cName.includes('pl')
-          if (level === 'fia') return cName.includes('fia')
-          if (level === '11th & 12th') return cName.includes('11') || cName.includes('12')
-          if (level === 'b.com') return cName.includes('b.com') || cName.includes('bba')
-          return true
+          if (sheet && (sheet === level || sheet.includes(level))) return true
+          if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl') || sheet.includes('kl')
+          if (level === 'acca sl') return cName.includes('skill') || cName.includes('sl') || sheet.includes('sl')
+          if (level === 'acca pl') return cName.includes('professional') || cName.includes('pl') || sheet.includes('pl')
+          if (level === 'fia') return cName.includes('fia') || sheet.includes('fia')
+          if (level === '11th & 12th') return cName.includes('11') || cName.includes('12') || sheet.includes('11')
+          if (level === 'b.com') return cName.includes('b.com') || cName.includes('bba') || sheet.includes('b.com')
+          return false
         })
       }
 

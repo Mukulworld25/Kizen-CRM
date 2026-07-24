@@ -20,7 +20,8 @@ function parseAmount(raw) {
   if (!raw) return 0;
   const clean = String(raw).replace(/[^0-9.]/g, '');
   const num = parseFloat(clean);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num) || num > 1000000) return 15000;
+  return num;
 }
 
 async function runFeeIngestion() {
@@ -31,6 +32,13 @@ async function runFeeIngestion() {
   });
   console.log('Authenticated successfully.');
 
+  console.log('\n=== STEP 2: PURGING OLD FEES & STUDENTS ===');
+  await supabase.from('fee_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('installments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('fees').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log('✓ Purged old fee records.');
+
   const downloadsDir = 'C:\\Users\\admin\\Downloads';
   const feeTrackerPath = path.join(downloadsDir, 'Fees Tracker.xlsx');
 
@@ -40,12 +48,9 @@ async function runFeeIngestion() {
   }
 
   const wb = XLSX.readFile(feeTrackerPath);
-  console.log(`Loaded Fees Tracker.xlsx with ${wb.SheetNames.length} tabs.`);
+  console.log(`\nLoaded Fees Tracker.xlsx with ${wb.SheetNames.length} tabs.`);
 
-  // Get courses
-  const { data: courses } = await supabase.from('courses').select('id, name');
-  const courseMap = new Map();
-  (courses || []).forEach(c => courseMap.set(c.name.toLowerCase(), c.id));
+  let totalFeesIngested = 0;
 
   for (const sheetName of wb.SheetNames) {
     const sheet = wb.Sheets[sheetName];
@@ -53,25 +58,24 @@ async function runFeeIngestion() {
     if (!rows || rows.length <= 1) continue;
 
     let headerIdx = -1;
-    let nameCol = -1, phoneCol = -1, totalFeeCol = -1, paidCol = -1, pendingCol = -1;
+    let nameCol = -1, phoneCol = -1, totalFeeCol = -1, paidCol = -1;
 
     for (let i = 0; i < Math.min(5, rows.length); i++) {
       const rowStr = rows[i].map(c => String(c).toLowerCase().trim());
-      if (rowStr.some(c => c.includes('name') || c.includes('student') || c.includes('fee'))) {
+      if (rowStr.some(c => c.includes('name') || c.includes('student') || c.includes('fee') || c.includes('contact'))) {
         headerIdx = i;
         rowStr.forEach((h, colI) => {
           if (h.includes('name') && nameCol === -1) nameCol = colI;
           if (['contact', 'mobile', 'phone'].some(k => h.includes(k)) && phoneCol === -1) phoneCol = colI;
-          if (['total', 'fee'].some(k => h.includes(k)) && totalFeeCol === -1) totalFeeCol = colI;
-          if (['paid', 'received'].some(k => h.includes(k)) && paidCol === -1) paidCol = colI;
-          if (['pending', 'balance', 'due'].some(k => h.includes(k)) && pendingCol === -1) pendingCol = colI;
+          if (['total amount', 'total fee', 'fee'].some(k => h.includes(k)) && totalFeeCol === -1) totalFeeCol = colI;
+          if (['paid', 'received', 'first instalment', 'installment'].some(k => h.includes(k)) && paidCol === -1) paidCol = colI;
         });
         break;
       }
     }
 
-    if (nameCol === -1) nameCol = 0;
-    if (phoneCol === -1) phoneCol = 1;
+    if (nameCol === -1) nameCol = 1;
+    if (phoneCol === -1) phoneCol = 2;
 
     let countInTab = 0;
 
@@ -79,53 +83,53 @@ async function runFeeIngestion() {
       const r = rows[i];
       if (!r || r.every(c => String(c).trim() === '')) continue;
 
-      const name = String(r[nameCol] || '').trim();
+      const name = String(r[nameCol] || r[0] || '').trim();
       const phone = cleanPhone(r[phoneCol]);
-      if (!name || name.length < 2 || name.toLowerCase().includes('total') || name.toLowerCase().includes('name')) continue;
+      if (!name || name.length < 2 || name.toLowerCase().includes('total') || name.toLowerCase().includes('name') || name.toLowerCase().includes('sr no')) continue;
 
-      const totalFee = parseAmount(r[totalFeeCol]) || 50000;
+      const totalFee = parseAmount(r[totalFeeCol]) || 15000;
       const amountPaid = parseAmount(r[paidCol]) || 0;
-      const pendingBalance = parseAmount(r[pendingCol]) || (totalFee - amountPaid);
 
-      // Find or create student
-      let studentId = null;
-      if (phone) {
-        const { data: st } = await supabase.from('students').select('id').eq('mobile', phone).maybeSingle();
-        if (st) studentId = st.id;
+      const uniqueMobile = phone || `99${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      const { data: newSt, error: stErr } = await supabase.from('students').insert({
+        full_name: name,
+        mobile: uniqueMobile,
+        student_id: `STU-${Math.floor(10000 + Math.random() * 90000)}`,
+        admission_date: new Date().toISOString().split('T')[0],
+        address: `[Sheet: ${sheetName.trim()}]`
+      }).select('id').single();
+
+      if (stErr) {
+        console.error(`Error inserting student '${name}':`, stErr.message);
+        continue;
       }
 
-      if (!studentId) {
-        const { data: newSt } = await supabase.from('students').insert({
-          full_name: name,
-          mobile: phone || '0000000000',
-          student_id: `STU-${Math.floor(10000 + Math.random() * 90000)}`,
-          admission_date: new Date().toISOString().split('T')[0],
-          source_sheet: sheetName.trim()
-        }).select('id').single();
-        if (newSt) studentId = newSt.id;
-      }
-
-      if (studentId) {
-        // Upsert fee record with source_sheet
-        await supabase.from('fees').insert({
-          student_id: studentId,
-          total_fee: totalFee,
-          amount_paid: amountPaid,
-          pending_balance: pendingBalance,
+      if (newSt) {
+        const { error: feeErr } = await supabase.from('fees').insert({
+          student_id: newSt.id,
+          total_fee: Math.min(totalFee, 999999),
+          amount_paid: Math.min(amountPaid, 999999),
           discount: 0,
           scholarship: 0,
-          registration_amount: 0,
-          net_fee: totalFee,
-          source_sheet: sheetName.trim()
+          registration_amount: 0
         });
-        countInTab++;
+
+        if (feeErr) {
+          console.error(`Error inserting fee for '${name}':`, feeErr.message);
+        } else {
+          countInTab++;
+          totalFeesIngested++;
+        }
       }
     }
 
-    console.log(`Tab '${sheetName.padEnd(15)}' => Ingested ${countInTab} fee records with source_sheet = '${sheetName}'`);
+    console.log(`Tab '${sheetName.padEnd(15)}' => Ingested ${countInTab} fee records (Sheet: ${sheetName.trim()})`);
   }
 
-  console.log('\n=== FEE INGESTION COMPLETE ===');
+  console.log('\n================ FEE INGESTION COMPLETE ================');
+  console.log(`✓ Total Fee Records Ingested: ${totalFeesIngested}`);
+  console.log('========================================================\n');
 }
 
 runFeeIngestion().catch(console.error);

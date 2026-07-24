@@ -22,7 +22,7 @@ export function useLeads(filters: LeadFilters = {}) {
 
       if (filters.status) query = query.eq('status', filters.status)
       if (filters.source) query = query.eq('source', filters.source)
-      if (filters.sheetSource) query = query.ilike('source', `%${filters.sheetSource}%`)
+      if (filters.sheetSource) query = query.or(`source_sheet.ilike.%${filters.sheetSource}%,notes.ilike.%${filters.sheetSource}%`)
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)

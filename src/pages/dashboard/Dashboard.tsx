@@ -654,29 +654,30 @@ function OwnerDashboard() {
       case 'cash_expense':
         const netValue = revenue - totalExpenses
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
-              <DollarSign style={{ width: 22, height: 22, color: 'var(--kizen-gold)' }} />
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border overflow-hidden">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+              <DollarSign style={{ width: 20, height: 20, color: 'var(--kizen-gold)' }} />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1 truncate">
                 Cash / Expense Snapshot
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
                 <div>
-                  <span className="text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums">
+                  <span className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums block truncate">
                     {formatCurrency(netValue)}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1 font-semibold">Net Balance</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold">Net Balance (Revenue - Expenses)</p>
                 </div>
-                <div className="flex flex-col justify-center space-y-1 pl-0 sm:pl-4 sm:border-l border-border">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Revenue In</span>
-                    <span className="font-bold text-success">{formatCurrency(revenue)}</span>
+                <div className="flex items-center gap-3 pt-2 border-t border-border/50 text-xs">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-muted-foreground text-[11px]">In:</span>
+                    <span className="font-bold text-success truncate">{formatCurrency(revenue)}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Expenses Out</span>
-                    <span className="font-bold text-danger">{formatCurrency(totalExpenses)}</span>
+                  <span className="text-muted-foreground/40">•</span>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-muted-foreground text-[11px]">Out:</span>
+                    <span className="font-bold text-danger truncate">{formatCurrency(totalExpenses)}</span>
                   </div>
                 </div>
               </div>

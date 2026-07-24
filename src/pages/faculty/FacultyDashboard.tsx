@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useBatches, useUpdateBatch, useUsers } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,7 +19,6 @@ import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
 import type { Student, Batch } from '@/types'
 
 export default function FacultyDashboard() {
-  const navigate = useNavigate()
   const { profile, isOwner } = useAuth()
   const queryClient = useQueryClient()
   const { data: batches = [], isLoading: batchesLoading } = useBatches()

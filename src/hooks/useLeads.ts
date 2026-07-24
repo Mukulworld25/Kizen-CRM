@@ -24,9 +24,15 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.source) query = query.eq('source', filters.source)
       if (filters.sheetSource) {
         let term = filters.sheetSource
-        if (term === 'ACCA (April)' || term === 'ACCA SL') term = 'ACCA'
-        else if (term.includes('NEW ACCA')) term = 'PAN IND'
-        query = query.or(`source_sheet.ilike.${term},notes.ilike.%[${term}]%`)
+        if (term === 'ACCA (April)' || term === 'ACCA SL') {
+          query = query.or('source_sheet.ilike.%ACCA%,notes.ilike.%[ACCA%]%,notes.ilike.%[Free ACCA%]%')
+        } else if (term.includes('NEW ACCA')) {
+          query = query.or('source_sheet.ilike.%PAN IND%,notes.ilike.%[PAN IND%]%,notes.ilike.%[NEW ACCA%]%')
+        } else if (term.includes('College')) {
+          query = query.or('source_sheet.ilike.%College%,notes.ilike.%[College%]%')
+        } else {
+          query = query.or(`source_sheet.ilike.${term},notes.ilike.%[${term}]%`)
+        }
       }
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)

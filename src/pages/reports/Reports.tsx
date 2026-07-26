@@ -1,19 +1,19 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
-import { Download } from 'lucide-react'
+import { Download, TrendingUp, Users, GraduationCap, IndianRupee, Filter } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, AreaChart, Area, Legend,
 } from 'recharts'
 
-const COLORS = ['#1E3A8A', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#64748B']
 
 export default function Reports() {
   const [dateFrom, setDateFrom] = useState('')
@@ -41,7 +41,7 @@ export default function Reports() {
   const { data: leads = [] } = useQuery({
     queryKey: ['report-leads', dateFrom, dateTo],
     queryFn: async () => {
-      let q = supabase.from('leads').select('*')
+      let q = supabase.from('leads').select('*, course:courses(name), counselor:users!leads_assigned_counselor_id_fkey(name)')
       if (dateFrom) q = q.gte('created_at', dateFrom)
       if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59')
       const { data } = await q
@@ -49,154 +49,271 @@ export default function Reports() {
     },
   })
 
-  const { data: batches = [] } = useQuery({
-    queryKey: ['report-batches'],
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['report-expenses', dateFrom, dateTo],
     queryFn: async () => {
-      const { data } = await supabase.from('batches').select('*, course:courses(name)')
+      let q = supabase.from('institute_expenses').select('*')
+      if (dateFrom) q = q.gte('expense_date', dateFrom)
+      if (dateTo) q = q.lte('expense_date', dateTo)
+      const { data } = await q
       return data ?? []
     },
   })
 
-  const revenueByCourse = Object.entries(
-    fees.reduce<Record<string, number>>((acc, f) => {
-      const name = (f as { course?: { name: string } }).course?.name ?? 'Unknown'
-      acc[name] = (acc[name] ?? 0) + Number(f.amount_paid)
-      return acc
-    }, {})
-  ).map(([name, value]) => ({ name, value }))
+  // Executive KPI Computations
+  const totalLeads = leads.length
+  const totalStudents = admissions.length
+  const conversionRate = totalLeads > 0 ? ((totalStudents / totalLeads) * 100).toFixed(1) : '0'
 
-  const admissionsByMonth = Object.entries(
-    admissions.reduce<Record<string, number>>((acc, s) => {
-      const month = (s as { admission_date: string }).admission_date?.slice(0, 7) ?? 'Unknown'
-      acc[month] = (acc[month] ?? 0) + 1
-      return acc
-    }, {})
-  ).map(([name, count]) => ({ name, count }))
+  const totalCollectedRevenue = useMemo(() => {
+    return fees.reduce((sum, f) => sum + Number(f.amount_paid || 0), 0)
+  }, [fees])
 
-  const sourceFunnel = Object.entries(
-    leads.reduce<Record<string, number>>((acc, l) => {
-      const src = (l as { source: string }).source ?? 'other'
-      acc[src] = (acc[src] ?? 0) + 1
-      return acc
-    }, {})
-  ).map(([name, value]) => ({ name, value }))
+  const totalPendingFee = useMemo(() => {
+    return fees.reduce((sum, f) => sum + Number(f.pending_balance || 0), 0)
+  }, [fees])
+
+  // Revenue by Course Chart Data
+  const revenueByCourse = useMemo(() => {
+    const map: Record<string, number> = {}
+    fees.forEach(f => {
+      const name = (f as { course?: { name: string } }).course?.name ?? 'General / Unlinked'
+      map[name] = (map[name] || 0) + Number(f.amount_paid || 0)
+    })
+    return Object.entries(map).map(([name, value]) => ({ name, value }))
+  }, [fees])
+
+  // Lead Pipeline Funnel Stages Data
+  const leadPipelineData = useMemo(() => {
+    const stageMap: Record<string, number> = {
+      'new_lead': 0,
+      'contacted': 0,
+      'follow_up': 0,
+      'demo_booked': 0,
+      'negotiation': 0,
+      'converted': 0,
+      'lost': 0
+    }
+    leads.forEach(l => {
+      const st = l.status || 'new_lead'
+      stageMap[st] = (stageMap[st] || 0) + 1
+    })
+    return [
+      { stage: 'New Lead', count: stageMap.new_lead },
+      { stage: 'Contacted', count: stageMap.contacted },
+      { stage: 'Follow Up', count: stageMap.follow_up },
+      { stage: 'Demo Scheduled', count: stageMap.demo_booked },
+      { stage: 'Negotiation', count: stageMap.negotiation },
+      { stage: 'Converted (Admitted)', count: stageMap.converted },
+    ]
+  }, [leads])
+
+  // Lead Sources Data
+  const sourceFunnel = useMemo(() => {
+    const map: Record<string, number> = {}
+    leads.forEach(l => {
+      const src = l.source ? l.source.replace('_', ' ').toUpperCase() : 'OTHER'
+      map[src] = (map[src] || 0) + 1
+    })
+    return Object.entries(map).map(([name, value]) => ({ name, value }))
+  }, [leads])
+
+  // Monthly Financial Comparison (Revenue vs Expenses)
+  const financialTrend = useMemo(() => {
+    const monthMap: Record<string, { revenue: number; expense: number }> = {}
+    fees.forEach(f => {
+      const month = f.created_at ? f.created_at.slice(0, 7) : 'Current'
+      if (!monthMap[month]) monthMap[month] = { revenue: 0, expense: 0 }
+      monthMap[month].revenue += Number(f.amount_paid || 0)
+    })
+    expenses.forEach(e => {
+      const month = e.expense_date ? e.expense_date.slice(0, 7) : 'Current'
+      if (!monthMap[month]) monthMap[month] = { revenue: 0, expense: 0 }
+      monthMap[month].expense += Number(e.amount || 0)
+    })
+    return Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, val]) => ({ month, Revenue: val.revenue, Expense: val.expense }))
+  }, [fees, expenses])
 
   const exportReport = (name: string, rows: Record<string, unknown>[]) => {
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, name)
-    XLSX.writeFile(wb, `kizen-${name}.xlsx`)
+    XLSX.writeFile(wb, `kizen-${name}-report.xlsx`)
   }
 
   return (
-    <div>
-      <PageHeader title="Reports" description="Owner-only analytics and exports" />
+    <div className="space-y-6">
+      <PageHeader title="Executive Reports & Insights" description="Comprehensive data analytics, revenue breakdown, and pipeline performance" />
 
-      <div className="mb-6 flex flex-wrap gap-4 items-end bg-white rounded-xl border border-border p-4 shadow-sm">
-        <div>
-          <Label>From</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+      {/* Date Filter Bar */}
+      <div className="flex flex-wrap gap-4 items-end bg-white rounded-xl border border-border p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm mr-2">
+          <Filter className="w-4 h-4 text-primary" /> Filter Date Range:
         </div>
         <div>
-          <Label>To</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Label className="text-xs text-slate-500">From Date</Label>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" />
         </div>
+        <div>
+          <Label className="text-xs text-slate-500">To Date</Label>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" />
+        </div>
+        {(dateFrom || dateTo) && (
+          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-xs text-slate-500">
+            Reset Filters
+          </Button>
+        )}
       </div>
 
+      {/* Executive Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="border-border/50 shadow-sm bg-gradient-to-br from-blue-50/50 to-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Total Pipeline Leads</p>
+              <h3 className="text-2xl font-black text-slate-900 mt-1">{totalLeads.toLocaleString()}</h3>
+              <p className="text-[11px] text-blue-600 font-semibold mt-1">Conversion: {conversionRate}%</p>
+            </div>
+            <div className="p-3 rounded-xl bg-blue-100/70 text-blue-600">
+              <Users className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-sm bg-gradient-to-br from-emerald-50/50 to-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Total Revenue Collected</p>
+              <h3 className="text-2xl font-black text-emerald-700 mt-1">{formatCurrency(totalCollectedRevenue)}</h3>
+              <p className="text-[11px] text-slate-500 font-semibold mt-1">Net Fee Received</p>
+            </div>
+            <div className="p-3 rounded-xl bg-emerald-100/70 text-emerald-600">
+              <IndianRupee className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-sm bg-gradient-to-br from-amber-50/50 to-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Outstanding Balance</p>
+              <h3 className="text-2xl font-black text-amber-700 mt-1">{formatCurrency(totalPendingFee)}</h3>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1">Pending Installments</p>
+            </div>
+            <div className="p-3 rounded-xl bg-amber-100/70 text-amber-600">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-sm bg-gradient-to-br from-purple-50/50 to-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Enrolled Students</p>
+              <h3 className="text-2xl font-black text-purple-700 mt-1">{totalStudents.toLocaleString()}</h3>
+              <p className="text-[11px] text-purple-600 font-semibold mt-1">Active Admissions</p>
+            </div>
+            <div className="p-3 rounded-xl bg-purple-100/70 text-purple-600">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* CHART 1: LEAD CONVERSION PIPELINE */}
         <ReportCard
-          title="Admissions by Month"
-          onExport={() => exportReport('admissions', admissionsByMonth)}
+          title="Lead Pipeline Funnel Stages"
+          subtitle="Distribution of leads across conversion stages"
+          onExport={() => exportReport('pipeline-funnel', leadPipelineData)}
           chart={
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={admissionsByMonth}>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={leadPipelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis allowDecimals={false} />
+                <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#1E3A8A" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="#3B82F6" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           }
         />
 
+        {/* CHART 2: REVENUE BY COURSE */}
         <ReportCard
-          title="Revenue by Course"
-          onExport={() => exportReport('revenue', revenueByCourse)}
+          title="Revenue Collection by Course"
+          subtitle="Fee distribution across academic programs"
+          onExport={() => exportReport('revenue-by-course', revenueByCourse)}
           chart={
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={revenueByCourse} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                  {revenueByCourse.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-              </PieChart>
-            </ResponsiveContainer>
+            revenueByCourse.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={revenueByCourse}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={3}
+                  >
+                    {revenueByCourse.map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-60 flex items-center justify-center text-xs text-slate-400">No fee data recorded yet</div>
+            )
           }
         />
 
+        {/* CHART 3: FINANCIAL HEALTH (REVENUE VS EXPENSES) */}
         <ReportCard
-          title="Lead Sources Performance"
-          onExport={() => exportReport('sources', sourceFunnel)}
+          title="Monthly Financial Health (Revenue vs Expenses)"
+          subtitle="Comparing net collected fees against operational expenses"
+          onExport={() => exportReport('financial-health', financialTrend)}
           chart={
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={sourceFunnel} layout="vertical">
+            financialTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={financialTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <Area type="monotone" dataKey="Revenue" stroke="#10B981" fill="#10B981" fillOpacity={0.2} />
+                  <Area type="monotone" dataKey="Expense" stroke="#EF4444" fill="#EF4444" fillOpacity={0.2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-60 flex items-center justify-center text-xs text-slate-400">No trend data available for selected period</div>
+            )
+          }
+        />
+
+        {/* CHART 4: LEAD SOURCES ATTRIBUTION */}
+        <ReportCard
+          title="Lead Acquisition Channels"
+          subtitle="Breakdown of leads by source"
+          onExport={() => exportReport('lead-sources', sourceFunnel)}
+          chart={
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={sourceFunnel} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#10B981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="value" fill="#8B5CF6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          }
-        />
-
-        <ReportCard
-          title="Batch Occupancy"
-          onExport={() => exportReport('batches', batches.map((b) => ({
-            batch: (b as { batch_name: string }).batch_name,
-            enrolled: (b as { enrolled_count: number }).enrolled_count,
-            total: (b as { total_seats: number }).total_seats,
-          })))}
-          chart={
-            <div className="space-y-2">
-              {batches.slice(0, 5).map((b) => {
-                const batch = b as { id: string; batch_name: string; enrolled_count: number; total_seats: number }
-                const pct = Math.round((batch.enrolled_count / batch.total_seats) * 100)
-                return (
-                  <div key={batch.id}>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-700">{batch.batch_name}</span>
-                      <span className="text-muted-foreground">{batch.enrolled_count}/{batch.total_seats}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-slate-100 mt-1">
-                      <div
-                        className="h-2.5 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: pct > 90 ? '#EF4444' : pct > 70 ? '#F59E0B' : '#10B981' }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          }
-        />
-
-        <ReportCard
-          title="Outstanding Fees"
-          onExport={() => exportReport('outstanding', fees.filter((f) => Number((f as { pending_balance: number }).pending_balance) > 0).map((f) => ({
-            student: (f as { student?: { full_name: string } }).student?.full_name,
-            balance: (f as { pending_balance: number }).pending_balance,
-          })))}
-          chart={
-            <div className="text-sm space-y-2 max-h-48 overflow-y-auto">
-              {fees.filter((f) => Number((f as { pending_balance: number }).pending_balance) > 0).slice(0, 8).map((f) => (
-                <div key={(f as { id: string }).id} className="flex justify-between border-b border-border/50 pb-1.5">
-                  <span className="text-slate-700">{(f as { student?: { full_name: string } }).student?.full_name}</span>
-                  <span className="font-medium text-danger">{formatCurrency(Number((f as { pending_balance: number }).pending_balance))}</span>
-                </div>
-              ))}
-            </div>
           }
         />
       </div>
@@ -204,16 +321,19 @@ export default function Reports() {
   )
 }
 
-function ReportCard({ title, chart, onExport }: { title: string; chart: React.ReactNode; onExport: () => void }) {
+function ReportCard({ title, subtitle, chart, onExport }: { title: string; subtitle?: string; chart: React.ReactNode; onExport: () => void }) {
   return (
-    <Card className="hover:shadow-md transition-shadow duration-150">
-      <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-primary" />
-          {title}
-        </CardTitle>
-        <Button variant="outline" size="sm" onClick={onExport}>
-          <Download className="h-4 w-4" /> Excel
+    <Card className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-3 bg-slate-50/40">
+        <div>
+          <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-primary" />
+            {title}
+          </CardTitle>
+          {subtitle && <CardDescription className="text-[11px] text-slate-500 mt-0.5">{subtitle}</CardDescription>}
+        </div>
+        <Button variant="outline" size="sm" onClick={onExport} className="h-8 text-xs gap-1 text-slate-600 hover:text-slate-900">
+          <Download className="h-3.5 w-3.5" /> Export Excel
         </Button>
       </CardHeader>
       <CardContent className="pt-4">{chart}</CardContent>

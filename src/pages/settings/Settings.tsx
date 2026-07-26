@@ -3,7 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Plus } from 'lucide-react'
+import { Plus, Download, Trash2, Loader2, Database, Pencil, Key, ShieldCheck } from 'lucide-react'
+import { format } from 'date-fns'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useUsers, useBatches } from '@/hooks/useStudents'
@@ -24,9 +26,12 @@ import { FieldValue } from '@/components/shared/FieldValue'
 import ExportData from '@/components/shared/ExportData'
 import TrashView from '@/components/shared/TrashView'
 import ActivityLog from '@/components/shared/ActivityLog'
+import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
+import { PasswordResetModal } from '@/components/shared/PasswordResetModal'
+import { RolePermissionsTab } from '@/components/settings/RolePermissionsTab'
 import type { User, UserRole } from '@/types'
 
-const ALL_ROLES = ['admin', 'counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
+const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
 
 const inviteSchema = z.object({
   name: z.string().min(2),
@@ -45,9 +50,71 @@ export default function Settings() {
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [editName, setEditName] = useState('')
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetTargetUser, setResetTargetUser] = useState<User | null>(null)
   const [editEmail, setEditEmail] = useState('')
   const [newCourse, setNewCourse] = useState('')
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
+  const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
+  const [wiping, setWiping] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+
+  const handleDownloadBackup = async () => {
+    setBackingUp(true)
+    try {
+      const wb = XLSX.utils.book_new()
+
+      const { data: students } = await supabase.from('students').select('*, course:courses(name), batch:batches(batch_name)')
+      if (students?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(students), 'Students')
+
+      const { data: fees } = await supabase.from('fees').select('*, student:students(full_name, mobile), course:courses(name)')
+      if (fees?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fees), 'Fees')
+
+      const { data: payments } = await supabase.from('fee_payments').select('*, student:students(full_name)')
+      if (payments?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payments), 'Payments')
+
+      const { data: installments } = await supabase.from('installments').select('*')
+      if (installments?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(installments), 'Installments')
+
+      const { data: leads } = await supabase.from('leads').select('*')
+      if (leads?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leads), 'Leads')
+
+      const { data: followups } = await supabase.from('follow_ups').select('*')
+      if (followups?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(followups), 'FollowUps')
+
+      const filename = `Kizen_CRM_Full_Backup_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, filename)
+      toast.success('Full system backup downloaded!')
+    } catch (err) {
+      toast.error('Backup failed: ' + (err as Error).message)
+    } finally {
+      setBackingUp(false)
+    }
+  }
+
+  const handleWipeTestData = async () => {
+    setWiping(true)
+    try {
+      // Sequence deletion respecting FK dependencies
+      await supabase.from('fee_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('installments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('fees').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('follow_ups').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('lead_activities').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('institute_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('batches').update({ enrolled_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000')
+
+      toast.success('Old test data wiped successfully!')
+      setWipeConfirmOpen(false)
+    } catch (err) {
+      toast.error('Failed to wipe data: ' + (err as Error).message)
+    } finally {
+      setWiping(false)
+    }
+  }
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<InviteForm>({
     resolver: zodResolver(inviteSchema),
@@ -152,9 +219,11 @@ export default function Settings() {
           <TabsTrigger value="users">Users ({userCount}/15)</TabsTrigger>
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
+          <TabsTrigger value="intake">Data Intake</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="trash">Trash</TabsTrigger>
+          {profile?.is_owner && <TabsTrigger value="permissions">Role Access Matrix</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
@@ -179,21 +248,18 @@ export default function Settings() {
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Email</TableHead>
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Role</TableHead>
                     <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Active</TableHead>
+                    <TableHead className="font-medium text-right" style={{ color: 'var(--muted-foreground)' }}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
-                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
-                          <FieldValue value={u.name} />
-                        </button>
+                        <FieldValue value={u.name} />
                         {u.is_owner && <Badge className="ml-2">Owner</Badge>}
                       </TableCell>
                       <TableCell>
-                        <button className="hover:underline text-left" onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}>
-                          <FieldValue value={u.email} />
-                        </button>
+                        <FieldValue value={u.email} />
                       </TableCell>
                       <TableCell>
                         {u.is_owner ? (
@@ -219,6 +285,28 @@ export default function Settings() {
                             }}
                           />
                         )}
+                      </TableCell>
+                      <TableCell className="text-right flex items-center justify-end gap-1.5">
+                        {(profile?.is_owner || profile?.role === 'admin') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { setResetTargetUser(u); setResetModalOpen(true) }}
+                            className="h-8 px-2 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200"
+                            title="Reset User Password"
+                          >
+                            <Key className="h-3.5 w-3.5 mr-1" /> Reset Password
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}
+                          className="h-8 px-2 text-xs"
+                          title="Edit User Name & Settings"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -311,7 +399,11 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="system" className="mt-4">
+        <TabsContent value="intake" className="mt-4">
+          <DataIntakeTab />
+        </TabsContent>
+
+        <TabsContent value="system" className="mt-4 space-y-4">
           <Card className="shadow-sm">
             <CardHeader className="border-b border-border/50 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -324,9 +416,92 @@ export default function Settings() {
                 <Label>CRM Name</Label>
                 <Input defaultValue="Kizen Education CRM" />
               </div>
-              <p className="text-sm text-muted-foreground">Logo upload available after Supabase Storage is configured.</p>
+              <p className="text-xs text-muted-foreground">System Name: Kizen Education CRM (Production)</p>
             </CardContent>
           </Card>
+
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="border-b border-border/50 pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-amber-500" />
+                Security & Credentials
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Password Management</p>
+                  <p className="text-xs text-muted-foreground">Update password credentials for your account ({profile?.email})</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setResetTargetUser(profile); setResetModalOpen(true) }}
+                  className="rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50 font-medium"
+                >
+                  <Key className="h-3.5 w-3.5 mr-1.5" /> Change My Password
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {profile?.is_owner && (
+            <Card className="mt-4 border-red-200 bg-red-50/20 shadow-sm">
+              <CardHeader className="border-b border-red-100 pb-3">
+                <CardTitle className="text-base text-red-800 flex items-center gap-2 font-semibold">
+                  <Database className="h-4 w-4 text-red-600" />
+                  Owner Actions — Backup & Reset Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <p className="text-sm text-red-700/80 leading-relaxed">
+                  Before performing a fresh data import, you can download a complete backup of all system data to Excel. Once saved, you can safely wipe old test records. Courses, Batches, and User accounts will remain untouched.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {/* Backup Button */}
+                  <Button
+                    type="button"
+                    onClick={handleDownloadBackup}
+                    disabled={backingUp}
+                    className="bg-slate-900 text-white hover:bg-slate-800 font-medium text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer"
+                  >
+                    {backingUp ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        Generating Backup...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 text-white" />
+                        Download Full System Backup (.xlsx)
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Wipe Button with Explicit Red Background */}
+                  <Button
+                    type="button"
+                    onClick={() => setWipeConfirmOpen(true)}
+                    disabled={wiping}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer border-none"
+                  >
+                    {wiping ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        Wiping Data...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 text-white" />
+                        Wipe All Old Test Data
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="export" className="mt-4">
@@ -345,6 +520,12 @@ export default function Settings() {
         <TabsContent value="activity" className="mt-4">
           <ActivityLog />
         </TabsContent>
+
+        {profile?.is_owner && (
+          <TabsContent value="permissions" className="mt-4">
+            <RolePermissionsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -431,6 +612,22 @@ export default function Settings() {
         description="This user will no longer be able to access the CRM."
         destructive
         onConfirm={() => deactivateId && handleDeactivate(deactivateId, false)}
+      />
+
+      <ConfirmDialog
+        open={wipeConfirmOpen}
+        onOpenChange={setWipeConfirmOpen}
+        title="Wipe all test data?"
+        description="This will permanently delete all test leads, students, fees, attendance, and follow-ups. Courses, Batches, and User accounts will be preserved. Are you sure?"
+        destructive
+        onConfirm={handleWipeTestData}
+      />
+
+      <PasswordResetModal
+        open={resetModalOpen}
+        onOpenChange={setResetModalOpen}
+        targetUser={resetTargetUser}
+        currentUser={profile}
       />
     </div>
   )

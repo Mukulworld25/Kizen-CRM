@@ -2,13 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document } from '@/types'
+import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document, Batch } from '@/types'
 
-export function useFollowUps(tab: string, counselorId?: string) {
+export function useFollowUps(tab: string, counselorId?: string, targetDate?: string) {
   const { profile } = useAuth()
 
   return useQuery({
-    queryKey: ['follow-ups', tab, counselorId, profile?.id],
+    queryKey: ['follow-ups', tab, counselorId, targetDate, profile?.id],
     queryFn: async () => {
       let query = supabase
         .from('follow_ups')
@@ -19,7 +19,12 @@ export function useFollowUps(tab: string, counselorId?: string) {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
 
-      if (tab === 'today') {
+      if (targetDate) {
+        const selected = new Date(targetDate)
+        const dStart = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate()).toISOString()
+        const dEnd = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 23, 59, 59).toISOString()
+        query = query.gte('scheduled_at', dStart).lte('scheduled_at', dEnd)
+      } else if (tab === 'today') {
         query = query.gte('scheduled_at', todayStart).lte('scheduled_at', todayEnd).neq('status', 'completed')
       } else if (tab === 'overdue') {
         query = query.eq('status', 'overdue')
@@ -67,6 +72,7 @@ export function useCompleteFollowUp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up marked complete')
     },
     onError: (err) => toast.error(err.message),
@@ -89,7 +95,30 @@ export function useCreateFollowUp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up scheduled')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useRescheduleFollowUp() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, scheduledAt, notes }: { id: string; scheduledAt: string; notes?: string }) => {
+      const payload: Record<string, any> = { scheduled_at: scheduledAt, status: 'pending' }
+      if (notes !== undefined) payload.notes = notes
+      const { error } = await supabase
+        .from('follow_ups')
+        .update(payload)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      toast.success('Follow-up rescheduled successfully')
     },
     onError: (err) => toast.error(err.message),
   })
@@ -114,7 +143,19 @@ export function useStudents(filters: { courseId?: string; batchId?: string; sear
 
       const { data, error } = await query
       if (error) throw error
-      return (data ?? []) as Student[]
+      const students = ((data ?? []) as Student[]).map((s) => {
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+        if (!s.is_active || s.certification_status === 'not_started') {
+          flag_color = 'red'
+          flag_reason = 'Certification Not Started / Inactive Status'
+        } else if (s.certification_status === 'in_progress') {
+          flag_color = 'yellow'
+          flag_reason = 'Certification In Progress'
+        }
+        return { ...s, flag_color, flag_reason }
+      })
+      return students
     },
     enabled: !!profile,
   })
@@ -126,7 +167,7 @@ export function useStudent(id: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('students')
-        .select('*, course:courses(*), batch:batches(*)')
+        .select('*, course:courses(*), batch:batches(*, faculty:users(*)), lead:leads(*)')
         .eq('id', id!)
         .single()
       if (error) throw error
@@ -219,7 +260,7 @@ export function useUploadStudentDocument() {
   })
 }
 
-export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) {
+export function useFees(filters: { overdue?: boolean; courseId?: string; courseLevel?: string; paymentStatus?: string; counselorId?: string } = {}) {
   const { profile, can } = useAuth()
 
   return useQuery({
@@ -227,7 +268,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) 
     queryFn: async () => {
       let query = supabase
         .from('fees')
-        .select('*, student:students(full_name, student_id, mobile), course:courses(name), installments(*)')
+        .select('*, student:students(full_name, student_id, mobile, address), course:courses(name), installments(*)')
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)
@@ -235,10 +276,47 @@ export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) 
       const { data, error } = await query
       if (error) throw error
 
-      let fees = (data ?? []) as Fee[]
+      let rawFees = (data ?? []) as Fee[]
       if (filters.overdue) {
-        fees = fees.filter((f) => f.pending_balance > 0)
+        rawFees = rawFees.filter((f) => f.pending_balance > 0)
       }
+
+      if (filters.courseLevel && filters.courseLevel !== 'all') {
+        rawFees = rawFees.filter((f) => {
+          const cName = (f.course?.name || '').toLowerCase()
+          const sheet = ((f as any).source_sheet || f.student?.address || '').toLowerCase()
+          const level = filters.courseLevel!.toLowerCase()
+          if (sheet && (sheet === level || sheet.includes(level))) return true
+          if (level === 'acca kl') return cName.includes('knowledge') || cName.includes('kl') || sheet.includes('kl')
+          if (level === 'acca sl') return cName.includes('skill') || cName.includes('sl') || sheet.includes('sl')
+          if (level === 'acca pl') return cName.includes('professional') || cName.includes('pl') || sheet.includes('pl')
+          if (level === 'fia') return cName.includes('fia') || sheet.includes('fia')
+          if (level === '11th & 12th') return cName.includes('11') || cName.includes('12') || sheet.includes('11')
+          if (level === 'b.com') return cName.includes('b.com') || cName.includes('bba') || sheet.includes('b.com')
+          if (level === 'others') return sheet.includes('others') || cName.includes('other')
+          return false
+        })
+      }
+
+      if (filters.paymentStatus) {
+        if (filters.paymentStatus === 'paid') rawFees = rawFees.filter((f) => f.pending_balance <= 0)
+        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.pending_balance > 0)
+        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.pending_balance > 50000)
+      }
+
+      const fees = rawFees.map((f) => {
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+        if (f.pending_balance > 50000) {
+          flag_color = 'red'
+          flag_reason = `High Outstanding Balance (₹${f.pending_balance.toLocaleString()})`
+        } else if (f.pending_balance > 0) {
+          flag_color = 'yellow'
+          flag_reason = `Installment Balance Pending (₹${f.pending_balance.toLocaleString()})`
+        }
+        return { ...f, flag_color, flag_reason }
+      })
+
       return fees
     },
     enabled: !!profile && can('viewFees'),
@@ -354,7 +432,8 @@ export function useBatches() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('batches')
-        .select('*, course:courses(name), faculty:users(name)')
+        .select('*, course:courses(name), faculty:users(id, name, email)')
+        .order('created_at', { ascending: false })
       if (error) throw error
       return data ?? []
     },
@@ -365,7 +444,7 @@ export function useUpdateBatch() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; faculty_id?: string | null }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Batch> }) => {
       const { data, error } = await supabase
         .from('batches')
         .update(updates)
@@ -377,7 +456,8 @@ export function useUpdateBatch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batches'] })
-      toast.success('Batch updated')
+      queryClient.invalidateQueries({ queryKey: ['faculty-students'] })
+      toast.success('Batch schedule & faculty updated')
     },
     onError: (err) => toast.error(err.message),
   })
@@ -389,9 +469,25 @@ export function useUsers() {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('users').select('*').order('name')
+      const { data, error } = await supabase.from('users').select('*')
       if (error) throw error
-      return data ?? []
+
+      const rolePriority: Record<string, number> = {
+        owner: 1,
+        admin: 2,
+        counselor: 3,
+        reception: 4,
+        accounts: 5,
+        faculty: 6,
+        bdm: 7,
+      }
+
+      return (data ?? []).sort((a, b) => {
+        const priorityA = rolePriority[a.role] ?? 99
+        const priorityB = rolePriority[b.role] ?? 99
+        if (priorityA !== priorityB) return priorityA - priorityB
+        return a.name.localeCompare(b.name)
+      })
     },
     enabled: can('manageUsers'),
   })
@@ -570,13 +666,13 @@ export function useGlobalSearch(query: string) {
       if (!query || query.length < 2) return []
 
       const [leadsRes, studentsRes] = await Promise.all([
-        supabase.from('leads').select('id, full_name, mobile').or(`full_name.ilike.%${query}%,mobile.ilike.%${query}%`).limit(5),
+        supabase.from('leads').select('id, display_id, full_name, mobile').or(`full_name.ilike.%${query}%,mobile.ilike.%${query}%,display_id.ilike.%${query}%`).limit(5),
         supabase.from('students').select('id, full_name, student_id, mobile').or(`full_name.ilike.%${query}%,student_id.ilike.%${query}%,mobile.ilike.%${query}%`).limit(5),
       ])
 
       const results = [
-        ...(leadsRes.data ?? []).map((l) => ({ ...l, type: 'lead' as const })),
-        ...(studentsRes.data ?? []).map((s) => ({ ...s, type: 'student' as const })),
+        ...(leadsRes.data ?? []).map((l) => ({ ...l, display_id: (l as any).display_id, type: 'lead' as const })),
+        ...(studentsRes.data ?? []).map((s) => ({ ...s, display_id: (s as any).student_id, type: 'student' as const })),
       ]
       return results
     },

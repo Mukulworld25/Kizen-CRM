@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
+import FlagDot from '@/components/ui/FlagDot'
 import AddInstitutionModal from '@/pages/institutions/AddInstitutionModal'
 import type { Institution, MouStatus } from '@/types'
 
@@ -22,12 +23,24 @@ const mouColors: Record<MouStatus, string> = {
 export default function InstitutionList() {
   const navigate = useNavigate()
   const { can } = useAuth()
-  const { data: institutions = [], isLoading } = useInstitutions()
+  const { data: rawInstitutions = [], isLoading } = useInstitutions()
   const softDelete = useSoftDelete()
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+
+  const institutions = flaggedOnly ? rawInstitutions.filter((i) => i.flag_color != null) : rawInstitutions
 
   const columns: Column<Institution>[] = [
+    {
+      key: 'flag',
+      header: '',
+      render: (r) => (
+        <div className="flex items-center justify-center w-4">
+          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+        </div>
+      ),
+    },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'type', header: 'Type', render: (r) => <Badge variant="outline" className="capitalize">{r.type}</Badge> },
     { key: 'city', header: 'City', render: (r) => r.city ?? '—' },
@@ -59,9 +72,19 @@ export default function InstitutionList() {
   return (
     <div>
       <PageHeader title="Institutions" description="Manage schools and colleges">
-        {can('editInstitutions') && (
-          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Institution</Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={flaggedOnly ? 'destructive' : 'outline'}
+            size="sm"
+            className="text-xs"
+            onClick={() => setFlaggedOnly((prev) => !prev)}
+          >
+            {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
+          </Button>
+          {can('editInstitutions') && (
+            <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Institution</Button>
+          )}
+        </div>
       </PageHeader>
 
       <DataTable

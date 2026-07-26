@@ -29,6 +29,7 @@ export type Permission =
   | 'importData'
   | 'viewCalendar'
   | 'manageCategories'
+  | 'viewKnowledgeBase'
 
 const rolePermissions: Record<UserRole, Permission[]> = {
   owner: [
@@ -38,7 +39,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'manageUsers', 'manageCourses', 'viewAuditLogs', 'assignCounselor',
     'viewInstitutions', 'editInstitutions', 'viewExpenses', 'manageExpenses',
     'viewBdmDashboard', 'generateInvoices', 'importData',
-    'viewCalendar', 'manageCategories',
+    'viewCalendar', 'manageCategories', 'viewKnowledgeBase',
   ],
   admin: [
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads',
@@ -47,7 +48,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents', 'viewCalendar',
+    'viewFollowUps', 'viewStudents', 'editStudents', 'viewFees', 'recordPayments', 'viewCalendar',
   ],
   faculty: [
     'viewDashboard', 'viewStudents', 'markAttendance', 'viewCalendar',
@@ -56,7 +57,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewFees', 'recordPayments',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',
@@ -68,10 +69,40 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   ],
 }
 
+const STORAGE_KEY = 'kizen_dynamic_role_permissions'
+
+export function getDynamicRolePermissions(role: UserRole): Permission[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed && parsed[role]) {
+        return parsed[role]
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse dynamic permissions:', e)
+  }
+  return rolePermissions[role] || []
+}
+
+export function saveDynamicRolePermissions(role: UserRole, permissions: Permission[]): void {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    const current = saved ? JSON.parse(saved) : {}
+    current[role] = permissions
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current))
+    window.dispatchEvent(new Event('kizen_permissions_updated'))
+  } catch (e) {
+    console.error('Failed to save dynamic permissions:', e)
+  }
+}
+
 export function hasPermission(role: UserRole | undefined, permission: Permission, isOwner = false): boolean {
   if (!role) return false
   if (isOwner) return true
-  return rolePermissions[role]?.includes(permission) ?? false
+  const activePermissions = getDynamicRolePermissions(role)
+  return activePermissions.includes(permission)
 }
 
 export function canAccessRoute(role: UserRole | undefined, path: string, isOwner = false): boolean {
@@ -82,6 +113,7 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
     '/dashboard': 'viewDashboard',
     '/leads': 'viewLeads',
     '/followups': 'viewFollowUps',
+    '/calendar': 'viewFollowUps',
     '/students': 'viewStudents',
     '/fees': 'viewFees',
     '/reports': 'viewReports',
@@ -90,7 +122,6 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
     '/expenses': 'viewExpenses',
     '/faculty': 'viewFacultyDashboard',
     '/import': 'importData',
-    '/calendar': 'viewCalendar',
   }
 
   const base = '/' + path.split('/').filter(Boolean)[0]

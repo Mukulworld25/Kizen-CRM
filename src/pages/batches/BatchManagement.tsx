@@ -78,7 +78,7 @@ export default function BatchManagement() {
     if (!selectedBatch) return
     await updateBatch.mutateAsync({
       id: selectedBatch.id,
-      faculty_id: facultyId === 'none' ? null : facultyId
+      updates: { faculty_id: facultyId === 'none' ? null : facultyId },
     })
     setEditOpen(false)
   }

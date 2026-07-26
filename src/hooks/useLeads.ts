@@ -9,7 +9,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 export function useLeads(filters: LeadFilters = {}) {
   const { profile } = useAuth()
   const page = filters.page ?? 1
-  const pageSize = filters.pageSize ?? 25
+  const pageSize = filters.pageSize ?? 15
 
   return useQuery({
     queryKey: ['leads', filters, profile?.id],
@@ -22,6 +22,19 @@ export function useLeads(filters: LeadFilters = {}) {
 
       if (filters.status) query = query.eq('status', filters.status)
       if (filters.source) query = query.eq('source', filters.source)
+      if (filters.sheetSource) {
+        let term = filters.sheetSource
+        if (term === 'ACCA (April)' || term === 'ACCA SL') {
+          query = query.or('source_sheet.ilike.%ACCA%,notes.ilike.%[ACCA%]%,notes.ilike.%[Free ACCA%]%')
+        } else if (term.includes('NEW ACCA')) {
+          query = query.or('source_sheet.ilike.%PAN IND%,notes.ilike.%[PAN IND%]%,notes.ilike.%[NEW ACCA%]%')
+        } else if (term.includes('College')) {
+          query = query.or('source_sheet.ilike.%College%,notes.ilike.%[College%]%')
+        } else {
+          query = query.or(`source_sheet.ilike.${term},notes.ilike.%[${term}]%`)
+        }
+      }
+      if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)
       if (filters.priority) query = query.eq('priority', filters.priority)
@@ -29,12 +42,35 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
       if (filters.dateTo) query = query.lte('created_at', filters.dateTo + 'T23:59:59')
       if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%`)
+        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%,city.ilike.%${filters.search}%`)
       }
 
       const { data, error, count } = await query
       if (error) throw error
-      return { leads: (data ?? []) as Lead[], total: count ?? 0 }
+
+      const now = new Date().getTime()
+      const leads = ((data ?? []) as Lead[]).map((lead) => {
+        const createdAtTime = new Date(lead.created_at).getTime()
+        const diffHours = (now - createdAtTime) / (1000 * 60 * 60)
+
+        let flag_color: 'red' | 'yellow' | null = null
+        let flag_reason: string | null = null
+
+        if ((lead.status === 'new_lead' || lead.status === 'follow_up') && diffHours > 48) {
+          flag_color = 'red'
+          flag_reason = `Uncontacted / Pinned >48 hours (${Math.round(diffHours)}h ago)`
+        } else if (lead.status === 'lost') {
+          flag_color = 'red'
+          flag_reason = 'Cold Lead Pool / High Risk'
+        } else if (lead.status === 'follow_up' || lead.status === 'demo_booked') {
+          flag_color = 'yellow'
+          flag_reason = 'Follow-up / Demo Scheduled'
+        }
+
+        return { ...lead, flag_color, flag_reason }
+      })
+
+      return { leads, total: count ?? 0 }
     },
     enabled: !!profile,
   })

@@ -14,14 +14,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { IndianRupee, AlertTriangle, Clock } from 'lucide-react'
+import FlagDot from '@/components/ui/FlagDot'
 import type { Fee, PaymentMethod } from '@/types'
+import { FEE_COURSE_LEVELS } from '@/types'
 import { supabase } from '@/lib/supabase'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
   const { can, isOwner } = useAuth()
   const [overdueOnly, setOverdueOnly] = useState(false)
-  const { data: fees = [], isLoading } = useFees({ overdue: overdueOnly })
+  const [courseLevel, setCourseLevel] = useState<string>('all')
+  const [paymentStatus, setPaymentStatus] = useState<string>('all')
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const { data: rawFees = [], isLoading } = useFees({
+    overdue: overdueOnly,
+    courseLevel,
+    paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
+  })
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
   const recordPayment = useRecordPayment()
@@ -31,11 +40,22 @@ export default function FeeManagement() {
   const [txnId, setTxnId] = useState('')
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
+  const fees = flaggedOnly ? rawFees.filter((f) => f.flag_color != null) : rawFees
+
   const totalCollected = fees.reduce((s, f) => s + Number(f.amount_paid), 0)
   const totalPending = fees.reduce((s, f) => s + Number(f.pending_balance), 0)
   const overdueCount = fees.filter((f) => f.pending_balance > 0).length
 
   const columns: Column<Fee>[] = [
+    {
+      key: 'flag',
+      header: '',
+      render: (r) => (
+        <div className="flex items-center justify-center w-4">
+          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+        </div>
+      ),
+    },
     { key: 'student', header: 'Student', render: (r) => r.student?.full_name ?? '—', exportValue: (r) => r.student?.full_name ?? '' },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—' },
     { key: 'duration', header: 'Duration', render: (r) => r.course?.duration_days ? `${r.course.duration_days} days` : (r.course?.duration_hours ? `${r.course.duration_hours} hrs` : '—') },
@@ -139,9 +159,43 @@ export default function FeeManagement() {
         <StatsCard title="Outstanding Accounts" value={overdueCount} icon={AlertTriangle} color="bg-danger" loading={isLoading} />
       </div>
 
-      <div className="mb-4 flex items-center gap-2 bg-white rounded-xl border border-border p-3 shadow-sm">
-        <Button variant={overdueOnly ? 'default' : 'outline'} size="sm" onClick={() => setOverdueOnly((o) => !o)}>
-          {overdueOnly ? 'Showing Overdue' : 'Filter Overdue'}
+      <div className="mb-4 flex flex-wrap items-center gap-3 bg-white rounded-xl border border-border p-3 shadow-sm">
+        <Select value={courseLevel} onValueChange={setCourseLevel}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Course Levels</SelectItem>
+            {FEE_COURSE_LEVELS.map((lvl) => (
+              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Health" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="paid">Paid in Full</SelectItem>
+            <SelectItem value="pending">Pending Balance</SelectItem>
+            <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant={overdueOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setOverdueOnly((prev) => !prev)}
+        >
+          {overdueOnly ? 'Showing Overdue' : 'Overdue Only'}
+        </Button>
+
+        <Button
+          variant={flaggedOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs"
+          onClick={() => setFlaggedOnly((prev) => !prev)}
+        >
+          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
         </Button>
       </div>
 
@@ -179,7 +233,7 @@ export default function FeeManagement() {
               <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['cash','upi','bank_transfer','cheque','card','other'].map((m) => (
+                  {['cash', 'upi', 'bank_transfer'].map((m) => (
                     <SelectItem key={m} value={m} className="capitalize">{m.replace('_', ' ')}</SelectItem>
                   ))}
                 </SelectContent>

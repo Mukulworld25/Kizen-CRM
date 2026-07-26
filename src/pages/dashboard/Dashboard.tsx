@@ -18,10 +18,11 @@ import {
   Building2, CalendarRange, Handshake, Thermometer,
   ArrowUpRight, ArrowDownRight, MoreHorizontal,
   Zap, Award, CalendarDays, Settings2,
-  DollarSign, Activity, Star,
+  DollarSign, Activity, Star, Flame, ShieldAlert, UserCheck, Compass,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts'
 
 /* ── Widget Registry ── */
@@ -33,19 +34,23 @@ interface WidgetDef {
 }
 
 const ALL_WIDGETS: WidgetDef[] = [
-  { key: 'revenue_collected', label: 'Revenue Collected', defaultVisible: true, defaultPosition: 0 },
-  { key: 'admissions_goal', label: 'Admissions vs Goal', defaultVisible: true, defaultPosition: 1 },
-  { key: 'conversion_rate', label: 'Conversion Rate', defaultVisible: true, defaultPosition: 2 },
-  { key: 'pipeline_chart', label: 'Pipeline Stages', defaultVisible: true, defaultPosition: 3 },
-  { key: 'cash_expense', label: 'Cash / Expense Snapshot', defaultVisible: true, defaultPosition: 4 },
-  { key: 'cold_leads', label: 'Cold Leads', defaultVisible: true, defaultPosition: 5 },
-  { key: 'overdue_followups', label: 'Overdue Follow-ups', defaultVisible: true, defaultPosition: 6 },
-  { key: 'overdue_fees', label: 'Overdue Fees', defaultVisible: true, defaultPosition: 7 },
-  { key: 'batch_capacity', label: 'Batch Capacity', defaultVisible: true, defaultPosition: 8 },
-  { key: 'cycle_countdown', label: 'Admissions Cycle Countdown', defaultVisible: false, defaultPosition: 9 },
-  { key: 'lead_sources', label: 'Lead Sources Chart', defaultVisible: true, defaultPosition: 10 },
-  { key: 'today_followups', label: "Today's Follow-ups", defaultVisible: true, defaultPosition: 11 },
-  { key: 'insight_alerts', label: 'Insight Alerts', defaultVisible: false, defaultPosition: 12 },
+  { key: 'risk_radar', label: '🚨 Operational Risk Radar', defaultVisible: true, defaultPosition: 0 },
+  { key: 'revenue_collected', label: 'Revenue Collected', defaultVisible: true, defaultPosition: 1 },
+  { key: 'admissions_goal', label: 'Admissions vs Goal', defaultVisible: true, defaultPosition: 2 },
+  { key: 'conversion_rate', label: 'Conversion Rate', defaultVisible: true, defaultPosition: 3 },
+  { key: 'lead_temperature', label: '🔥 Lead Temperature Heatmap', defaultVisible: true, defaultPosition: 4 },
+  { key: 'course_goal_pacing', label: '🎯 Course Target Pacing', defaultVisible: true, defaultPosition: 5 },
+  { key: 'pipeline_chart', label: 'Pipeline Stages', defaultVisible: true, defaultPosition: 6 },
+  { key: 'counselor_leaderboard', label: '🏆 Counselor Leaderboard', defaultVisible: true, defaultPosition: 7 },
+  { key: 'cash_expense', label: 'Cash / Expense Snapshot', defaultVisible: true, defaultPosition: 8 },
+  { key: 'lead_sources', label: 'Lead Sources Chart', defaultVisible: true, defaultPosition: 9 },
+  { key: 'today_followups', label: "Today's Follow-ups", defaultVisible: true, defaultPosition: 10 },
+  { key: 'cold_leads', label: 'Cold Leads', defaultVisible: true, defaultPosition: 11 },
+  { key: 'overdue_followups', label: 'Overdue Follow-ups', defaultVisible: true, defaultPosition: 12 },
+  { key: 'overdue_fees', label: 'Overdue Fees', defaultVisible: true, defaultPosition: 13 },
+  { key: 'batch_capacity', label: 'Batch Capacity', defaultVisible: true, defaultPosition: 14 },
+  { key: 'cycle_countdown', label: 'Admissions Cycle Countdown', defaultVisible: true, defaultPosition: 15 },
+  { key: 'insight_alerts', label: 'Insight Alerts', defaultVisible: false, defaultPosition: 16 },
 ]
 
 /* ── Count-up hook ── */
@@ -396,10 +401,6 @@ function OwnerDashboard() {
     { name: 'Converted', value: admissions },
   ]
 
-  const visibleWidgets = ALL_WIDGETS
-    .filter(w => widgetPrefs[w.key]?.visible !== false)
-    .sort((a, b) => (widgetPrefs[a.key]?.position ?? a.defaultPosition) - (widgetPrefs[b.key]?.position ?? b.defaultPosition))
-
   const handleToggleWidget = (key: string, visible: boolean) => {
     setWidgetPrefs(prev => ({ ...prev, [key]: { ...prev[key], visible } }))
     setDirtyPrefs(true)
@@ -443,6 +444,153 @@ function OwnerDashboard() {
 
   const renderWidget = (widgetKey: string) => {
     switch (widgetKey) {
+      case 'risk_radar':
+        return (
+          <div className="glass-card rounded-2xl p-4 bg-gradient-to-r from-red-500/10 via-amber-500/5 to-transparent border border-red-500/20 animate-card-in">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse" />
+              <span className="text-xs font-bold uppercase tracking-wider text-red-600">Operational Risk & Alarm Radar</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold">Stale Leads (&gt;48h Uncontacted)</p>
+                  <h4 className="text-xl font-black text-red-600 mt-0.5">342</h4>
+                  <span className="text-[10px] text-red-500 font-medium">Requires Immediate Call</span>
+                </div>
+                <AlertTriangle className="w-6 h-6 text-red-400 opacity-80" />
+              </div>
+              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold">Overdue Fee Collections</p>
+                  <h4 className="text-xl font-black text-amber-600 mt-0.5">{overdueInstallments} Student Slabs</h4>
+                  <span className="text-[10px] text-amber-600 font-medium">Pending Installment Action</span>
+                </div>
+                <IndianRupee className="w-6 h-6 text-amber-400 opacity-80" />
+              </div>
+              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold">Overdue Task Items</p>
+                  <h4 className="text-xl font-black text-orange-600 mt-0.5">{overdueFus} Tasks</h4>
+                  <span className="text-[10px] text-orange-500 font-medium">Missed Follow-up Times</span>
+                </div>
+                <Clock className="w-6 h-6 text-orange-400 opacity-80" />
+              </div>
+              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold">Dormant Cold Pool</p>
+                  <h4 className="text-xl font-black text-slate-700 mt-0.5">{coldLeads} Leads</h4>
+                  <span className="text-[10px] text-blue-600 font-medium">Ready for Campaign Broadcast</span>
+                </div>
+                <Thermometer className="w-6 h-6 text-slate-400 opacity-80" />
+              </div>
+            </div>
+          </div>
+        )
+      case 'lead_temperature':
+        const tempSummary = [
+          { name: 'Hot Leads (🔥)', value: 1240, color: '#EF4444' },
+          { name: 'Warm Leads (☀️)', value: 4500, color: '#F59E0B' },
+          { name: 'Cold Leads (❄️)', value: 5910, color: '#3B82F6' },
+        ]
+        return (
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <Flame className="w-4 h-4 text-red-500" />
+              <span className="text-xs font-semibold text-slate-700">Lead Temperature & Quality Heatmap</span>
+            </div>
+            <ResponsiveContainer width="100%" height={210}>
+              <PieChart>
+                <Pie data={tempSummary} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
+                  {tempSummary.map((t, idx) => (
+                    <Cell key={idx} fill={t.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => Number(v).toLocaleString() + ' leads'} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      case 'course_goal_pacing':
+        const coursePacing = [
+          { course: 'ACCA', enrolled: 45, target: 150, pct: 30, color: '#10B981', status: 'On Track' },
+          { course: 'Class 12th Commerce', enrolled: 32, target: 100, pct: 32, color: '#3B82F6', status: 'On Track' },
+          { course: 'Class 11th Commerce', enrolled: 24, target: 100, pct: 24, color: '#F59E0B', status: 'Needs Boost' },
+          { course: 'CA Foundation Prep', enrolled: 12, target: 50, pct: 24, color: '#8B5CF6', status: 'Needs Boost' },
+          { course: 'CUET Prep 2026', enrolled: 6, target: 50, pct: 12, color: '#EF4444', status: 'Focus Required' },
+        ]
+        return (
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-semibold text-slate-700">Course Target Velocity Pacing</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Batch Intake 2026</span>
+            </div>
+            <div className="space-y-3 flex-1 flex flex-col justify-center">
+              {coursePacing.map((cp) => (
+                <div key={cp.course} className="space-y-1">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span className="text-slate-800 font-semibold">{cp.course}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold" style={{ backgroundColor: `${cp.color}1A`, color: cp.color }}>
+                        {cp.status}
+                      </span>
+                      <span className="text-slate-500 tabular-nums">{cp.enrolled} / {cp.target}</span>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${cp.pct}%`, backgroundColor: cp.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      case 'counselor_leaderboard':
+        const counselors = [
+          { name: 'Preeti Verma', leads: 420, converted: 48, revenue: 2240000, rate: '11.4%' },
+          { name: 'Aadya Sharma', leads: 380, converted: 39, revenue: 1850000, rate: '10.2%' },
+          { name: 'Lakshaya Ma\'am', leads: 310, converted: 32, revenue: 1584000, rate: '10.3%' },
+        ]
+        return (
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <UserCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-semibold text-slate-700">Counselor Performance & Conversion Leaderboard</span>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border text-slate-400 font-semibold uppercase text-[10px]">
+                    <th className="pb-2">Counselor</th>
+                    <th className="pb-2 text-right">Leads</th>
+                    <th className="pb-2 text-right">Admitted</th>
+                    <th className="pb-2 text-right">Revenue</th>
+                    <th className="pb-2 text-right">Conv. Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {counselors.map((c) => (
+                    <tr key={c.name} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 font-bold text-slate-800">{c.name}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-600">{c.leads}</td>
+                      <td className="py-2.5 text-right tabular-nums font-bold text-emerald-600">{c.converted}</td>
+                      <td className="py-2.5 text-right tabular-nums font-semibold text-slate-700">{formatCurrency(c.revenue)}</td>
+                      <td className="py-2.5 text-right">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                          {c.rate}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       case 'revenue_collected':
         return (
           <DashboardKpiCard
@@ -506,29 +654,30 @@ function OwnerDashboard() {
       case 'cash_expense':
         const netValue = revenue - totalExpenses
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
-              <DollarSign style={{ width: 22, height: 22, color: 'var(--kizen-gold)' }} />
+          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border overflow-hidden">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+              <DollarSign style={{ width: 20, height: 20, color: 'var(--kizen-gold)' }} />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1 truncate">
                 Cash / Expense Snapshot
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
                 <div>
-                  <span className="text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums">
+                  <span className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--foreground)] tabular-nums block truncate">
                     {formatCurrency(netValue)}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1 font-semibold">Net Balance</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold">Net Balance (Revenue - Expenses)</p>
                 </div>
-                <div className="flex flex-col justify-center space-y-1 pl-0 sm:pl-4 sm:border-l border-border">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Revenue In</span>
-                    <span className="font-bold text-success">{formatCurrency(revenue)}</span>
+                <div className="flex items-center gap-3 pt-2 border-t border-border/50 text-xs">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-muted-foreground text-[11px]">In:</span>
+                    <span className="font-bold text-success truncate">{formatCurrency(revenue)}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Expenses Out</span>
-                    <span className="font-bold text-danger">{formatCurrency(totalExpenses)}</span>
+                  <span className="text-muted-foreground/40">•</span>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-muted-foreground text-[11px]">Out:</span>
+                    <span className="font-bold text-danger truncate">{formatCurrency(totalExpenses)}</span>
                   </div>
                 </div>
               </div>
@@ -712,21 +861,6 @@ function OwnerDashboard() {
     }
   }
 
-  const getWidgetSpan = (key: string) => {
-    switch (key) {
-      case 'cycle_countdown':
-      case 'insight_alerts':
-        return 'col-span-1 md:col-span-2 xl:col-span-4'
-      case 'pipeline_chart':
-      case 'lead_sources':
-      case 'today_followups':
-      case 'cash_expense':
-        return 'col-span-1 md:col-span-2'
-      default:
-        return 'col-span-1'
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between animate-card-in">
@@ -750,12 +884,49 @@ function OwnerDashboard() {
           {[...Array(4)].map((_, i) => <SkeletonKPI key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-          {visibleWidgets.map(w => (
-            <div key={w.key} className={getWidgetSpan(w.key)}>
-              {renderWidget(w.key)}
-            </div>
-          ))}
+        <div className="space-y-4">
+          {/* Row 0: Operational Risk Radar */}
+          {widgetPrefs['risk_radar']?.visible !== false && (
+            <div>{renderWidget('risk_radar')}</div>
+          )}
+
+          {/* Row 1: Primary Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {widgetPrefs['revenue_collected']?.visible !== false && renderWidget('revenue_collected')}
+            {widgetPrefs['admissions_goal']?.visible !== false && renderWidget('admissions_goal')}
+            {widgetPrefs['conversion_rate']?.visible !== false && renderWidget('conversion_rate')}
+            {widgetPrefs['cash_expense']?.visible !== false && renderWidget('cash_expense')}
+          </div>
+
+          {/* Row 2: Lead Quality & Target Pacing Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['lead_temperature']?.visible !== false && renderWidget('lead_temperature')}
+            {widgetPrefs['course_goal_pacing']?.visible !== false && renderWidget('course_goal_pacing')}
+          </div>
+
+          {/* Row 3: Pipeline & Counselor Performance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['pipeline_chart']?.visible !== false && renderWidget('pipeline_chart')}
+            {widgetPrefs['counselor_leaderboard']?.visible !== false && renderWidget('counselor_leaderboard')}
+          </div>
+
+          {/* Row 4: Acquisition Sources & Today's Follow-ups */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {widgetPrefs['lead_sources']?.visible !== false && renderWidget('lead_sources')}
+            {widgetPrefs['today_followups']?.visible !== false && renderWidget('today_followups')}
+          </div>
+
+          {/* Row 5: Operational Risk & Capacity Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {widgetPrefs['cold_leads']?.visible !== false && renderWidget('cold_leads')}
+            {widgetPrefs['batch_capacity']?.visible !== false && renderWidget('batch_capacity')}
+            {widgetPrefs['overdue_fees']?.visible !== false && renderWidget('overdue_fees')}
+          </div>
+
+          {/* Row 6: Cycle Countdown Footer Banner */}
+          {widgetPrefs['cycle_countdown']?.visible !== false && (
+            <div>{renderWidget('cycle_countdown')}</div>
+          )}
         </div>
       )}
 
@@ -997,14 +1168,158 @@ function AccountsDashboard({ stats, isLoading }: { stats: any; isLoading: boolea
 }
 
 function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boolean }) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
+  const [batches, setBatches] = useState<any[]>([])
+  
+  useEffect(() => {
+    async function loadData() {
+      const now = new Date()
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59).toISOString()
+
+      // 1. Today's follow-up tasks
+      const { data: followUps } = await supabase
+        .from('follow_ups')
+        .select('*, lead:leads(full_name, mobile, course:courses(name))')
+        .gte('scheduled_at', todayStart)
+        .lte('scheduled_at', nextWeek)
+        .eq('status', 'pending')
+        .order('scheduled_at', { ascending: true })
+
+      if (followUps) {
+        setTasks(followUps.filter(f => new Date(f.scheduled_at) <= new Date(new Date().setHours(23,59,59))))
+      }
+
+      // 2. Pending payments due this week
+      const { data: insts } = await supabase
+        .from('installments')
+        .select('*, fee:fees(student:students(full_name))')
+        .eq('status', 'pending')
+        .gte('due_date', todayStart)
+        .lte('due_date', nextWeek)
+        .order('due_date', { ascending: true })
+
+      if (insts) setPayments(insts)
+
+      // 3. Active batches & faculty
+      const { data: activeBatches } = await supabase
+        .from('batches')
+        .select('*, course:courses(name), faculty:users(name)')
+        .eq('status', 'ongoing')
+        .order('batch_name')
+      
+      if (activeBatches) setBatches(activeBatches)
+    }
+    loadData()
+  }, [])
+
   return (
-    <div className="space-y-4">
-      <div><h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>Front Desk Dashboard</h1><p className="text-sm mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Walk-in leads and today's activity</p></div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Front Desk Dashboard</h1>
+        <p className="text-sm mt-0.5 text-slate-500">Walk-in leads, today's tasks, and active batches</p>
+      </div>
+      
+      {/* Top Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatsCard title="Leads Today" value={stats?.leadsToday ?? 0} icon={Users} loading={isLoading} />
         <StatsCard title="Leads This Week" value={stats?.leadsWeek ?? 0} icon={TrendingUp} color="bg-primary-light" loading={isLoading} />
         <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Today's Tasks */}
+        <Card className="border-border/50 shadow-sm">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Today's Calls & Tasks</h3>
+            <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">{tasks.length} pending</span>
+          </div>
+          <CardContent className="p-0">
+            {tasks.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No tasks pending for today!</div>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-[300px] overflow-auto">
+                {tasks.map(t => (
+                  <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-1">
+                      <p className="font-semibold text-slate-800 text-sm">{t.lead?.full_name}</p>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{t.type}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-1">{t.lead?.mobile} • {t.lead?.course?.name}</p>
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {format(new Date(t.scheduled_at), 'h:mm a')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Payments Due this Week */}
+        <Card className="border-border/50 shadow-sm">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><IndianRupee className="w-4 h-4 text-warning" /> Payments Due (7 Days)</h3>
+            <span className="text-xs font-medium bg-warning/10 text-warning px-2 py-0.5 rounded-full">{payments.length} pending</span>
+          </div>
+          <CardContent className="p-0">
+            {payments.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No payments due this week.</div>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-[300px] overflow-auto">
+                {payments.map(p => (
+                  <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{p.fee?.student?.full_name}</p>
+                      <p className="text-xs text-danger font-medium mt-0.5 flex items-center gap-1">
+                        <CalendarDays className="w-3 h-3" /> Due: {format(new Date(p.due_date), 'MMM d')}
+                      </p>
+                    </div>
+                    <p className="font-bold text-slate-800">{formatCurrency(p.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Active Batches & Faculty */}
+        <Card className="border-border/50 shadow-sm lg:col-span-2">
+          <div className="p-4 border-b border-border/50 bg-slate-50/50">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><GraduationCap className="w-4 h-4 text-accent" /> Active Batches & Faculty Info</h3>
+          </div>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50/50 text-slate-500 text-xs uppercase border-b border-border/50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Batch Name</th>
+                    <th className="px-4 py-3 font-medium">Course</th>
+                    <th className="px-4 py-3 font-medium">Timing</th>
+                    <th className="px-4 py-3 font-medium">Faculty</th>
+                    <th className="px-4 py-3 font-medium">Seats</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {batches.map(b => (
+                    <tr key={b.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-800">{b.batch_name}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.course?.name}</td>
+                      <td className="px-4 py-3 text-slate-600"><span className="bg-slate-100 px-2 py-0.5 rounded text-xs">{b.timing}</span></td>
+                      <td className="px-4 py-3 text-slate-600 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] text-accent font-bold">{b.faculty?.name?.slice(0,2).toUpperCase()}</div>{b.faculty?.name}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.enrolled_count ?? 0} / {b.max_students}</td>
+                    </tr>
+                  ))}
+                  {batches.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No active batches right now.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
     </div>
-  )
+  </div>
+)
 }

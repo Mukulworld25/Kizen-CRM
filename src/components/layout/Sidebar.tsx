@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Clock, GraduationCap, IndianRupee,
   BarChart3, Settings, ChevronLeft, ChevronRight,
-  Building2, Wallet, BookOpen, Upload,
+  Building2, Wallet, BookOpen, Upload, CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -10,12 +11,14 @@ import { useOverdueCount } from '@/hooks/useStudents'
 import { roleLabels } from '@/lib/permissions'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import kizenLogo from '@/assets/kizen-logo.jpg'
+import sagedoLogo from '@/assets/sagedo-logo.jpeg'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'viewDashboard' as const },
   { path: '/leads', label: 'Leads', icon: Users, permission: 'viewLeads' as const },
   { path: '/followups', label: 'Follow-ups', icon: Clock, permission: 'viewFollowUps' as const, badge: true },
-  { path: '/calendar', label: 'Calendar', icon: Clock, permission: 'viewCalendar' as const },
+  { path: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'viewFollowUps' as const },
   { path: '/institutions', label: 'Institutions', icon: Building2, permission: 'viewInstitutions' as const },
   { path: '/students', label: 'Students', icon: GraduationCap, permission: 'viewStudents' as const },
   { path: '/batches', label: 'Batches', icon: Users, permission: 'viewStudents' as const },
@@ -23,6 +26,7 @@ const navItems = [
   { path: '/expenses', label: 'Expenses', icon: Wallet, permission: 'viewExpenses' as const },
   { path: '/faculty', label: 'Faculty', icon: BookOpen, permission: 'viewFacultyDashboard' as const },
   { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'viewReports' as const },
+  { path: '/knowledge', label: 'Knowledge Base', icon: BookOpen, permission: 'viewKnowledgeBase' as const },
   { path: '/settings', label: 'Settings', icon: Settings, permission: 'manageUsers' as const },
   { path: '/import', label: 'Import', icon: Upload, permission: 'importData' as const },
 ]
@@ -38,6 +42,13 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
   const location = useLocation()
   const { profile, can } = useAuth()
   const { data: overdueCount = 0 } = useOverdueCount()
+  const [, setPermTick] = useState(0)
+
+  useEffect(() => {
+    const handleUpdate = () => setPermTick(t => t + 1)
+    window.addEventListener('kizen_permissions_updated', handleUpdate)
+    return () => window.removeEventListener('kizen_permissions_updated', handleUpdate)
+  }, [])
 
   const visibleItems = navItems.filter((item) => can(item.permission))
 
@@ -51,8 +62,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     >
       <div className="flex h-16 items-center justify-between border-b px-4" style={{ borderColor: 'var(--sidebar-border)' }}>
         {(!collapsed || mobile) && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold shadow-sm" style={{ backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' }}>K</div>
+          <div className="flex items-center gap-2.5">
+            <img src={kizenLogo} alt="Kizen Education" className="h-9 w-9 rounded-xl object-cover shadow-sm border border-white/20" />
             <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--sidebar-foreground)' }}>Kizen Education</span>
           </div>
         )}
@@ -106,12 +117,18 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               </AvatarFallback>
             </Avatar>
             {(!collapsed || mobile) && (
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>{profile.name}</p>
                 <p className="text-xs" style={{ color: 'var(--sidebar-accent-foreground)', opacity: 0.7 }}>{roleLabels[profile.role]}</p>
               </div>
             )}
           </div>
+          {(!collapsed || mobile) && (
+            <div className="mt-3 flex items-center justify-center gap-1.5 pt-2 border-t border-white/10 opacity-80">
+              <span className="text-[10px] tracking-wide font-medium" style={{ color: 'var(--sidebar-foreground)' }}>Powered by</span>
+              <img src={sagedoLogo} alt="SAGE DO" className="h-4 object-contain rounded" />
+            </div>
+          )}
         </div>
       )}
     </aside>

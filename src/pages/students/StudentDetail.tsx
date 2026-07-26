@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, FileText, Plus, Download, Printer, Phone } from 'lucide-react'
+import { ArrowLeft, FileText, Plus, Download, Printer, CreditCard, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useStudent, useUpdateStudent, useAttendance, useMarkAttendance,
-  useFees, useFeePayments, useBatches, useStudentDocuments, useUploadStudentDocument
+  useFees, useFeePayments, useBatches, useStudentDocuments, useUploadStudentDocument, useInstallments
 } from '@/hooks/useStudents'
 import { useCourses } from '@/hooks/useLeads'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +38,7 @@ export default function StudentDetail() {
   const { data: fees = [] } = useFees()
   const studentFee = fees.find((f) => f.student_id === id)
   const { data: payments = [] } = useFeePayments(studentFee?.id)
+  const { data: installments = [] } = useInstallments(studentFee?.id)
 
   const { data: documents = [], isLoading: docsLoading } = useStudentDocuments(id)
   const uploadDoc = useUploadStudentDocument()
@@ -99,13 +100,51 @@ export default function StudentDetail() {
     setDocUrl('')
   }
 
+  // Payment Status Badge Logic
+  let paymentBadge = null
+  if (studentFee) {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const hasOverdue = installments.some(i => i.status === 'overdue' || (i.status === 'pending' && new Date(`${i.due_date}T00:00:00`) < todayStart))
+    if (hasOverdue) {
+      paymentBadge = (
+        <Badge variant="destructive" className="ml-2 animate-pulse flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" /> OVERDUE
+        </Badge>
+      )
+    } else if (studentFee.pending_balance === 0 && studentFee.amount_paid > 0) {
+      paymentBadge = (
+        <Badge variant="success" className="ml-2 flex items-center gap-1">
+          <CheckCircle className="w-3 h-3" /> PAID
+        </Badge>
+      )
+    } else if (studentFee.amount_paid > 0 && studentFee.pending_balance > 0) {
+      paymentBadge = (
+        <Badge variant="warning" className="ml-2 flex items-center gap-1">
+          <Clock className="w-3 h-3" /> PARTIAL
+        </Badge>
+      )
+    } else if (studentFee.amount_paid === 0 && studentFee.total_fee > 0) {
+      paymentBadge = (
+        <Badge variant="destructive" className="ml-2 flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
+          <CreditCard className="w-3 h-3" /> DUE
+        </Badge>
+      )
+    } else if (studentFee.total_fee === 0) {
+      paymentBadge = (
+        <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+          <CheckCircle className="w-3 h-3" /> NO FEE
+        </Badge>
+      )
+  }
+  }
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" className="mb-2 gap-2" onClick={() => navigate('/students')}>
         <ArrowLeft className="h-4 w-4" /> Back to Students List
       </Button>
 
-      {/* Header Profile Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-600 to-indigo-700 text-2xl font-bold text-white shadow-md">
@@ -115,40 +154,19 @@ export default function StudentDetail() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-slate-900">{student.full_name}</h1>
               <Badge variant={student.is_active ? 'success' : 'secondary'}>
-                {student.is_active ? 'Active Student' : 'Inactive'}
+                {student.is_active ? 'Active' : 'Inactive'}
               </Badge>
+              {paymentBadge}
               {canInlineEdit && (
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
                   Admin Edit Enabled
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-mono mt-1">
-              ID: {student.student_id ?? 'Unassigned'} · Roll No: {student.roll_number ?? 'N/A'} · Admitted: {student.admission_date ?? '—'}
+            <p className="text-xs text-slate-500 mt-1">
+              Student ID: <span className="font-mono font-semibold">{student.student_id ?? '—'}</span> · Enrolled: {format(new Date(student.created_at), 'MMM d, yyyy')}
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {student.mobile && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={`tel:${student.mobile}`} className="gap-2">
-                <Phone className="h-4 w-4 text-sky-600" />
-                Call Student
-              </a>
-            </Button>
-          )}
-          {studentFee && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => setInvoiceOpen(true)}
-            >
-              <FileText className="h-4 w-4 text-indigo-600" />
-              GST Invoice
-            </Button>
-          )}
         </div>
       </div>
 
@@ -160,132 +178,41 @@ export default function StudentDetail() {
           <TabsTrigger value="documents" className="rounded-lg text-xs font-medium">Documents ({documents.length})</TabsTrigger>
         </TabsList>
 
-        {/* PROFILE TAB */}
         <TabsContent value="profile" className="mt-4 space-y-6">
           <Card className="border border-slate-200">
             <CardHeader className="border-b pb-3">
               <CardTitle className="text-base font-bold">Personal & Contact Information</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
-              <InlineEdit
-                label="Full Name"
-                value={student.full_name}
-                onSave={(v) => handleSaveField('full_name', v)}
-              />
-              <InlineEdit
-                label="Mobile Number"
-                value={student.mobile}
-                onSave={(v) => handleSaveField('mobile', v)}
-              />
-              <InlineEdit
-                label="Email Address"
-                value={student.email}
-                onSave={(v) => handleSaveField('email', v)}
-              />
-              <InlineEdit
-                label="Parent / Guardian Name"
-                value={student.parent_name}
-                onSave={(v) => handleSaveField('parent_name', v)}
-              />
-              <InlineEdit
-                label="Parent Contact"
-                value={student.parent_contact}
-                onSave={(v) => handleSaveField('parent_contact', v)}
-              />
-              <InlineEdit
-                label="Emergency Contact"
-                value={student.emergency_contact}
-                onSave={(v) => handleSaveField('emergency_contact', v)}
-              />
-              <InlineEdit
-                label="Date of Birth"
-                type="date"
-                value={student.dob}
-                onSave={(v) => handleSaveField('dob', v)}
-              />
-              <InlineEdit
-                label="Gender"
-                type="select"
-                options={genderOptions}
-                value={student.gender}
-                onSave={(v) => handleSaveField('gender', v)}
-              />
-              <InlineEdit
-                label="City"
-                value={student.city}
-                onSave={(v) => handleSaveField('city', v)}
-              />
-              <InlineEdit
-                className="lg:col-span-3"
-                label="Address"
-                type="textarea"
-                value={student.address}
-                onSave={(v) => handleSaveField('address', v)}
-              />
+              <InlineEdit label="Full Name" value={student.full_name} onSave={(v) => handleSaveField('full_name', v)} />
+              <InlineEdit label="Mobile Number" value={student.mobile} onSave={(v) => handleSaveField('mobile', v)} />
+              <InlineEdit label="Email Address" value={student.email} onSave={(v) => handleSaveField('email', v)} />
+              <InlineEdit label="Parent / Guardian Name" value={student.parent_name} onSave={(v) => handleSaveField('parent_name', v)} />
+              <InlineEdit label="Parent Contact" value={student.parent_contact} onSave={(v) => handleSaveField('parent_contact', v)} />
+              <InlineEdit label="Emergency Contact" value={student.emergency_contact} onSave={(v) => handleSaveField('emergency_contact', v)} />
+              <InlineEdit label="Date of Birth" type="date" value={student.dob} onSave={(v) => handleSaveField('dob', v)} />
+              <InlineEdit label="Gender" type="select" options={genderOptions} value={student.gender} onSave={(v) => handleSaveField('gender', v)} />
+              <InlineEdit label="City" value={student.city} onSave={(v) => handleSaveField('city', v)} />
+              <InlineEdit className="lg:col-span-3" label="Address" type="textarea" value={student.address} onSave={(v) => handleSaveField('address', v)} />
             </CardContent>
           </Card>
-
           <Card className="border border-slate-200">
             <CardHeader className="border-b pb-3">
               <CardTitle className="text-base font-bold">Academic & Course Details</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
-              <InlineEdit
-                label="Student ID"
-                mono
-                value={student.student_id}
-                onSave={(v) => handleSaveField('student_id', v)}
-              />
-              <InlineEdit
-                label="Roll Number"
-                mono
-                value={student.roll_number}
-                onSave={(v) => handleSaveField('roll_number', v)}
-              />
-              <InlineEdit
-                label="Course"
-                type="select"
-                options={courseOptions}
-                value={student.course_id}
-                onSave={(v) => handleSaveField('course_id', v)}
-              />
-              <InlineEdit
-                label="Batch"
-                type="select"
-                options={batchOptions}
-                value={student.batch_id}
-                onSave={(v) => handleSaveField('batch_id', v)}
-              />
-              <InlineEdit
-                label="Admission Date"
-                type="date"
-                value={student.admission_date}
-                onSave={(v) => handleSaveField('admission_date', v)}
-              />
-              <InlineEdit
-                label="School / College"
-                value={student.school_college}
-                onSave={(v) => handleSaveField('school_college', v)}
-              />
-              <InlineEdit
-                label="Certification Status"
-                type="select"
-                options={certOptions}
-                value={student.certification_status}
-                onSave={(v) => handleSaveField('certification_status', v)}
-              />
-              <InlineEdit
-                label="Enrollment Status"
-                type="select"
-                options={statusOptions}
-                value={String(student.is_active)}
-                onSave={(v) => handleSaveField('is_active', v === 'true')}
-              />
+              <InlineEdit label="Student ID" mono value={student.student_id} onSave={(v) => handleSaveField('student_id', v)} />
+              <InlineEdit label="Roll Number" mono value={student.roll_number} onSave={(v) => handleSaveField('roll_number', v)} />
+              <InlineEdit label="Course" type="select" options={courseOptions} value={student.course_id} onSave={(v) => handleSaveField('course_id', v)} />
+              <InlineEdit label="Batch" type="select" options={batchOptions} value={student.batch_id} onSave={(v) => handleSaveField('batch_id', v)} />
+              <InlineEdit label="Admission Date" type="date" value={student.admission_date} onSave={(v) => handleSaveField('admission_date', v)} />
+              <InlineEdit label="School / College" value={student.school_college} onSave={(v) => handleSaveField('school_college', v)} />
+              <InlineEdit label="Certification Status" type="select" options={certOptions} value={student.certification_status} onSave={(v) => handleSaveField('certification_status', v)} />
+              <InlineEdit label="Enrollment Status" type="select" options={statusOptions} value={String(student.is_active)} onSave={(v) => handleSaveField('is_active', v === 'true')} />
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ATTENDANCE TAB */}
         <TabsContent value="attendance" className="mt-4">
           <Card className="border border-slate-200">
             <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
@@ -293,12 +220,7 @@ export default function StudentDetail() {
                 <CardTitle className="text-base font-bold">Attendance Matrix — {attendancePct}%</CardTitle>
                 <p className="text-xs text-muted-foreground">{presentCount} present out of {attendance.length} marked days</p>
               </div>
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium bg-white"
-              />
+              <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium bg-white" />
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-7 gap-2">
@@ -314,12 +236,7 @@ export default function StudentDetail() {
                       onClick={() => {
                         if (!student.batch_id) return
                         const next = record?.status === 'present' ? 'absent' : 'present'
-                        markAttendance.mutate({
-                          student_id: student.id,
-                          batch_id: student.batch_id,
-                          date: dateStr,
-                          status: next,
-                        })
+                        markAttendance.mutate({ student_id: student.id, batch_id: student.batch_id, date: dateStr, status: next })
                       }}
                       className={cn(
                         'aspect-square rounded-xl text-xs font-semibold flex flex-col items-center justify-center border transition-all',
@@ -339,11 +256,9 @@ export default function StudentDetail() {
           </Card>
         </TabsContent>
 
-        {/* FEES & LEDGER TAB */}
         <TabsContent value="fees" className="mt-4 space-y-6">
           {studentFee ? (
             <div className="space-y-6">
-              {/* Fee Summary Cards */}
               <div className="grid gap-4 sm:grid-cols-4">
                 <Card className="bg-slate-900 text-white">
                   <CardContent className="p-4">
@@ -351,21 +266,18 @@ export default function StudentDetail() {
                     <p className="text-2xl font-bold mt-1">{formatCurrency(studentFee.total_fee)}</p>
                   </CardContent>
                 </Card>
-
                 <Card className="bg-emerald-50 border-emerald-200">
                   <CardContent className="p-4">
                     <p className="text-xs text-emerald-700 font-semibold uppercase">Amount Paid</p>
                     <p className="text-2xl font-bold text-emerald-950 mt-1">{formatCurrency(studentFee.amount_paid)}</p>
                   </CardContent>
                 </Card>
-
                 <Card className="bg-amber-50 border-amber-200">
                   <CardContent className="p-4">
                     <p className="text-xs text-amber-700 font-semibold uppercase">Pending Balance</p>
                     <p className="text-2xl font-bold text-amber-950 mt-1">{formatCurrency(studentFee.pending_balance)}</p>
                   </CardContent>
                 </Card>
-
                 <Card className="bg-sky-50 border-sky-200">
                   <CardContent className="p-4">
                     <p className="text-xs text-sky-700 font-semibold uppercase">Net Fee</p>
@@ -373,38 +285,15 @@ export default function StudentDetail() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Subject / Duration / Next Due Row */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <Card className="border border-slate-200">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Subject</p>
-                    <p className="text-lg font-bold text-slate-900 mt-1">{studentFee.subject ?? student.course?.name ?? '—'}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border border-slate-200">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Duration</p>
-                    <p className="text-lg font-bold text-slate-900 mt-1">{studentFee.duration ?? (student.course?.duration_days ? `${student.course.duration_days} days` : student.course?.duration_hours ? `${student.course.duration_hours} hrs` : '—')}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border border-slate-200">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Next Due Date</p>
-                    <p className="text-lg font-bold text-slate-900 mt-1">
-                      {studentFee.next_due_date ? format(new Date(studentFee.next_due_date), 'dd MMM yyyy') : '—'}
-                      {studentFee.next_due_amount ? <span className="text-sm text-amber-600 ml-2">(₹{studentFee.next_due_amount})</span> : ''}
-                    </p>
-                  </CardContent>
-                </Card>
+                <Card className="border border-slate-200"><CardContent className="p-4"><p className="text-xs text-slate-500 uppercase font-semibold">Subject</p><p className="text-lg font-bold text-slate-900 mt-1">{studentFee.subject ?? student.course?.name ?? '—'}</p></CardContent></Card>
+                <Card className="border border-slate-200"><CardContent className="p-4"><p className="text-xs text-slate-500 uppercase font-semibold">Duration</p><p className="text-lg font-bold text-slate-900 mt-1">{studentFee.duration ?? (student.course?.duration_days ? `${student.course.duration_days} days` : student.course?.duration_hours ? `${student.course.duration_hours} hrs` : '—')}</p></CardContent></Card>
+                <Card className="border border-slate-200"><CardContent className="p-4"><p className="text-xs text-slate-500 uppercase font-semibold">Next Due Date</p><p className="text-lg font-bold text-slate-900 mt-1">{studentFee.next_due_date ? format(new Date(studentFee.next_due_date), 'dd MMM yyyy') : '—'}{studentFee.next_due_amount ? <span className="text-sm text-amber-600 ml-2">(₹{studentFee.next_due_amount})</span> : ''}</p></CardContent></Card>
               </div>
-
               <Card className="border border-slate-200">
                 <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
                   <CardTitle className="text-base font-bold">Payment Receipts History</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => setInvoiceOpen(true)}>
-                    <Printer className="h-4 w-4 mr-2" /> GST Invoice
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setInvoiceOpen(true)}><Printer className="h-4 w-4 mr-2" /> GST Invoice</Button>
                 </CardHeader>
                 <CardContent className="p-4">
                   {payments.length === 0 ? (
@@ -412,41 +301,17 @@ export default function StudentDetail() {
                   ) : (
                     <div className="space-y-3">
                       {payments.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors gap-3"
-                        >
+                        <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors gap-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-slate-900 text-sm">
-                                {p.receipt_number ?? 'REC-' + p.id.slice(0, 6)}
-                              </span>
-                              <Badge variant="outline" className="capitalize text-xs">
-                                {p.payment_method?.replace('_', ' ')}
-                              </Badge>
+                              <span className="font-mono font-bold text-slate-900 text-sm">{p.receipt_number ?? 'REC-' + p.id.slice(0, 6)}</span>
+                              <Badge variant="outline" className="capitalize text-xs">{p.payment_method?.replace('_', ' ')}</Badge>
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              Date: {format(new Date(p.payment_date), 'dd MMM yyyy')}
-                              {p.transaction_id && ` · Txn: ${p.transaction_id}`}
-                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">Date: {format(new Date(p.payment_date), 'dd MMM yyyy')}{p.transaction_id && ` · Txn: ${p.transaction_id}`}</p>
                           </div>
-
                           <div className="flex items-center justify-between sm:justify-end gap-4">
-                            <span className="font-extrabold text-emerald-700 text-base">
-                              {formatCurrency(p.amount)}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-xs text-sky-700 border-sky-200 hover:bg-sky-50"
-                              onClick={() => {
-                                setSelectedPayment(p)
-                                setReceiptOpen(true)
-                              }}
-                            >
-                              <Printer className="h-3.5 w-3.5" />
-                              Receipt PDF
-                            </Button>
+                            <span className="font-extrabold text-emerald-700 text-base">{formatCurrency(p.amount)}</span>
+                            <Button size="sm" variant="outline" className="gap-1.5 text-xs text-sky-700 border-sky-200 hover:bg-sky-50" onClick={() => { setSelectedPayment(p); setReceiptOpen(true); }}><Printer className="h-3.5 w-3.5" /> Receipt PDF</Button>
                           </div>
                         </div>
                       ))}
@@ -571,3 +436,4 @@ export default function StudentDetail() {
     </div>
   )
 }
+

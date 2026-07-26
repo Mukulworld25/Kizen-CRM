@@ -17,7 +17,7 @@ export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo' | 
 
 export type ActivityType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'note' | 'status_change'
 
-export type PaymentMethod = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'card' | 'other'
+export type PaymentMethod = 'cash' | 'upi' | 'bank_transfer'
 
 export type InstitutionType = 'school' | 'college'
 export type MouStatus = 'not_started' | 'in_discussion' | 'signed' | 'expired'
@@ -55,6 +55,7 @@ export interface Batch {
   start_date: string | null
   end_date: string | null
   timing: string | null
+  days_of_week?: string | null
   total_seats: number
   enrolled_count: number
   faculty_id: string | null
@@ -67,6 +68,7 @@ export interface Batch {
 
 export interface Lead {
   id: string
+  display_id?: string | null
   full_name: string
   mobile: string
   email: string | null
@@ -87,11 +89,15 @@ export interface Lead {
   expected_joining_date: string | null
   lead_score: number | null
   notes: string | null
+  referred_by_lead_id?: string | null
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_by: string | null
   created_at: string
   updated_at: string
   course?: Course
   counselor?: User
+  referred_by?: Lead
 }
 
 export interface LeadActivity {
@@ -145,6 +151,8 @@ export interface Student {
   faculty_id: string | null
   certification_status: 'not_started' | 'in_progress' | 'completed' | 'issued'
   is_active: boolean
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   updated_at: string
   course?: Course
@@ -164,10 +172,12 @@ export interface Fee {
   pending_balance: number
   gst_applicable: boolean
   gst_percent: number
-  subject: string | null
-  duration: string | null
-  next_due_date: string | null
-  next_due_amount: number | null
+  subject?: string | null
+  duration?: string | null
+  next_due_date?: string | null
+  next_due_amount?: number | null
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   updated_at: string
   student?: Student
@@ -256,6 +266,9 @@ export interface Institution {
   mou_status: MouStatus
   mou_expiry_date: string | null
   assigned_bdm_id: string | null
+  lead_id?: string | null
+  flag_color?: 'red' | 'yellow' | null
+  flag_reason?: string | null
   created_at: string
   bdm?: User
 }
@@ -287,6 +300,8 @@ export interface InstituteExpense {
   category: ExpenseCategory
   amount: number
   expense_date: string
+  vendor?: string | null
+  lead_id?: string | null
   notes: string | null
   created_by: string | null
   created_at: string
@@ -343,6 +358,8 @@ export interface FeaturePermission {
 export interface LeadFilters {
   status?: LeadStatus
   source?: LeadSource
+  sheetSource?: string
+  city?: string
   counselorId?: string
   courseId?: string
   priority?: Priority
@@ -382,4 +399,42 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'college_visit', label: 'College Visit' },
   { value: 'other', label: 'Other' },
+]
+
+export const SHEET_SOURCES: { value: string; label: string }[] = [
+  { value: 'ACCA (April)', label: 'Sheet: ACCA (April)' },
+  { value: 'NEW ACCA PAN IND', label: 'Sheet: NEW ACCA PAN IND' },
+  { value: 'Free ACCA Classes', label: 'Sheet: Free ACCA Classes' },
+  { value: 'Ai Sensy', label: 'Sheet: Ai Sensy' },
+  { value: 'SMART PREP', label: 'Sheet: SMART PREP' },
+  { value: 'Warm leads', label: 'Sheet: Warm leads' },
+  { value: 'Hot Leads', label: 'Sheet: Hot Leads' },
+  { value: 'PU', label: 'Sheet: PU' },
+  { value: '11 - 12 demo class', label: 'Sheet: 11 - 12 demo class' },
+  { value: '12 Pass out CHD', label: 'Sheet: 12 Pass out CHD' },
+  { value: 'SD Leads', label: 'Sheet: SD Leads' },
+  { value: '12th and 1st year data', label: 'Sheet: 12th and 1st year data' },
+  { value: 'AI Leads', label: 'Sheet: AI Leads' },
+  { value: 'College List', label: 'Sheet: College List' },
+  { value: '11th 12th - April', label: 'Sheet: 11th 12th - April' },
+  { value: 'Hindi Course', label: 'Sheet: Hindi Course' },
+  { value: 'CUET 1', label: 'Sheet: CUET 1' },
+  { value: 'CUET 2', label: 'Sheet: CUET 2' },
+  { value: "SATINDER'S SESSION", label: "Sheet: SATINDER'S SESSION" },
+  { value: 'Simrat Leads', label: 'Sheet: Simrat Leads' },
+  { value: 'New leads', label: 'Sheet: New leads' },
+  { value: 'Sourav Lists', label: 'Sheet: Sourav Lists' },
+  { value: 'Simrat (Bcom)', label: 'Sheet: Simrat (Bcom)' },
+  { value: '11th & 12th', label: 'Sheet: 11th & 12th' },
+  { value: 'Vaibhav Leads', label: 'Sheet: Vaibhav Leads' },
+]
+
+export const FEE_COURSE_LEVELS: { value: string; label: string }[] = [
+  { value: 'ACCA KL', label: 'Sheet: ACCA KL' },
+  { value: 'ACCA SL', label: 'Sheet: ACCA SL' },
+  { value: 'ACCA PL', label: 'Sheet: ACCA PL' },
+  { value: 'FIA', label: 'Sheet: FIA' },
+  { value: '11th & 12th', label: 'Sheet: 11th & 12th' },
+  { value: 'B.com', label: 'Sheet: B.com' },
+  { value: 'Others', label: 'Sheet: Others' },
 ]

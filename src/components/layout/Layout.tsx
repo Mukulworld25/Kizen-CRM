@@ -11,7 +11,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden lg:block">
+      <div className="hidden lg:block h-full">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       </div>
 

@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'admin' | 'counselor' | 'faculty' | 'accounts' | 'reception' | 'bdm'
+export type UserRole = 'owner' | 'admin' | 'counselor' | 'faculty' | 'accounts' | 'reception' | 'bdm' | 'hod'
 
 export type LeadStatus =
   | 'new_lead' | 'contacted' | 'follow_up' | 'demo_booked'
@@ -13,7 +13,7 @@ export type Priority = 'high' | 'medium' | 'low'
 export type LeadTemperature = 'hot' | 'warm' | 'cold'
 
 export type FollowUpStatus = 'pending' | 'completed' | 'overdue' | 'cancelled'
-export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo'
+export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo' | 'task'
 
 export type ActivityType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'note' | 'status_change'
 
@@ -59,6 +59,7 @@ export interface Batch {
   enrolled_count: number
   faculty_id: string | null
   status: 'upcoming' | 'ongoing' | 'completed'
+  schedule_days: string | null
   created_at: string
   course?: Course
   faculty?: User
@@ -108,7 +109,7 @@ export interface LeadActivity {
 
 export interface FollowUp {
   id: string
-  lead_id: string
+  lead_id: string | null
   scheduled_at: string
   type: FollowUpType
   notes: string | null
@@ -163,10 +164,15 @@ export interface Fee {
   pending_balance: number
   gst_applicable: boolean
   gst_percent: number
+  subject: string | null
+  duration: string | null
+  next_due_date: string | null
+  next_due_amount: number | null
   created_at: string
   updated_at: string
   student?: Student
   course?: Course
+  installments?: Installment[]
 }
 
 export interface FeePayment {
@@ -282,6 +288,43 @@ export interface InstituteExpense {
   amount: number
   expense_date: string
   notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface Reminder {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  reminder_date: string
+  is_completed: boolean
+  created_at: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  description: string | null
+  assigned_to: string | null
+  assigned_by: string | null
+  due_date: string | null
+  status: 'pending' | 'in_progress' | 'completed'
+  created_at: string
+  assignee?: User
+  assigner?: User
+}
+
+export interface Scratchpad {
+  id: string
+  user_id: string
+  content: string
+  updated_at: string
+}
+
+export interface ExpenseCategoryItem {
+  id: string
+  name: string
   created_by: string | null
   created_at: string
 }

@@ -27,6 +27,8 @@ export type Permission =
   | 'viewBdmDashboard'
   | 'generateInvoices'
   | 'importData'
+  | 'viewCalendar'
+  | 'manageCategories'
 
 const rolePermissions: Record<UserRole, Permission[]> = {
   owner: [
@@ -36,18 +38,19 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'manageUsers', 'manageCourses', 'viewAuditLogs', 'assignCounselor',
     'viewInstitutions', 'editInstitutions', 'viewExpenses', 'manageExpenses',
     'viewBdmDashboard', 'generateInvoices', 'importData',
+    'viewCalendar', 'manageCategories',
   ],
   admin: [
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads',
     'viewFollowUps', 'viewStudents', 'editStudents', 'markAttendance',
-    'viewFees', 'assignCounselor',
+    'viewFees', 'assignCounselor', 'viewCalendar',
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents',
+    'viewFollowUps', 'viewStudents', 'editStudents', 'viewCalendar',
   ],
   faculty: [
-    'viewDashboard', 'viewStudents', 'markAttendance',
+    'viewDashboard', 'viewStudents', 'markAttendance', 'viewCalendar',
   ],
   accounts: [
     'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
@@ -58,6 +61,10 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',
     'viewFollowUps', 'viewDashboard',
+  ],
+  hod: [
+    'viewDashboard', 'viewStudents', 'editStudents', 'viewFacultyDashboard',
+    'viewFollowUps', 'assignCounselor', 'markAttendance', 'viewCalendar',
   ],
 }
 
@@ -83,6 +90,7 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
     '/expenses': 'viewExpenses',
     '/faculty': 'viewFacultyDashboard',
     '/import': 'importData',
+    '/calendar': 'viewCalendar',
   }
 
   const base = '/' + path.split('/').filter(Boolean)[0]
@@ -107,4 +115,5 @@ export const roleLabels: Record<UserRole, string> = {
   accounts: 'Accounts',
   reception: 'Reception',
   bdm: 'BDM',
+  hod: 'HOD',
 }

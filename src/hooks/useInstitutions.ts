@@ -301,3 +301,24 @@ export function useDeleteInstituteExpense() {
     onError: (err) => toast.error(err.message),
   })
 }
+
+export function useUpdateInstituteExpense() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<InstituteExpense> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('institute_expenses')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
+      toast.success('Expense category updated')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}

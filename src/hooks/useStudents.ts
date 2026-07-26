@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense } from '@/types'
+import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document } from '@/types'
 
 export function useFollowUps(tab: string, counselorId?: string) {
   const { profile } = useAuth()
@@ -153,6 +153,72 @@ export function useCreateStudent() {
   })
 }
 
+export function useUpdateStudent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Student> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('students')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['students', vars.id] })
+      toast.success('Student profile updated')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useStudentDocuments(studentId: string | undefined) {
+  return useQuery({
+    queryKey: ['student-documents', studentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('entity_type', 'student')
+        .eq('entity_id', studentId!)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Document[]
+    },
+    enabled: !!studentId,
+  })
+}
+
+export function useUploadStudentDocument() {
+  const queryClient = useQueryClient()
+  const { profile } = useAuth()
+
+  return useMutation({
+    mutationFn: async (doc: { entity_id: string; doc_name: string; doc_url: string; doc_type?: string }) => {
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({
+          ...doc,
+          entity_type: 'student',
+          uploaded_by: profile?.id,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['student-documents', vars.entity_id] })
+      toast.success('Document uploaded')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
 export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) {
   const { profile, can } = useAuth()
 
@@ -161,7 +227,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string } = {}) 
     queryFn: async () => {
       let query = supabase
         .from('fees')
-        .select('*, student:students(full_name, student_id, mobile), course:courses(name)')
+        .select('*, student:students(full_name, student_id, mobile), course:courses(name), installments(*)')
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)
@@ -292,6 +358,28 @@ export function useBatches() {
       if (error) throw error
       return data ?? []
     },
+  })
+}
+
+export function useUpdateBatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; faculty_id?: string | null }) => {
+      const { data, error } = await supabase
+        .from('batches')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] })
+      toast.success('Batch updated')
+    },
+    onError: (err) => toast.error(err.message),
   })
 }
 

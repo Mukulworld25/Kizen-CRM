@@ -11,6 +11,7 @@ import LeadDetail from '@/pages/leads/LeadDetail'
 import FollowUps from '@/pages/followups/FollowUps'
 import StudentList from '@/pages/students/StudentList'
 import StudentDetail from '@/pages/students/StudentDetail'
+import BatchManagement from '@/pages/batches/BatchManagement'
 import FeeManagement from '@/pages/fees/FeeManagement'
 import FeeDetail from '@/pages/fees/FeeDetail'
 import Reports from '@/pages/reports/Reports'
@@ -20,6 +21,7 @@ import InstitutionDetail from '@/pages/institutions/InstitutionDetail'
 import ExpensesPage from '@/pages/expenses/ExpensesPage'
 import FacultyDashboard from '@/pages/faculty/FacultyDashboard'
 import LeadImport from '@/pages/leads/LeadImport'
+import CalendarPage from '@/pages/calendar/CalendarPage'
 import { CommandPalette } from '@/components/shared/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -51,6 +53,7 @@ export default function App() {
               <Route path="institutions/:id" element={<InstitutionDetail />} />
               <Route path="expenses" element={<ExpensesPage />} />
               <Route path="faculty" element={<FacultyDashboard />} />
+              <Route path="calendar" element={<CalendarPage />} />
               <Route
                 path="import"
                 element={
@@ -61,6 +64,7 @@ export default function App() {
               />
               <Route path="students" element={<StudentList />} />
               <Route path="students/:id" element={<StudentDetail />} />
+              <Route path="batches" element={<BatchManagement />} />
               <Route path="fees" element={<FeeManagement />} />
               <Route path="fees/:id" element={<FeeDetail />} />
               <Route

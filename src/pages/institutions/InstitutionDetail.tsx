@@ -1,17 +1,21 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, Mail, MapPin, Building2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useInstitution, useInstitutionMeetings, useCreateInstitutionMeeting,
   useInstitutionFollowUps, useCreateInstitutionFollowUp, useCompleteInstitutionFollowUp, useBdmList, useUpdateInstitution,
 } from '@/hooks/useInstitutions'
+import { supabase } from '@/lib/supabase'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { InlineEdit } from '@/components/shared/InlineEdit'
+import type { Institution } from '@/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { format } from 'date-fns'
@@ -39,14 +43,42 @@ export default function InstitutionDetail() {
 
   const [meetingOpen, setMeetingOpen] = useState(false)
   const [fuOpen, setFuOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
   const [meetingDate, setMeetingDate] = useState('')
   const [meetingNotes, setMeetingNotes] = useState('')
   const [meetingOutcome, setMeetingOutcome] = useState('')
   const [fuDate, setFuDate] = useState('')
   const [fuNotes, setFuNotes] = useState('')
-  const [editMou, setEditMou] = useState<MouStatus | ''>('')
-  const [editBdm, setEditBdm] = useState('')
+
+  // Add new employee modal state
+  const [addEmpOpen, setAddEmpOpen] = useState(false)
+  const [empName, setEmpName] = useState('')
+  const [empEmail, setEmpEmail] = useState('')
+  const [empPhone, setEmpPhone] = useState('')
+  const queryClient = useQueryClient()
+
+  const createBdmUser = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .insert({ name: empName, email: empEmail, phone: empPhone || null, role: 'bdm', is_active: true })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bdm-users'] })
+      queryClient.invalidateQueries({ queryKey: ['institutions'] })
+      // Auto-assign this new BDM to the institution
+      updateInstitution.mutate({ id: inst!.id, assigned_bdm_id: data.id })
+      toast.success('New employee added and assigned')
+      setAddEmpOpen(false)
+      setEmpName('')
+      setEmpEmail('')
+      setEmpPhone('')
+    },
+    onError: (err) => toast.error(err.message),
+  })
 
   if (isLoading || !inst) return <p>Loading...</p>
 
@@ -76,13 +108,12 @@ export default function InstitutionDetail() {
     setFuNotes('')
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveField = async (field: keyof Institution, value: any) => {
+    if (!inst) return
     await updateInstitution.mutateAsync({
       id: inst.id,
-      mou_status: editMou as MouStatus || inst.mou_status,
-      assigned_bdm_id: editBdm || inst.assigned_bdm_id,
+      [field]: value
     })
-    setEditOpen(false)
   }
 
   return (
@@ -97,25 +128,24 @@ export default function InstitutionDetail() {
       </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Contact Details</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{inst.address ?? '—'}, {inst.city ?? ''}</div>
-            <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{inst.contact_phone ?? '—'}</div>
-            <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{inst.contact_email ?? '—'}</div>
-            <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" />Contact: {inst.contact_person ?? '—'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">MOU & Assignment</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <p><span className="text-muted-foreground">Status:</span> <Badge variant="outline" className={mouColors[inst.mou_status]}>{inst.mou_status.replace('_', ' ')}</Badge></p>
-            <p><span className="text-muted-foreground">BDM:</span> {inst.bdm?.name ?? 'Unassigned'}</p>
-            {can('editInstitutions') && (
-              <Button size="sm" variant="outline" onClick={() => { setEditMou(inst.mou_status); setEditBdm(inst.assigned_bdm_id ?? ''); setEditOpen(true) }}>
-                Edit Details
-              </Button>
-            )}
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Institution Details</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
+            <InlineEdit label="Name" value={inst.name} onSave={can('editInstitutions') ? (v) => handleSaveField('name', v) : undefined} />
+            <InlineEdit label="Type" type="select" options={[{value:'school',label:'School'},{value:'college',label:'College'},{value:'coaching',label:'Coaching'},{value:'corporate',label:'Corporate'}]} value={inst.type} onSave={can('editInstitutions') ? (v) => handleSaveField('type', v) : undefined} />
+            <InlineEdit label="Address" value={inst.address} onSave={can('editInstitutions') ? (v) => handleSaveField('address', v) : undefined} />
+            <InlineEdit label="City" value={inst.city} onSave={can('editInstitutions') ? (v) => handleSaveField('city', v) : undefined} />
+            <InlineEdit label="Contact Phone" value={inst.contact_phone} onSave={can('editInstitutions') ? (v) => handleSaveField('contact_phone', v) : undefined} />
+            <InlineEdit label="Contact Email" value={inst.contact_email} onSave={can('editInstitutions') ? (v) => handleSaveField('contact_email', v) : undefined} />
+            <InlineEdit label="Contact Person" value={inst.contact_person} onSave={can('editInstitutions') ? (v) => handleSaveField('contact_person', v) : undefined} />
+            <InlineEdit label="MOU Status" type="select" options={[{value:'not_started',label:'Not Started'},{value:'in_discussion',label:'In Discussion'},{value:'signed',label:'Signed'},{value:'expired',label:'Expired'}]} value={inst.mou_status} onSave={can('editInstitutions') ? (v) => handleSaveField('mou_status', v) : undefined} />
+            <InlineEdit label="Assigned BDM" type="select" options={[...bdms.map(b => ({value: b.id, label: b.name})), {value: '__add_new__', label: '+ Add New Employee'}]} value={inst.assigned_bdm_id} onSave={can('editInstitutions') ? (v) => {
+              if (v === '__add_new__') {
+                setAddEmpOpen(true)
+                return
+              }
+              handleSaveField('assigned_bdm_id', v)
+            } : undefined} />
           </CardContent>
         </Card>
         <Card>
@@ -209,39 +239,33 @@ export default function InstitutionDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {/* Add New Employee Dialog */}
+      <Dialog open={addEmpOpen} onOpenChange={setAddEmpOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit Institution</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add New Employee (BDM)</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>MOU Status</Label>
-              <Select value={editMou} onValueChange={(v) => setEditMou(v as MouStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="not_started">Not Started</SelectItem>
-                  <SelectItem value="in_discussion">In Discussion</SelectItem>
-                  <SelectItem value="signed">Signed</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Full Name</Label>
+              <Input value={empName} onChange={(e) => setEmpName(e.target.value)} placeholder="e.g. Rahul Verma" />
             </div>
             <div>
-              <Label>Assigned BDM</Label>
-              <Select value={editBdm} onValueChange={(v) => setEditBdm(v)}>
-                <SelectTrigger><SelectValue placeholder="Select BDM" /></SelectTrigger>
-                <SelectContent>
-                  {bdms.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label>Email</Label>
+              <Input type="email" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} placeholder="rahul@example.com" />
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <Input value={empPhone} onChange={(e) => setEmpPhone(e.target.value)} placeholder="+91 98765 43210" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEdit}>Save</Button>
+            <Button variant="outline" onClick={() => setAddEmpOpen(false)}>Cancel</Button>
+            <Button onClick={() => createBdmUser.mutate()} disabled={!empName || !empEmail}>
+              Add & Assign
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }

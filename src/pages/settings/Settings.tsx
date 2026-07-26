@@ -55,7 +55,7 @@ export default function Settings() {
   })
 
   const userCount = users.length
-  const atCap = userCount >= 10
+  const atCap = userCount >= 15
 
   const handleInvite = async (data: InviteForm) => {
     try {
@@ -149,7 +149,7 @@ export default function Settings() {
 
       <Tabs defaultValue="users">
         <TabsList>
-          <TabsTrigger value="users">Users ({userCount}/10)</TabsTrigger>
+          <TabsTrigger value="users">Users ({userCount}/15)</TabsTrigger>
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
@@ -162,7 +162,7 @@ export default function Settings() {
         <TabsContent value="users" className="mt-4">
           {atCap && (
             <div className="mb-4 rounded-xl bg-accent/10 p-3 text-sm text-amber-800 border border-accent/20">
-              Maximum 10 users reached. Deactivate a user to invite someone new.
+              Maximum 15 users reached. Deactivate a user to invite someone new.
             </div>
           )}
           <div className="mb-4">

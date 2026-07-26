@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, UserPlus, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useLead, useUpdateLead, useLeadActivities, useAddActivity } from '@/hooks/useLeads'
+import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses } from '@/hooks/useLeads'
 import { useCreateFollowUp } from '@/hooks/useStudents'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -17,16 +17,17 @@ import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import type { LeadStatus, FollowUpType } from '@/types'
+import type { Lead, LeadStatus, FollowUpType } from '@/types'
 import { Skeleton } from '@/components/ui/table'
-import { FieldRow } from '@/components/shared/FieldValue'
+import { InlineEdit } from '@/components/shared/InlineEdit'
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { can } = useAuth()
+  const { can, isOwner, profile } = useAuth()
   const { data: lead, isLoading } = useLead(id)
   const { data: activities = [], isLoading: activitiesLoading } = useLeadActivities(id)
+  const { data: courses = [] } = useCourses()
   const updateLead = useUpdateLead()
   const addActivity = useAddActivity()
   const createFollowUp = useCreateFollowUp()
@@ -38,6 +39,23 @@ export default function LeadDetail() {
   const [fuType, setFuType] = useState<FollowUpType>('call')
   const [fuDate, setFuDate] = useState('')
   const [fuNotes, setFuNotes] = useState('')
+
+  const canInlineEdit = can('editLeads') || isOwner || profile?.role === 'admin'
+
+  const handleSaveField = async (field: keyof Lead, value: any) => {
+    if (!lead?.id) return
+    await updateLead.mutateAsync({ id: lead.id, [field]: value })
+  }
+
+  const courseOptions = courses.map((c) => ({ value: c.id, label: c.name }))
+  const sourceOptions = [
+    { value: 'website', label: 'Website' },
+    { value: 'social_media', label: 'Social Media' },
+    { value: 'referral', label: 'Referral' },
+    { value: 'walk_in', label: 'Walk In' },
+    { value: 'event', label: 'Event' },
+    { value: 'other', label: 'Other' },
+  ]
 
   if (isLoading) {
     return (
@@ -87,19 +105,17 @@ export default function LeadDetail() {
           <Card>
             <CardHeader><CardTitle className="text-base">Lead Information</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
-              <FieldRow label="Mobile" value={lead.mobile} />
-              <FieldRow label="Email" value={lead.email} />
-              <FieldRow label="City" value={lead.city} />
-              <FieldRow label="Course" value={lead.course?.name} />
-              <FieldRow label="Source" value={lead.source?.replace('_', ' ')} />
-              <FieldRow label="Temperature" value={lead.temperature} />
-              <FieldRow label="Budget" value={lead.budget ? `₹${lead.budget.toLocaleString()}` : null} mono />
-              <FieldRow label="Expected Joining" value={lead.expected_joining_date ? new Date(lead.expected_joining_date).toLocaleDateString() : null} />
-              <FieldRow label="Counselor" value={lead.counselor?.name} />
-              <FieldRow label="Parent" value={lead.parent_name} />
-              <FieldRow label="School/College" value={lead.school_college} />
-              {lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={lead.notes} /></div>}
-              {!lead.notes && <div className="sm:col-span-2"><FieldRow label="Notes" value={null} /></div>}
+              <InlineEdit label="Mobile" value={lead.mobile} onSave={canInlineEdit ? (v) => handleSaveField('mobile', v) : undefined} />
+              <InlineEdit label="Email" value={lead.email} onSave={canInlineEdit ? (v) => handleSaveField('email', v) : undefined} />
+              <InlineEdit label="City" value={lead.city} onSave={canInlineEdit ? (v) => handleSaveField('city', v) : undefined} />
+              <InlineEdit label="Course" type="select" options={courseOptions} value={lead.interested_course_id} onSave={canInlineEdit ? (v) => handleSaveField('interested_course_id', v) : undefined} />
+              <InlineEdit label="Source" type="select" options={sourceOptions} value={lead.source} onSave={canInlineEdit ? (v) => handleSaveField('source', v) : undefined} />
+              <InlineEdit label="Temperature" type="select" options={[{value:'hot', label:'Hot'},{value:'warm',label:'Warm'},{value:'cold',label:'Cold'}]} value={lead.temperature} onSave={canInlineEdit ? (v) => handleSaveField('temperature', v) : undefined} />
+              <InlineEdit label="Budget" value={lead.budget?.toString()} mono onSave={canInlineEdit ? (v) => handleSaveField('budget', v ? parseFloat(String(v)) : null) : undefined} />
+              <InlineEdit label="Expected Joining" type="date" value={lead.expected_joining_date} onSave={canInlineEdit ? (v) => handleSaveField('expected_joining_date', v) : undefined} />
+              <InlineEdit label="Parent" value={lead.parent_name} onSave={canInlineEdit ? (v) => handleSaveField('parent_name', v) : undefined} />
+              <InlineEdit label="School/College" value={lead.school_college} onSave={canInlineEdit ? (v) => handleSaveField('school_college', v) : undefined} />
+              <InlineEdit className="sm:col-span-2" label="Notes" type="textarea" value={lead.notes} onSave={canInlineEdit ? (v) => handleSaveField('notes', v) : undefined} />
             </CardContent>
           </Card>
 
@@ -206,4 +222,4 @@ export default function LeadDetail() {
   )
 }
 
-// Removed InfoField — using shared FieldRow component
+// Using shared InlineEdit component

@@ -1,9 +1,11 @@
-
 import { useState } from 'react'
-import { Plus, Trash2, IndianRupee, TrendingDown, PiggyBank } from 'lucide-react'
+import { Plus, Trash2, IndianRupee, TrendingDown, PiggyBank, Edit, Settings2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useInstituteExpenses, useCreateInstituteExpense } from '@/hooks/useInstitutions'
+import { useInstituteExpenses, useCreateInstituteExpense, useUpdateInstituteExpense } from '@/hooks/useInstitutions'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
+import { supabase } from '@/lib/supabase'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { DataTable, type Column } from '@/components/shared/DataTable'
@@ -15,27 +17,115 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
 import { format } from 'date-fns'
 import { formatCurrency } from '@/lib/utils'
-import type { InstituteExpense, ExpenseCategory } from '@/types'
+import type { InstituteExpense, ExpenseCategory, ExpenseCategoryItem } from '@/types'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-
-const categoryLabels: Record<ExpenseCategory, string> = {
-  rent: 'Rent', salaries: 'Salaries', electricity: 'Electricity', marketing: 'Marketing', misc: 'Misc',
-}
 
 const COLORS = ['#EF4444', '#3B82F6', '#F59E0B', '#10B981', '#8B5CF6']
 
 export default function ExpensesPage() {
-  const { can } = useAuth()
+  const { profile, can } = useAuth()
+  const queryClient = useQueryClient()
   const { data: expenses = [], isLoading } = useInstituteExpenses()
   const createExpense = useCreateInstituteExpense()
+  const updateExpense = useUpdateInstituteExpense()
   const softDelete = useSoftDelete()
 
   const [addOpen, setAddOpen] = useState(false)
+  const [editExpenseId, setEditExpenseId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [category, setCategory] = useState<ExpenseCategory>('misc')
   const [amount, setAmount] = useState('')
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
+
+  // Fetch categories from DB
+  const { data: dbCategories = [] } = useQuery({
+    queryKey: ['expense-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_categories').select('*').order('name')
+      if (error) throw error
+      return (data ?? []) as ExpenseCategoryItem[]
+    },
+    enabled: !!profile,
+  })
+
+  // Build category options from DB + legacy fallback
+  const categoryOptions = dbCategories.length > 0
+    ? dbCategories.map(c => ({ value: c.name.toLowerCase().replace(/\s+/g, '_'), label: c.name }))
+    : [
+        { value: 'rent', label: 'Rent' },
+        { value: 'salaries', label: 'Salaries' },
+        { value: 'electricity', label: 'Electricity' },
+        { value: 'marketing', label: 'Marketing' },
+        { value: 'misc', label: 'Miscellaneous' },
+      ]
+
+  // Category management state
+  const [catManageOpen, setCatManageOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [editingCatId, setEditingCatId] = useState<string | null>(null)
+  const [editingCatName, setEditingCatName] = useState('')
+
+  const addCategory = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase.from('expense_categories').insert({ name })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] })
+      toast.success('Category added')
+      setNewCatName('')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const updateCategory = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from('expense_categories').update({ name }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] })
+      toast.success('Category updated')
+      setEditingCatId(null)
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const deleteCategory = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('expense_categories').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] })
+      toast.success('Category deleted')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  // Build label map from DB categories
+  const catLabelMap: Record<string, string> = {}
+  dbCategories.forEach(c => { catLabelMap[c.name.toLowerCase().replace(/\s+/g, '_')] = c.name })
+  const getCatLabel = (key: string) => catLabelMap[key] ?? key.charAt(0).toUpperCase() + key.slice(1)
+
+  const handleEditClick = (e: InstituteExpense) => {
+    setEditExpenseId(e.id)
+    setCategory(e.category)
+    setAmount(e.amount.toString())
+    setExpenseDate(new Date(e.expense_date).toISOString().split('T')[0])
+    setNotes(e.notes ?? '')
+    setAddOpen(true)
+  }
+
+  const handleAddOpen = () => {
+    setEditExpenseId(null)
+    setCategory('misc')
+    setAmount('')
+    setExpenseDate(new Date().toISOString().split('T')[0])
+    setNotes('')
+    setAddOpen(true)
+  }
 
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const byCategory = expenses.reduce<Record<string, number>>((acc, e) => {
@@ -44,13 +134,13 @@ export default function ExpensesPage() {
   }, {})
 
   const categoryData = Object.entries(byCategory).map(([k, v]) => ({
-    name: categoryLabels[k as ExpenseCategory] ?? k,
+    name: getCatLabel(k),
     value: v,
   }))
 
   const columns: Column<InstituteExpense>[] = [
     { key: 'expense_date', header: 'Date', render: (r) => format(new Date(r.expense_date), 'MMM d, yyyy') },
-    { key: 'category', header: 'Category', render: (r) => categoryLabels[r.category] ?? r.category },
+    { key: 'category', header: 'Category', render: (r) => getCatLabel(r.category) },
     { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount) },
     { key: 'notes', header: 'Notes', render: (r) => r.notes ?? '—' },
     { key: 'created_at', header: 'Recorded', render: (r) => format(new Date(r.created_at), 'MMM d, yyyy') },
@@ -58,21 +148,36 @@ export default function ExpensesPage() {
       key: 'actions' as const,
       header: 'Actions' as const,
       render: (r: InstituteExpense) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id) }}>
-          <Trash2 className="h-4 w-4 text-danger" />
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditClick(r) }}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id) }}>
+            <Trash2 className="h-4 w-4 text-danger" />
+          </Button>
+        </div>
       ),
     }] : []),
   ]
 
   const handleAdd = async () => {
     if (!amount || !expenseDate) return
-    await createExpense.mutateAsync({
-      category,
-      amount: parseFloat(amount),
-      expense_date: expenseDate,
-      notes: notes || null,
-    })
+    if (editExpenseId) {
+      await updateExpense.mutateAsync({
+        id: editExpenseId,
+        category,
+        amount: parseFloat(amount),
+        expense_date: expenseDate,
+        notes: notes || null,
+      })
+    } else {
+      await createExpense.mutateAsync({
+        category,
+        amount: parseFloat(amount),
+        expense_date: expenseDate,
+        notes: notes || null,
+      })
+    }
     setAddOpen(false)
     setAmount('')
     setNotes('')
@@ -81,9 +186,16 @@ export default function ExpensesPage() {
   return (
     <div>
       <PageHeader title="Institute Expenses" description="Track and manage expenses">
-        {can('manageExpenses') && (
-          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Expense</Button>
-        )}
+        <div className="flex gap-2">
+          {can('manageExpenses') && (
+            <Button variant="outline" onClick={() => setCatManageOpen(true)}>
+              <Settings2 className="h-4 w-4" /> Manage Categories
+            </Button>
+          )}
+          {can('manageExpenses') && (
+            <Button onClick={handleAddOpen}><Plus className="h-4 w-4" /> Add Expense</Button>
+          )}
+        </div>
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
@@ -143,15 +255,15 @@ export default function ExpensesPage() {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editExpenseId ? 'Edit Expense' : 'Add Expense'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Category</Label>
               <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(categoryLabels) as [ExpenseCategory, string][]).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {categoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -187,6 +299,70 @@ export default function ExpensesPage() {
         }}
         loading={softDelete.isPending}
       />
+
+      {/* Manage Categories Dialog */}
+      <Dialog open={catManageOpen} onOpenChange={setCatManageOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Manage Expense Categories</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {/* Add new category */}
+            <div className="flex gap-2">
+              <Input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="New category name..."
+                onKeyDown={(e) => { if (e.key === 'Enter' && newCatName.trim()) addCategory.mutate(newCatName.trim()) }}
+              />
+              <Button onClick={() => { if (newCatName.trim()) addCategory.mutate(newCatName.trim()) }} disabled={!newCatName.trim()}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {/* Category list */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {dbCategories.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No categories yet. Add one above.</p>
+              ) : (
+                dbCategories.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-2.5">
+                    {editingCatId === cat.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          value={editingCatName}
+                          onChange={(e) => setEditingCatName(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') updateCategory.mutate({ id: cat.id, name: editingCatName })
+                            if (e.key === 'Escape') setEditingCatId(null)
+                          }}
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => updateCategory.mutate({ id: cat.id, name: editingCatName })}>
+                          Save
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium">{cat.name}</span>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingCatId(cat.id); setEditingCatName(cat.name) }}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => deleteCategory.mutate(cat.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-danger" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatManageOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

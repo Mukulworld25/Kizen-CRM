@@ -38,11 +38,53 @@ export default function FeeManagement() {
   const columns: Column<Fee>[] = [
     { key: 'student', header: 'Student', render: (r) => r.student?.full_name ?? '—', exportValue: (r) => r.student?.full_name ?? '' },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—' },
+    { key: 'duration', header: 'Duration', render: (r) => r.course?.duration_days ? `${r.course.duration_days} days` : (r.course?.duration_hours ? `${r.course.duration_hours} hrs` : '—') },
     { key: 'total_fee', header: 'Total', render: (r) => formatCurrency(r.total_fee) },
+    { key: 'discount', header: 'Discount', render: (r) => formatCurrency(r.discount) },
+    { key: 'scholarship', header: 'Scholarship', render: (r) => formatCurrency(r.scholarship) },
+    { key: 'registration_amount', header: 'Reg Amt', render: (r) => formatCurrency(r.registration_amount) },
+    { key: 'net_fee', header: 'Net Fee', render: (r) => formatCurrency(r.net_fee) },
     { key: 'amount_paid', header: 'Paid', render: (r) => formatCurrency(r.amount_paid) },
     { key: 'pending_balance', header: 'Balance', render: (r) => (
       <span className={r.pending_balance > 0 ? 'text-danger font-medium' : ''}>{formatCurrency(r.pending_balance)}</span>
     )},
+    {
+      key: 'inst_1',
+      header: 'Inst 1',
+      render: (r) => {
+        const i1 = r.installments?.find(i => i.installment_number === 1)
+        if (!i1) return '—'
+        return <div className="text-xs"><span>{formatCurrency(i1.amount)}</span><br/><span className={i1.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i1.due_date), 'dd/MM/yy')}</span></div>
+      }
+    },
+    {
+      key: 'inst_2',
+      header: 'Inst 2',
+      render: (r) => {
+        const i2 = r.installments?.find(i => i.installment_number === 2)
+        if (!i2) return '—'
+        return <div className="text-xs"><span>{formatCurrency(i2.amount)}</span><br/><span className={i2.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i2.due_date), 'dd/MM/yy')}</span></div>
+      }
+    },
+    {
+      key: 'inst_3',
+      header: 'Inst 3',
+      render: (r) => {
+        const i3 = r.installments?.find(i => i.installment_number === 3)
+        if (!i3) return '—'
+        return <div className="text-xs"><span>{formatCurrency(i3.amount)}</span><br/><span className={i3.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i3.due_date), 'dd/MM/yy')}</span></div>
+      }
+    },
+    {
+      key: 'next_due',
+      header: 'Next Due',
+      render: (r) => {
+        const pendingInst = r.installments?.filter(i => i.status !== 'paid').sort((a,b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        if (!pendingInst?.length) return '—'
+        const next = pendingInst[0]
+        return <span className={next.status === 'overdue' ? 'text-danger font-semibold text-xs' : 'text-slate-600 text-xs'}>{format(new Date(next.due_date), 'dd MMM')}</span>
+      }
+    },
     {
       key: 'status',
       header: 'Status',

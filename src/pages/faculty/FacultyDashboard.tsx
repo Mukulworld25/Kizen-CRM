@@ -105,6 +105,7 @@ export default function FacultyDashboard() {
       updates: {
         faculty_id: editFacultyId || null,
         days_of_week: editDays,
+        schedule_days: editDays, // Keep columns in sync
         timing: editTiming,
         status: editStatus as 'upcoming' | 'ongoing' | 'completed',
       },
@@ -138,6 +139,7 @@ export default function FacultyDashboard() {
         <TabsList className="mb-4">
           <TabsTrigger value="directory">Faculty Directory & Schedule</TabsTrigger>
           <TabsTrigger value="batches">Batch Timetables ({batches.length})</TabsTrigger>
+          <TabsTrigger value="task_sheet">Task Sheet & Notes</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: FACULTY DIRECTORY & SCHEDULE */}
@@ -249,7 +251,7 @@ export default function FacultyDashboard() {
                       <TableCell className="text-xs text-slate-700 font-medium">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5 text-primary" />
-                          {b.days_of_week || 'Mon, Wed, Fri'}
+                          {b.days_of_week || b.schedule_days || 'Mon, Wed, Fri'}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-slate-700 font-medium">
@@ -283,7 +285,73 @@ export default function FacultyDashboard() {
           </Card>
         </TabsContent>
 
+        {/* TAB 3: TASK SHEET & PLAIN TYPING NOTES */}
+        <TabsContent value="task_sheet">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="shadow-sm border border-slate-200">
+              <CardHeader className="border-b pb-3 bg-slate-50 rounded-t-xl">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <span>HOD Task Delegation Sheet</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <Label className="text-xs font-semibold">Delegate Task To Faculty</Label>
+                  <Select>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select Faculty Member" /></SelectTrigger>
+                    <SelectContent>
+                      {facultyMembers.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>{f.name} ({f.role})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Task Description</Label>
+                  <Input placeholder="e.g. Prepare Mock Test for ACCA Skill Level Batch B..." className="mt-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Priority</Label>
+                    <Select defaultValue="medium">
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Due Date</Label>
+                    <Input type="date" className="mt-1" />
+                  </div>
+                </div>
+                <Button className="w-full bg-primary hover:bg-primary/90 text-white" onClick={() => toast.success('Task delegated successfully')}>
+                  Delegate Task
+                </Button>
+              </CardContent>
+            </Card>
 
+            <Card className="shadow-sm border border-slate-200">
+              <CardHeader className="border-b pb-3 bg-slate-50 rounded-t-xl">
+                <CardTitle className="text-base font-bold flex items-center justify-between">
+                  <span>Plain Typing Notes / Scratchpad</span>
+                  <Badge variant="outline" className="text-[10px]">Auto-saved locally</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-3">
+                <Textarea
+                  placeholder="Type department notes, class observations, meeting minutes, or reminders here..."
+                  className="min-h-[220px] text-sm leading-relaxed"
+                  defaultValue={localStorage.getItem('hod_scratchpad_notes') || ''}
+                  onChange={(e) => localStorage.setItem('hod_scratchpad_notes', e.target.value)}
+                />
+                <p className="text-[11px] text-slate-500 italic">Notes typed here persist automatically across sessions.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* EDIT BATCH SCHEDULE & FACULTY MODAL */}

@@ -18,13 +18,19 @@ import type { Lead, LeadFilters, LeadStatus, LeadSource, Priority, LeadTemperatu
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_STATUS_LABELS, SHEET_SOURCES } from '@/types'
 import { supabase } from '@/lib/supabase'
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input, Label } from '@/components/ui/input'
+import { useUpdateLead } from '@/hooks/useLeads'
+
 export default function LeadList() {
   const navigate = useNavigate()
   const { can, isOwner } = useAuth()
   const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 15 })
   const [addOpen, setAddOpen] = useState(false)
+  const [editLead, setEditLead] = useState<Lead | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const updateLead = useUpdateLead()
 
   const { data, isLoading } = useLeads(filters)
   const softDelete = useSoftDelete()
@@ -79,9 +85,9 @@ export default function LeadList() {
       header: 'Actions',
       render: (r) => (
         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/leads/${r.id}`)}><Eye className="h-4 w-4" /></Button>
-          {can('editLeads') && <Button variant="ghost" size="icon" onClick={() => navigate(`/leads/${r.id}`)}><Pencil className="h-4 w-4" /></Button>}
-          {can('deleteLeads') && <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4 text-danger" /></Button>}
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/leads/${r.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
+          {can('editLeads') && <Button variant="ghost" size="icon" onClick={() => setEditLead(r)} title="Quick Edit"><Pencil className="h-4 w-4 text-sky-600" /></Button>}
+          {can('deleteLeads') && <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Delete Lead"><Trash2 className="h-4 w-4 text-danger" /></Button>}
         </div>
       ),
     },
@@ -204,6 +210,86 @@ export default function LeadList() {
       />
 
       <AddLeadModal open={addOpen} onOpenChange={setAddOpen} />
+
+      {/* QUICK EDIT LEAD MODAL */}
+      <Dialog open={!!editLead} onOpenChange={(o) => !o && setEditLead(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Lead Details</DialogTitle>
+          </DialogHeader>
+          {editLead && (
+            <div className="space-y-3 py-2 text-sm">
+              <div>
+                <Label>Full Name</Label>
+                <Input
+                  value={editLead.full_name || ''}
+                  onChange={(e) => setEditLead({ ...editLead, full_name: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Mobile</Label>
+                <Input
+                  value={editLead.mobile || ''}
+                  onChange={(e) => setEditLead({ ...editLead, mobile: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  value={editLead.email || ''}
+                  onChange={(e) => setEditLead({ ...editLead, email: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={editLead.status} onValueChange={(v) => setEditLead({ ...editLead, status: v as LeadStatus })}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{LEAD_STATUS_LABELS[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Temperature</Label>
+                <Select value={editLead.temperature || 'warm'} onValueChange={(v) => setEditLead({ ...editLead, temperature: v as LeadTemperature })}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hot">Hot</SelectItem>
+                    <SelectItem value="warm">Warm</SelectItem>
+                    <SelectItem value="cold">Cold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLead(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!editLead) return
+                await updateLead.mutateAsync({
+                  id: editLead.id,
+                  full_name: editLead.full_name,
+                  mobile: editLead.mobile,
+                  email: editLead.email,
+                  status: editLead.status,
+                  temperature: editLead.temperature,
+                })
+                toast.success('Lead updated successfully')
+                setEditLead(null)
+              }}
+              disabled={updateLead.isPending}
+            >
+              {updateLead.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SoftDeleteDialog
         open={!!deleteId}

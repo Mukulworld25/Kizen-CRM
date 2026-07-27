@@ -5,9 +5,10 @@ import { ArrowLeft, FileText, Plus, Download, Printer, CreditCard, AlertTriangle
 import { useAuth } from '@/hooks/useAuth'
 import {
   useStudent, useUpdateStudent, useAttendance, useMarkAttendance,
-  useFees, useFeePayments, useBatches, useStudentDocuments, useUploadStudentDocument, useInstallments
+  useFees, useFeePayments, useBatches, useStudentDocuments, useUploadStudentDocument, useInstallments,
+  useStudents
 } from '@/hooks/useStudents'
-import { useCourses } from '@/hooks/useLeads'
+import { useCourses, useLeads } from '@/hooks/useLeads'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -30,6 +31,12 @@ export default function StudentDetail() {
   const updateStudent = useUpdateStudent()
   const { data: courses = [] } = useCourses()
   const { data: batches = [] } = useBatches()
+  const { data: students = [] } = useStudents()
+  const { data: leadsData } = useLeads({ pageSize: 1000 })
+
+  const otherStudents = students.filter((s) => s.id !== id)
+  const studentOptions = otherStudents.map((s) => ({ value: s.id, label: `${s.full_name} (${s.mobile})` }))
+  const leadOptions = (leadsData?.leads ?? []).map((l) => ({ value: l.id, label: `${l.full_name} (${l.mobile})` }))
 
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const { data: attendance = [] } = useAttendance(id, month)
@@ -65,7 +72,9 @@ export default function StudentDetail() {
   }
 
   const courseOptions = courses.map((c) => ({ value: c.id, label: c.name }))
-  const batchOptions = batches.map((b) => ({ value: b.id, label: b.batch_name }))
+  const batchOptions = batches
+    .filter((b) => !student.course_id || b.course_id === student.course_id)
+    .map((b) => ({ value: b.id, label: b.batch_name }))
   const certOptions = [
     { value: 'not_started', label: 'Not Started' },
     { value: 'in_progress', label: 'In Progress' },
@@ -209,6 +218,27 @@ export default function StudentDetail() {
               <InlineEdit label="School / College" value={student.school_college} onSave={(v) => handleSaveField('school_college', v)} />
               <InlineEdit label="Certification Status" type="select" options={certOptions} value={student.certification_status} onSave={(v) => handleSaveField('certification_status', v)} />
               <InlineEdit label="Enrollment Status" type="select" options={statusOptions} value={String(student.is_active)} onSave={(v) => handleSaveField('is_active', v === 'true')} />
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="text-base font-bold">Referral Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 p-6 sm:grid-cols-2">
+              <InlineEdit
+                label="Referred By (Student)"
+                type="select"
+                options={[{ value: '', label: 'None' }, ...studentOptions]}
+                value={student.referred_by_student_id}
+                onSave={(v) => handleSaveField('referred_by_student_id', v || null)}
+              />
+              <InlineEdit
+                label="Referred By (Lead)"
+                type="select"
+                options={[{ value: '', label: 'None' }, ...leadOptions]}
+                value={student.referred_by_lead_id}
+                onSave={(v) => handleSaveField('referred_by_lead_id', v || null)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, UserPlus, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses } from '@/hooks/useLeads'
-import { useCreateFollowUp } from '@/hooks/useStudents'
+import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses, useLeads } from '@/hooks/useLeads'
+import { useCreateFollowUp, useStudents } from '@/hooks/useStudents'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
@@ -30,7 +30,15 @@ export default function LeadDetail() {
   const { data: lead, isLoading } = useLead(id)
   const { data: activities = [], isLoading: activitiesLoading } = useLeadActivities(id)
   const { data: courses = [] } = useCourses()
+  const { data: leadsData } = useLeads({ pageSize: 1000 })
+  const { data: students = [] } = useStudents()
   const updateLead = useUpdateLead()
+
+  const leadOptions = (leadsData?.leads ?? [])
+    .filter((l) => l.id !== id)
+    .map((l) => ({ value: l.id, label: `${l.full_name} (${l.mobile})` }))
+  
+  const studentOptions = students.map((s) => ({ value: s.id, label: `${s.full_name} (${s.mobile})` }))
   const addActivity = useAddActivity()
   const createFollowUp = useCreateFollowUp()
 
@@ -124,6 +132,8 @@ export default function LeadDetail() {
                   <InlineEdit label="Expected Joining" type="date" value={lead.expected_joining_date} onSave={canInlineEdit ? (v) => handleSaveField('expected_joining_date', v) : undefined} />
                   <InlineEdit label="Parent" value={lead.parent_name} onSave={canInlineEdit ? (v) => handleSaveField('parent_name', v) : undefined} />
                   <InlineEdit label="School/College" value={lead.school_college} onSave={canInlineEdit ? (v) => handleSaveField('school_college', v) : undefined} />
+                  <InlineEdit label="Referred By (Lead)" type="select" options={[{ value: '', label: 'None' }, ...leadOptions]} value={lead.referred_by_lead_id} onSave={canInlineEdit ? (v) => handleSaveField('referred_by_lead_id', v || null) : undefined} />
+                  <InlineEdit label="Referred By (Student)" type="select" options={[{ value: '', label: 'None' }, ...studentOptions]} value={(lead as any).referred_by_student_id} onSave={canInlineEdit ? (v) => handleSaveField('referred_by_student_id' as keyof Lead, v || null) : undefined} />
                   <InlineEdit className="sm:col-span-2" label="Notes" type="textarea" value={lead.notes} onSave={canInlineEdit ? (v) => handleSaveField('notes', v) : undefined} />
                 </CardContent>
               </Card>
@@ -180,6 +190,26 @@ export default function LeadDetail() {
                 <CardContent>
                   <p className="font-medium">{lead.counselor?.name ?? 'Unassigned'}</p>
                   <p className="text-sm text-muted-foreground">{lead.counselor?.email}</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Referral Details</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <InlineEdit
+                    label="Referred By (Student)"
+                    type="select"
+                    options={[{ value: '', label: 'None' }, ...studentOptions]}
+                    value={(lead as any).referred_by_student_id}
+                    onSave={(v) => handleSaveField('referred_by_student_id' as any, v || null)}
+                  />
+                  <InlineEdit
+                    label="Referred By (Lead)"
+                    type="select"
+                    options={[{ value: '', label: 'None' }, ...leadOptions]}
+                    value={lead.referred_by_lead_id}
+                    onSave={(v) => handleSaveField('referred_by_lead_id', v || null)}
+                  />
                 </CardContent>
               </Card>
             </div>

@@ -863,6 +863,31 @@ function OwnerDashboard() {
 
   return (
     <div className="space-y-4">
+      {/* AUTO REMINDERS BANNER */}
+      {(overdueFollowups > 0 || overdueInstallments > 0) && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-red-500/10 to-amber-500/10 border border-amber-300/40 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm animate-card-in">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0 font-bold">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-900">Auto Reminders & Urgent Action Items</p>
+              <p className="text-xs text-amber-800 mt-0.5 font-medium">
+                You have <strong className="text-red-700">{overdueFollowups} overdue follow-up calls</strong> and <strong className="text-amber-800">{overdueInstallments} pending fee installment dues</strong> requiring action today.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="h-8 text-xs bg-white border-amber-300 text-amber-900 hover:bg-amber-50" onClick={() => window.location.href = '/followups'}>
+              View Follow-ups
+            </Button>
+            <Button size="sm" className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={() => window.location.href = '/fees'}>
+              Fee Ledger
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between animate-card-in">
         <div>
           <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>Dashboard</h1>

@@ -457,7 +457,47 @@ export function useUpdateBatch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batches'] })
       queryClient.invalidateQueries({ queryKey: ['faculty-students'] })
-      toast.success('Batch schedule & faculty updated')
+      toast.success('Batch updated')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useCreateBatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (batch: Partial<Batch>) => {
+      const { data, error } = await supabase
+        .from('batches')
+        .insert(batch)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] })
+      toast.success('Batch created successfully')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useDeleteBatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('batches')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] })
+      toast.success('Batch deleted')
     },
     onError: (err) => toast.error(err.message),
   })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCreateStudent, useBatches } from '@/hooks/useStudents'
-import { useCourses } from '@/hooks/useLeads'
+import { useCreateStudent, useBatches, useStudents } from '@/hooks/useStudents'
+import { useCourses, useLeads } from '@/hooks/useLeads'
 import { supabase } from '@/lib/supabase'
 import type { Lead } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -20,9 +20,13 @@ export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStu
   const createStudent = useCreateStudent()
   const { data: courses = [] } = useCourses()
   const { data: batches = [] } = useBatches()
+  const { data: leadsData } = useLeads({ pageSize: 1000 })
+  const { data: students = [] } = useStudents()
   const [courseId, setCourseId] = useState(lead.interested_course_id ?? '')
   const [batchId, setBatchId] = useState('')
   const [totalFee, setTotalFee] = useState('')
+  const [referredByLeadId, setReferredByLeadId] = useState(lead.referred_by_lead_id ?? '')
+  const [referredByStudentId, setReferredByStudentId] = useState((lead as any).referred_by_student_id ?? '')
 
   const filteredBatches = batches.filter((b) => !courseId || b.course_id === courseId)
 
@@ -40,6 +44,8 @@ export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStu
         school_college: lead.school_college,
         course_id: courseId || null,
         batch_id: batchId || null,
+        referred_by_lead_id: referredByLeadId || null,
+        referred_by_student_id: referredByStudentId || null,
       })
       .select()
       .single()
@@ -89,6 +95,26 @@ export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStu
           <div>
             <Label>Total Fee (₹)</Label>
             <Input type="number" value={totalFee} onChange={(e) => setTotalFee(e.target.value)} placeholder="45000" />
+          </div>
+          <div>
+            <Label>Referred By (Lead)</Label>
+            <Select value={referredByLeadId} onValueChange={setReferredByLeadId}>
+              <SelectTrigger><SelectValue placeholder="Select Lead" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None</SelectItem>
+                {(leadsData?.leads ?? []).filter(l => l.id !== lead.id).map((l) => <SelectItem key={l.id} value={l.id}>{l.full_name} ({l.mobile})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Referred By (Student)</Label>
+            <Select value={referredByStudentId} onValueChange={setReferredByStudentId}>
+              <SelectTrigger><SelectValue placeholder="Select Student" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None</SelectItem>
+                {students.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.mobile})</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>

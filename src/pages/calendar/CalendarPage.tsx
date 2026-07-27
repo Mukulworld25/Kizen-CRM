@@ -46,6 +46,11 @@ export default function CalendarPage() {
   const [showFollowups, setShowFollowups] = useState(true)
   const [showInstallments, setShowInstallments] = useState(true)
   const [showDemos, setShowDemos] = useState(true)
+  const [showReminders, setShowReminders] = useState(true)
+  const [showTasks, setShowTasks] = useState(true)
+  const [showMeetings, setShowMeetings] = useState(true)
+  const [showBatchSchedules, setShowBatchSchedules] = useState(true)
+  const [showInstFus, setShowInstFus] = useState(true)
 
   // Dialog States
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -101,6 +106,11 @@ export default function CalendarPage() {
     if (e.type === 'followup' && !showFollowups) return false
     if (e.type === 'installment' && !showInstallments) return false
     if (e.type === 'demo' && !showDemos) return false
+    if (e.type === 'reminder' && !showReminders) return false
+    if (e.type === 'task' && !showTasks) return false
+    if (e.type === 'meeting' && !showMeetings) return false
+    if (e.type === 'batch_schedule' && !showBatchSchedules) return false
+    if (e.type === 'institution_fu' && !showInstFus) return false
 
     if (viewMode === 'day') {
       return e.date === format(selectedDate, 'yyyy-MM-dd')
@@ -134,11 +144,13 @@ export default function CalendarPage() {
     setIsCreateModalOpen(true)
   }
 
+  const [leadSearchText, setLeadSearchText] = useState('')
+
   const handleScheduleSubmit = async () => {
-    if (!selectedLeadId || !createDate) return
+    if (!createDate) return
     const scheduledAt = new Date(`${createDate}T${followupTime}:00`).toISOString()
     await createFollowUp.mutateAsync({
-      lead_id: selectedLeadId,
+      lead_id: selectedLeadId === 'none' ? null : (selectedLeadId || null),
       scheduled_at: scheduledAt,
       notes: followupNotes,
       assigned_to: counselorId,
@@ -148,6 +160,7 @@ export default function CalendarPage() {
     setIsCreateModalOpen(false)
     setFollowupNotes('')
     setSelectedLeadId('')
+    setLeadSearchText('')
   }
 
   // Days array for month view grid
@@ -157,7 +170,7 @@ export default function CalendarPage() {
   })
 
   // Helper for event styling
-  const getEventBadgeClass = (type: CalendarEvent['type'], status: CalendarEvent['status']) => {
+  const getEventBadgeClass = (type: string, status: string) => {
     if (status === 'completed' || status === 'paid') {
       return 'bg-emerald-100 text-emerald-800 border-emerald-300'
     }
@@ -171,6 +184,16 @@ export default function CalendarPage() {
         return 'bg-amber-100 text-amber-800 border-amber-300'
       case 'demo':
         return 'bg-purple-100 text-purple-800 border-purple-300'
+      case 'reminder':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300'
+      case 'task':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-300'
+      case 'meeting':
+        return 'bg-orange-100 text-orange-800 border-orange-300'
+      case 'batch_schedule':
+        return 'bg-teal-100 text-teal-800 border-teal-300'
+      case 'institution_fu':
+        return 'bg-pink-100 text-pink-800 border-pink-300'
       default:
         return 'bg-slate-100 text-slate-800 border-slate-300'
     }
@@ -548,15 +571,28 @@ export default function CalendarPage() {
 
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold text-slate-700">Select Lead *</label>
-              <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Choose a lead" /></SelectTrigger>
+              <label className="text-xs font-semibold text-slate-700">Select Lead / Event Target</label>
+              <Input
+                placeholder="Search lead by name or mobile..."
+                value={leadSearchText}
+                onChange={(e) => setLeadSearchText(e.target.value)}
+                className="mt-1 mb-2 text-xs"
+              />
+              <Select value={selectedLeadId || 'none'} onValueChange={setSelectedLeadId}>
+                <SelectTrigger><SelectValue placeholder="Choose a lead or select general reminder" /></SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {allLeads.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.full_name} ({l.mobile})
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="none">General / Personal Reminder (No Lead)</SelectItem>
+                  {allLeads
+                    .filter((l) =>
+                      !leadSearchText ||
+                      l.full_name.toLowerCase().includes(leadSearchText.toLowerCase()) ||
+                      (l.mobile && l.mobile.includes(leadSearchText))
+                    )
+                    .map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.full_name} ({l.mobile})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -586,7 +622,7 @@ export default function CalendarPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleScheduleSubmit} disabled={!selectedLeadId || !createDate || createFollowUp.isPending}>
+            <Button onClick={handleScheduleSubmit} disabled={!createDate || createFollowUp.isPending}>
               {createFollowUp.isPending ? 'Scheduling...' : 'Schedule Task'}
             </Button>
           </DialogFooter>

@@ -90,6 +90,7 @@ export interface Lead {
   lead_score: number | null
   notes: string | null
   referred_by_lead_id?: string | null
+  referred_by_student_id?: string | null
   flag_color?: 'red' | 'yellow' | null
   flag_reason?: string | null
   created_by: string | null
@@ -98,6 +99,7 @@ export interface Lead {
   course?: Course
   counselor?: User
   referred_by?: Lead
+  referred_by_student?: Student
 }
 
 export interface LeadActivity {
@@ -149,6 +151,8 @@ export interface Student {
   roll_number: string | null
   admission_date: string
   faculty_id: string | null
+  referred_by_lead_id?: string | null
+  referred_by_student_id?: string | null
   certification_status: 'not_started' | 'in_progress' | 'completed' | 'issued'
   is_active: boolean
   flag_color?: 'red' | 'yellow' | null
@@ -157,6 +161,8 @@ export interface Student {
   updated_at: string
   course?: Course
   batch?: Batch
+  referred_by_lead?: Lead
+  referred_by_student?: Student
 }
 
 export interface Fee {

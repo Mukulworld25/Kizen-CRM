@@ -8,8 +8,8 @@ export interface CalendarEvent {
   title: string
   date: string // YYYY-MM-DD
   time?: string // e.g. "10:30 AM"
-  type: 'followup' | 'installment' | 'demo'
-  status: 'pending' | 'completed' | 'overdue' | 'paid' | 'partial' | 'upcoming'
+  type: 'followup' | 'installment' | 'demo' | 'reminder' | 'task' | 'meeting' | 'batch_schedule' | 'institution_fu'
+  status: 'pending' | 'completed' | 'overdue' | 'paid' | 'partial' | 'upcoming' | 'ongoing'
   description?: string
   counselorId?: string
   counselorName?: string

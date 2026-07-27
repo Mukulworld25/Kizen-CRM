@@ -6,7 +6,6 @@ import { StatsCard } from '@/components/shared/StatsCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -342,9 +341,9 @@ export default function FacultyDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-3">
-                <Textarea
+                <textarea
                   placeholder="Type department notes, class observations, meeting minutes, or reminders here..."
-                  className="min-h-[220px] text-sm leading-relaxed"
+                  className="min-h-[220px] text-sm leading-relaxed flex w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   defaultValue={localStorage.getItem('hod_scratchpad_notes') || ''}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => localStorage.setItem('hod_scratchpad_notes', e.target.value)}
                 />

@@ -1,0 +1,44 @@
+
+=== STEP A: VERIFY FOLLOW_UPS AND NOTIFICATIONS WRITE TO DB ===
+
+
+=== 1. OWNER SIGNIN ===
+
+  OK: shivam.kizen.test@gmail.com
+  Owner: Shivam Owner (owner, id: 57d165aa-08ac-47a8-a87d-fe1ae1954f42)
+
+=== 2. GET EXISTING LEAD & COUNSELOR ===
+
+  Lead: E2E Test Student (7fd300d0-ecc5-4719-9633-eaaa6744b6c5)
+  Counselor: Priya Counselor (4ea6f481-8d36-4129-961d-cdfd0625d051)
+
+=== 3. CREATE FOLLOW-UP ===
+
+  OK: Follow-up created (id: 2dbae498-c927-4cd0-abfd-c171da15ab6f)
+  Type: call, Status: pending, Scheduled: 2026-07-14T12:28:11.128+00:00
+
+=== 4. VERIFY FOLLOW-UP PERSISTS ===
+
+  ✅ PASS: follow_ups row found in database
+  Lead: E2E Test Student, Type: call, Status: pending
+  Total follow_ups rows: 2
+
+=== 5. CHECK NOTIFICATIONS TABLE ===
+
+  Total notifications: 0
+  ⚠️  No notifications found in database
+
+=== 6. CREATE NEW LEAD (should trigger notification) ===
+
+  OK: Lead created (id: c9de2361-25a7-405c-8e22-75dd9e50ee8f)
+
+=== 7. VERIFY NOTIFICATION WAS CREATED FOR COUNSELOR ===
+
+  ❌ FAIL: No notifications created for counselor after lead assignment
+  ⚠️  No 'new_lead' type notifications - no trigger fires on lead creation
+
+=== RESULTS SUMMARY ===
+
+  FOLLOW_UPS write to DB: ✅ PASS
+  NOTIFICATIONS have rows: ⚠️ WARNING
+  NOTIFICATION on lead assignment: ❌ FAIL (no trigger)

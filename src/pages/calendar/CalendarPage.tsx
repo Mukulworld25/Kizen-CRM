@@ -46,11 +46,11 @@ export default function CalendarPage() {
   const [showFollowups, setShowFollowups] = useState(true)
   const [showInstallments, setShowInstallments] = useState(true)
   const [showDemos, setShowDemos] = useState(true)
-  const [showReminders, setShowReminders] = useState(true)
-  const [showTasks, setShowTasks] = useState(true)
-  const [showMeetings, setShowMeetings] = useState(true)
-  const [showBatchSchedules, setShowBatchSchedules] = useState(true)
-  const [showInstFus, setShowInstFus] = useState(true)
+  const [showReminders] = useState(true)
+  const [showTasks] = useState(true)
+  const [showMeetings] = useState(true)
+  const [showBatchSchedules] = useState(true)
+  const [showInstFus] = useState(true)
 
   // Dialog States
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)

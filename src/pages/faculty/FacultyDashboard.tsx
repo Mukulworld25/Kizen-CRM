@@ -6,6 +6,7 @@ import { StatsCard } from '@/components/shared/StatsCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -345,7 +346,7 @@ export default function FacultyDashboard() {
                   placeholder="Type department notes, class observations, meeting minutes, or reminders here..."
                   className="min-h-[220px] text-sm leading-relaxed"
                   defaultValue={localStorage.getItem('hod_scratchpad_notes') || ''}
-                  onChange={(e) => localStorage.setItem('hod_scratchpad_notes', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => localStorage.setItem('hod_scratchpad_notes', e.target.value)}
                 />
                 <p className="text-[11px] text-slate-500 italic">Notes typed here persist automatically across sessions.</p>
               </CardContent>

@@ -1,0 +1,14 @@
+{
+  "git": {
+    "lfs": false
+  },
+  "buildCommand": "cd kizen-crm && npm install && npm run build",
+  "outputDirectory": "kizen-crm/dist",
+  "installCommand": "cd kizen-crm && npm install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

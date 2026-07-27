@@ -1,0 +1,35 @@
+
+=== VERIFY MIGRATION 008 ===
+
+
+=== 1. LEADS NEW COLUMNS ===
+
+
+=== 2. INSTITUTIONS TABLE ===
+
+  institutions table: ✅ exists
+  institution_meetings: ✅ exists
+  institution_follow_ups: ✅ exists
+
+=== 3. FEATURE PERMISSIONS ===
+
+  feature_permissions: ✅ exists
+  institute_expenses: ✅ exists
+
+=== 4. BDM ROLE ===
+
+  bdm users: 0 found
+
+=== 5. LEAD STATUSES ===
+
+  Unique statuses in use: admitted, new
+  ❌ Invalid statuses remaining: admitted, new
+
+=== 6. NOTIFICATION TRIGGERS ===
+
+
+=== 7. has_feature_access FUNCTION ===
+
+  has_feature_access: check via RLS (will be tested when expense tracking is used)
+
+=== MIGRATION VERIFICATION COMPLETE ===

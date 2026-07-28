@@ -1,13 +1,10 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
-import { useAuth, AuthProvider } from '@/hooks/useAuth'
+import { AuthProvider } from '@/hooks/useAuth'
 import { ProtectedRoute, RoleGuard } from '@/components/auth/ProtectedRoute'
 import { Layout } from '@/components/layout/Layout'
-import { FloatingAIVoiceButton } from '@/components/home/FloatingAIVoiceButton'
-import { VibeOnboardingModal } from '@/components/auth/VibeOnboardingModal'
-import type { VibeState } from '@/components/auth/VibeOnboardingModal'
 import Login from '@/pages/auth/Login'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import LeadList from '@/pages/leads/LeadList'
@@ -46,32 +43,8 @@ const queryClient = new QueryClient({
 })
 
 function AppContent() {
-  const { profile, loading, vibe, setVibe, showVibeOnboarding, setShowVibeOnboarding } = useAuth()
-
-  // Trigger vibe onboarding on first sign-in when no vibe is stored
-  useEffect(() => {
-    if (!loading && profile && !vibe.innerWeather) {
-      setShowVibeOnboarding(true)
-    }
-  }, [loading, profile, vibe, setShowVibeOnboarding])
-
-  const handleVibeComplete = (vibeData: VibeState) => {
-    setVibe(vibeData)
-    localStorage.setItem('pausewithsk_vibe', JSON.stringify(vibeData))
-    setShowVibeOnboarding(false)
-  }
-
-  const handleVibeSkip = () => {
-    setShowVibeOnboarding(false)
-  }
-
   return (
     <>
-      <VibeOnboardingModal
-        open={showVibeOnboarding}
-        onComplete={handleVibeComplete}
-        onSkip={handleVibeSkip}
-      />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -133,7 +106,6 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         <CommandPalette />
-        <FloatingAIVoiceButton />
       </BrowserRouter>
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
     </>

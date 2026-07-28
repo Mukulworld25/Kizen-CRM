@@ -8,7 +8,7 @@ interface AIVoiceCompanionProps {
   onClose: () => void
 }
 
-export function AIVoiceCompanion({ onClose }: AIVoiceCompanionProps) {
+export function AIVoiceCompanion({ onClose: _onClose }: AIVoiceCompanionProps) {
   const [activeTab, setActiveTab] = useState<'assist' | 'grounding'>('assist')
   const [isListening, setIsListening] = useState(false)
 

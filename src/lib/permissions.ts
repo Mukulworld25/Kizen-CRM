@@ -38,7 +38,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewFees', 'recordPayments', 'viewReports', 'viewRevenue',
     'manageUsers', 'manageCourses', 'viewAuditLogs', 'assignCounselor',
     'viewInstitutions', 'editInstitutions', 'viewExpenses', 'manageExpenses',
-    'viewBdmDashboard', 'generateInvoices', 'importData',
+    'viewFacultyDashboard', 'viewBdmDashboard', 'generateInvoices', 'importData',
     'viewCalendar', 'manageCategories', 'viewKnowledgeBase',
   ],
   admin: [
@@ -57,7 +57,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewFees', 'recordPayments',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewFees', 'recordPayments', 'viewFacultyDashboard', 'viewCalendar',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',

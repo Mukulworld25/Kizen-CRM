@@ -150,7 +150,7 @@ export default function BatchManagement() {
       header: '',
       render: (r) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/students?batch=${r.id}`)} title="View Students">
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/students?batchId=${r.id}`)} title="View Students">
             <Eye className="h-4 w-4 text-sky-600" />
           </Button>
           {(isOwner || can('manageUsers')) && (

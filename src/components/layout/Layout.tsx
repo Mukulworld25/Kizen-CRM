@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { AmbientAudio } from '@/components/layout/AmbientAudio'
 import { useRealtime } from '@/hooks/useRealtime'
 
 export function Layout() {
@@ -11,6 +12,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <AmbientAudio />
       <div className="hidden lg:block h-full">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStudents, useBatches, useFees } from '@/hooks/useStudents'
 import { useCourses } from '@/hooks/useLeads'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -16,8 +16,11 @@ import { AddStudentModal } from '@/pages/students/AddStudentModal'
 export default function StudentList() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'all' | 'admissions'>('all')
+  const [searchParams] = useSearchParams()
+  const initialBatchId = searchParams.get('batchId') ?? undefined
+
   const [courseId, setCourseId] = useState<string>()
-  const [batchId, setBatchId] = useState<string>()
+  const [batchId, setBatchId] = useState<string | undefined>(initialBatchId)
   const [courseLevel, setCourseLevel] = useState<string>('all')
   const [flaggedOnly, setFlaggedOnly] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)

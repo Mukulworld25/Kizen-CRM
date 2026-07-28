@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardStats, useFollowUps, useDashboardInsights, useExpenses } from '@/hooks/useStudents'
 import { useBdmDashboardStats } from '@/hooks/useInstitutions'
+import { ABOUT_DATA } from '@/data/aboutData'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,7 @@ import {
   Building2, CalendarRange, Handshake, Thermometer,
   ArrowUpRight, ArrowDownRight, MoreHorizontal,
   Zap, Award, CalendarDays, Settings2,
-  DollarSign, Activity, Star, Flame, ShieldAlert, UserCheck, Compass,
+  DollarSign, Activity, Star, Flame, ShieldAlert, UserCheck, Compass, Sparkles,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -365,7 +366,7 @@ function OwnerDashboard() {
   const { data: insights } = useDashboardInsights()
   const { data: expenses = [] } = useExpenses()
   const { data: todayFollowUps = [] } = useFollowUps('today')
-  const { profile } = useAuth()
+  const { profile, vibe } = useAuth()
   const [editOpen, setEditOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<Record<string, { visible: boolean; position: number }>>({})
   const [dirtyPrefs, setDirtyPrefs] = useState(false)
@@ -863,6 +864,72 @@ function OwnerDashboard() {
 
   return (
     <div className="space-y-4">
+      {/* YOUR TAILORED DAILY PRACTICE - based on vibe selections */}
+      {vibe.innerWeather && vibe.corePath && (
+        <div
+          className="rounded-2xl p-5 animate-card-in overflow-hidden relative"
+          style={{
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.04) 100%)',
+            border: '1px solid rgba(139,92,246,0.15)',
+          }}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}
+            >
+              <Activity className="w-6 h-6 text-violet-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-violet-400">
+                  Your Tailored Daily Practice
+                </span>
+                <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1">
+                {vibe.innerWeather === 'calm' && 'Extend Your Calm'}
+                {vibe.innerWeather === 'anxious' && 'Soften the Edges'}
+                {vibe.innerWeather === 'overwhelmed' && 'Return to Center'}
+                {vibe.innerWeather === 'seeking_clarity' && 'Find Your Direction'}
+                {vibe.innerWeather === 'exhausted' && 'Restorative Grounding'}
+              </h3>
+              <p className="text-sm text-violet-200/70">
+                Based on your current state, we recommend a{' '}
+                {vibe.corePath === 'emotional_wellness'
+                  ? 'Emotional Wellness'
+                  : vibe.corePath === 'spiritual_alignment'
+                    ? 'Spiritual Alignment'
+                    : 'Mind & Body Balance'}{' '}
+                practice to help you{' '}
+                {vibe.primaryGoal === 'reduce_stress'
+                  ? 'reduce stress and find calm.'
+                  : vibe.primaryGoal === 'process_triggers'
+                    ? 'process emotional triggers.'
+                    : vibe.primaryGoal === 'sleep_deeply'
+                      ? 'prepare for deep, restful sleep.'
+                      : 'rebuild your inner resilience.'}
+              </p>
+              <Button
+                size="sm"
+                className="mt-3 h-8 text-xs font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  color: '#fff',
+                }}
+                onClick={() => {
+                  const btn = document.querySelector<HTMLButtonElement>('[aria-label="Open AI Voice Assistant"]')
+                  btn?.click()
+                }}
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                Start Guided Session
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AUTO REMINDERS BANNER */}
       {(overdueFus > 0 || overdueInstallments > 0) && (
         <div className="bg-gradient-to-r from-amber-500/10 via-red-500/10 to-amber-500/10 border border-amber-300/40 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm animate-card-in">

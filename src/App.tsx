@@ -1,10 +1,13 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from '@/hooks/useAuth'
+import { useAuth, AuthProvider } from '@/hooks/useAuth'
 import { ProtectedRoute, RoleGuard } from '@/components/auth/ProtectedRoute'
 import { Layout } from '@/components/layout/Layout'
+import { FloatingAIVoiceButton } from '@/components/home/FloatingAIVoiceButton'
+import { VibeOnboardingModal } from '@/components/auth/VibeOnboardingModal'
+import type { VibeState } from '@/components/auth/VibeOnboardingModal'
 import Login from '@/pages/auth/Login'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import LeadList from '@/pages/leads/LeadList'
@@ -42,73 +45,106 @@ const queryClient = new QueryClient({
   },
 })
 
+function AppContent() {
+  const { profile, loading, vibe, setVibe, showVibeOnboarding, setShowVibeOnboarding } = useAuth()
+
+  // Trigger vibe onboarding on first sign-in when no vibe is stored
+  useEffect(() => {
+    if (!loading && profile && !vibe.innerWeather) {
+      setShowVibeOnboarding(true)
+    }
+  }, [loading, profile, vibe, setShowVibeOnboarding])
+
+  const handleVibeComplete = (vibeData: VibeState) => {
+    setVibe(vibeData)
+    localStorage.setItem('pausewithsk_vibe', JSON.stringify(vibeData))
+    setShowVibeOnboarding(false)
+  }
+
+  const handleVibeSkip = () => {
+    setShowVibeOnboarding(false)
+  }
+
+  return (
+    <>
+      <VibeOnboardingModal
+        open={showVibeOnboarding}
+        onComplete={handleVibeComplete}
+        onSkip={handleVibeSkip}
+      />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="leads" element={<LeadList />} />
+            <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="followups" element={<FollowUps />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="institutions" element={<InstitutionList />} />
+            <Route path="institutions/:id" element={<InstitutionDetail />} />
+            <Route path="expenses" element={<Suspense fallback={<PageFallback />}><ExpensesPage /></Suspense>} />
+            <Route path="faculty" element={<Suspense fallback={<PageFallback />}><FacultyDashboard /></Suspense>} />
+            <Route
+              path="import"
+              element={
+                <RoleGuard permission="importData" fallback={<Navigate to="/dashboard" replace />}>
+                  <Suspense fallback={<PageFallback />}><DataImport /></Suspense>
+                </RoleGuard>
+              }
+            />
+            <Route path="students" element={<StudentList />} />
+            <Route path="students/:id" element={<StudentDetail />} />
+            <Route path="batches" element={<BatchManagement />} />
+            <Route path="fees" element={<FeeManagement />} />
+            <Route path="fees/:id" element={<FeeDetail />} />
+            <Route
+              path="reports"
+              element={
+                <RoleGuard permission="viewReports" fallback={<Navigate to="/dashboard" replace />}>
+                  <Suspense fallback={<PageFallback />}><Reports /></Suspense>
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RoleGuard permission="manageUsers" fallback={<Navigate to="/dashboard" replace />}>
+                  <Settings />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="knowledge"
+              element={
+                <RoleGuard permission="viewKnowledgeBase" fallback={<Navigate to="/dashboard" replace />}>
+                  <Suspense fallback={<PageFallback />}><KnowledgeBase /></Suspense>
+                </RoleGuard>
+              }
+            />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+        <CommandPalette />
+        <FloatingAIVoiceButton />
+      </BrowserRouter>
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+    </>
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="leads" element={<LeadList />} />
-              <Route path="leads/:id" element={<LeadDetail />} />
-              <Route path="followups" element={<FollowUps />} />
-              <Route path="calendar" element={<CalendarPage />} />
-              <Route path="institutions" element={<InstitutionList />} />
-              <Route path="institutions/:id" element={<InstitutionDetail />} />
-              <Route path="expenses" element={<Suspense fallback={<PageFallback />}><ExpensesPage /></Suspense>} />
-              <Route path="faculty" element={<Suspense fallback={<PageFallback />}><FacultyDashboard /></Suspense>} />
-              <Route
-                path="import"
-                element={
-                  <RoleGuard permission="importData" fallback={<Navigate to="/dashboard" replace />}>
-                    <Suspense fallback={<PageFallback />}><DataImport /></Suspense>
-                  </RoleGuard>
-                }
-              />
-              <Route path="students" element={<StudentList />} />
-              <Route path="students/:id" element={<StudentDetail />} />
-              <Route path="batches" element={<BatchManagement />} />
-              <Route path="fees" element={<FeeManagement />} />
-              <Route path="fees/:id" element={<FeeDetail />} />
-              <Route
-                path="reports"
-                element={
-                  <RoleGuard permission="viewReports" fallback={<Navigate to="/dashboard" replace />}>
-                    <Suspense fallback={<PageFallback />}><Reports /></Suspense>
-                  </RoleGuard>
-                }
-              />
-              <Route
-                path="settings"
-                element={
-                  <RoleGuard permission="manageUsers" fallback={<Navigate to="/dashboard" replace />}>
-                    <Settings />
-                  </RoleGuard>
-                }
-              />
-              <Route
-                path="knowledge"
-                element={
-                  <RoleGuard permission="viewKnowledgeBase" fallback={<Navigate to="/dashboard" replace />}>
-                    <Suspense fallback={<PageFallback />}><KnowledgeBase /></Suspense>
-                  </RoleGuard>
-                }
-              />
-            </Route>
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-          <CommandPalette />
-        </BrowserRouter>
-        <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+        <AppContent />
       </AuthProvider>
     </QueryClientProvider>
   )

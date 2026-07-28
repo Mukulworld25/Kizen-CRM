@@ -4,6 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { hasPermission, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
 
+interface UserVibe {
+  innerWeather: string | null
+  corePath: string | null
+  primaryGoal: string | null
+}
+
 interface AuthContextValue {
   session: Session | null
   profile: User | null
@@ -13,6 +19,16 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>
   can: (permission: Permission) => boolean
   isOwner: boolean
+  vibe: UserVibe
+  setVibe: (vibe: UserVibe) => void
+  showVibeOnboarding: boolean
+  setShowVibeOnboarding: (show: boolean) => void
+}
+
+const DEFAULT_VIBE: UserVibe = {
+  innerWeather: null,
+  corePath: null,
+  primaryGoal: null,
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -21,6 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [vibe, setVibe] = useState<UserVibe>(() => {
+    try {
+      const saved = localStorage.getItem('pausewithsk_vibe')
+      return saved ? JSON.parse(saved) : DEFAULT_VIBE
+    } catch {
+      return DEFAULT_VIBE
+    }
+  })
+  const [showVibeOnboarding, setShowVibeOnboarding] = useState(false)
 
   const fetchProfile = useCallback(async (authId: string): Promise<User | null> => {
     try {
@@ -139,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasPermission(profile?.role, permission, isOwner)
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, isOwner }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, isOwner, vibe, setVibe, showVibeOnboarding, setShowVibeOnboarding }}>
       {children}
     </AuthContext.Provider>
   )

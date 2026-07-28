@@ -33,7 +33,7 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
         .from('follow_ups')
         .select(`
           id, type, scheduled_at, status, notes, assigned_to,
-          lead:leads(id, full_name, mobile, course:courses(name)),
+          lead:leads!follow_ups_lead_id_fkey!left(id, full_name, mobile, course:courses(name)),
           assignee:users!follow_ups_assigned_to_fkey(name)
         `)
         .order('scheduled_at', { ascending: true })
@@ -82,7 +82,7 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
         const dateStr = format(d, 'yyyy-MM-dd')
         const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         const lead = fu.lead as any
-        const personName = lead?.full_name || 'Unassigned Lead'
+        const personName = lead?.full_name || (fu.notes ? `Reminder: ${fu.notes}` : 'Standalone Reminder')
         const courseName = lead?.course?.name
 
         events.push({

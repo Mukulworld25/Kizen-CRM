@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   format,
   addMonths,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCounselors, useLeads } from '@/hooks/useLeads'
-import { useCreateFollowUp, useCompleteFollowUp, useRescheduleFollowUp } from '@/hooks/useStudents'
+import { useCreateFollowUp, useCompleteFollowUp, useRescheduleFollowUp, useStudents } from '@/hooks/useStudents'
 import { useCalendarEvents, type CalendarEvent } from '@/hooks/useCalendarEvents'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton'
@@ -75,6 +76,7 @@ export default function CalendarPage() {
   const { data: events = [] } = useCalendarEvents(startDateStr, endDateStr, counselorId)
   const { data: counselors = [] } = useCounselors()
   const { data: leadsData } = useLeads({ pageSize: 1000 })
+  const queryClient = useQueryClient()
   const createFollowUp = useCreateFollowUp()
   const completeFollowUp = useCompleteFollowUp()
   const rescheduleFollowUp = useRescheduleFollowUp()
@@ -100,6 +102,8 @@ export default function CalendarPage() {
   }
 
   const allLeads = leadsData?.leads ?? []
+  const { data: studentsData } = useStudents({})
+  const allStudents = studentsData ?? []
 
   // Filter events by type and viewMode
   const filteredEvents = events.filter((e) => {
@@ -130,6 +134,7 @@ export default function CalendarPage() {
     const today = new Date()
     setCurrentMonth(today)
     setSelectedDate(today)
+    setViewMode('day')
   }
 
   const handleDayClick = (day: Date) => {
@@ -153,10 +158,12 @@ export default function CalendarPage() {
       lead_id: selectedLeadId === 'none' ? null : (selectedLeadId || null),
       scheduled_at: scheduledAt,
       notes: followupNotes,
-      assigned_to: counselorId,
+      assigned_to: counselorId || null,
       type: 'call',
       status: 'pending',
     })
+    // Ensure calendar data is refetched before closing modal
+    await queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
     setIsCreateModalOpen(false)
     setFollowupNotes('')
     setSelectedLeadId('')
@@ -571,15 +578,15 @@ export default function CalendarPage() {
 
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold text-slate-700">Select Lead / Event Target</label>
+              <label className="text-xs font-semibold text-slate-700">Select Lead / Student / Reminder</label>
               <Input
-                placeholder="Search lead by name or mobile..."
+                placeholder="Search lead or student by name or mobile..."
                 value={leadSearchText}
                 onChange={(e) => setLeadSearchText(e.target.value)}
                 className="mt-1 mb-2 text-xs"
               />
               <Select value={selectedLeadId || 'none'} onValueChange={setSelectedLeadId}>
-                <SelectTrigger><SelectValue placeholder="Choose a lead or select general reminder" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Choose a lead, student, or general reminder" /></SelectTrigger>
                 <SelectContent className="max-h-60">
                   <SelectItem value="none">General / Personal Reminder (No Lead)</SelectItem>
                   {allLeads
@@ -588,9 +595,22 @@ export default function CalendarPage() {
                       l.full_name.toLowerCase().includes(leadSearchText.toLowerCase()) ||
                       (l.mobile && l.mobile.includes(leadSearchText))
                     )
+                    .slice(0, 50)
                     .map((l) => (
                       <SelectItem key={l.id} value={l.id}>
-                        {l.full_name} ({l.mobile})
+                        📋 {l.full_name} {l.mobile ? `(${l.mobile})` : ''}
+                      </SelectItem>
+                    ))}
+                  {allStudents
+                    .filter((s: any) =>
+                      !leadSearchText ||
+                      (s.full_name && s.full_name.toLowerCase().includes(leadSearchText.toLowerCase())) ||
+                      (s.mobile && s.mobile.includes(leadSearchText))
+                    )
+                    .slice(0, 20)
+                    .map((s: any) => (
+                      <SelectItem key={`stu-${s.id}`} value={`stu-${s.id}`}>
+                        🎓 {s.full_name} {s.mobile ? `(${s.mobile})` : ''} [Student]
                       </SelectItem>
                     ))}
                 </SelectContent>

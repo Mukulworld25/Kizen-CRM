@@ -107,7 +107,6 @@ export function useBdmList() {
       const { data, error } = await supabase
         .from('users')
         .select('id, name, email')
-        .in('role', ['owner', 'admin', 'bdm'])
         .eq('is_active', true)
       if (error) throw error
       return data ?? []

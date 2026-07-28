@@ -4,5 +4,6 @@ dist/
 .env
 *.tsbuildinfo
 *.log
-# Local Netlify folder
 .netlify
+.vite/
+kizen-crm/

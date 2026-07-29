@@ -48,13 +48,14 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents', 'viewFees', 'recordPayments', 'viewCalendar',
+    'viewFollowUps', 'viewStudents', 'editStudents', 'viewFees', 'recordPayments', 'generateInvoices', 'viewCalendar',
   ],
   faculty: [
-    'viewDashboard', 'viewStudents', 'markAttendance', 'viewCalendar',
+    'viewDashboard', 'viewStudents', 'editStudents', 'viewFacultyDashboard',
+    'viewFollowUps', 'assignCounselor', 'markAttendance', 'viewCalendar',
   ],
   accounts: [
-    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments',
+    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments', 'generateInvoices',
   ],
   reception: [
     'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewFees', 'recordPayments', 'viewFacultyDashboard', 'viewCalendar',
@@ -141,10 +142,10 @@ export function getDefaultRoute(role: UserRole): string {
 export const roleLabels: Record<UserRole, string> = {
   owner: 'Owner',
   admin: 'Admin',
-  counselor: 'Counselor',
-  faculty: 'Faculty',
-  accounts: 'Accounts',
+  counselor: 'Counselor & Accounts',
+  faculty: 'Faculty HOD',
+  accounts: 'Counselor & Accounts',
   reception: 'Reception',
   bdm: 'BDM',
-  hod: 'HOD',
+  hod: 'Faculty HOD',
 }

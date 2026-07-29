@@ -127,7 +127,8 @@ export default function Settings() {
   const handleInvite = async (data: InviteForm) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`, {
+      const baseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
+      const res = await fetch(`${baseUrl}/functions/v1/invite-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

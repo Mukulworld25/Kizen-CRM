@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const supabaseUrl =
+  (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
+const supabaseAnonKey =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
+  'sb_publishable_WvTe_Y2WcJay9k3aeDc8sQ_0W2--LjH'
 
 // Failsafe storage adapter to prevent SecurityError/DOMException in Chrome macOS
 const safeStorage = {
@@ -24,17 +27,13 @@ const safeStorage = {
   },
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder',
-  {
-    auth: {
-      storage: safeStorage,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  }
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: safeStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+})
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+export const isSupabaseConfigured = true

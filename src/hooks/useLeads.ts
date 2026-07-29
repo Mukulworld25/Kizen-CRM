@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { Lead, LeadFilters, LeadActivity } from '@/types'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+const SUPABASE_URL =
+  (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
 
 export function useLeads(filters: LeadFilters = {}) {
   const { profile } = useAuth()

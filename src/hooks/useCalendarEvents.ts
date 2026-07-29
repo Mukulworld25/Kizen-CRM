@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -22,13 +22,19 @@ export interface CalendarEvent {
   raw: any
 }
 
-export function useCalendarEvents(startDate?: string, endDate?: string, counselorId?: string) {
+export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
   const { profile } = useAuth()
 
+  // Calculate full grid range (start of first week to end of last week)
+  const gridStart = startOfWeek(startOfMonth(currentMonth))
+  const gridEnd = endOfWeek(endOfMonth(currentMonth))
+  const startDateStr = format(gridStart, 'yyyy-MM-dd')
+  const endDateStr = format(gridEnd, 'yyyy-MM-dd')
+
   return useQuery({
-    queryKey: ['calendar-events', startDate, endDate, counselorId, profile?.id],
+    queryKey: ['calendar-events', startDateStr, endDateStr, counselorId, profile?.id],
     queryFn: async () => {
-      // 1. Fetch Follow-ups
+      // 1. Fetch Follow-ups / Tasks / Reminders / Meetings
       let fuQuery = supabase
         .from('follow_ups')
         .select(`
@@ -38,8 +44,8 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
         `)
         .order('scheduled_at', { ascending: true })
 
-      if (startDate) fuQuery = fuQuery.gte('scheduled_at', `${startDate}T00:00:00.000Z`)
-      if (endDate) fuQuery = fuQuery.lte('scheduled_at', `${endDate}T23:59:59.999Z`)
+      if (startDateStr) fuQuery = fuQuery.gte('scheduled_at', `${startDateStr}T00:00:00.000Z`)
+      if (endDateStr) fuQuery = fuQuery.lte('scheduled_at', `${endDateStr}T23:59:59.999Z`)
       if (counselorId) fuQuery = fuQuery.eq('assigned_to', counselorId)
 
       // 2. Fetch Installment Due Dates
@@ -51,8 +57,8 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
         `)
         .order('due_date', { ascending: true })
 
-      if (startDate) instQuery = instQuery.gte('due_date', startDate)
-      if (endDate) instQuery = instQuery.lte('due_date', endDate)
+      if (startDateStr) instQuery = instQuery.gte('due_date', startDateStr)
+      if (endDateStr) instQuery = instQuery.lte('due_date', endDateStr)
 
       // 3. Fetch Leads with Demos/Joining Dates
       let leadQuery = supabase
@@ -63,8 +69,8 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
         `)
         .not('expected_joining_date', 'is', null)
 
-      if (startDate) leadQuery = leadQuery.gte('expected_joining_date', startDate)
-      if (endDate) leadQuery = leadQuery.lte('expected_joining_date', endDate)
+      if (startDateStr) leadQuery = leadQuery.gte('expected_joining_date', startDateStr)
+      if (endDateStr) leadQuery = leadQuery.lte('expected_joining_date', endDateStr)
       if (counselorId) leadQuery = leadQuery.eq('assigned_counselor_id', counselorId)
 
       const [fuRes, instRes, leadRes] = await Promise.all([fuQuery, instQuery, leadQuery])
@@ -75,81 +81,88 @@ export function useCalendarEvents(startDate?: string, endDate?: string, counselo
 
       const events: CalendarEvent[] = []
 
-      // Normalize Follow-ups
+      // Normalize Follow-ups / Tasks / Reminders / Meetings
       ;(fuRes.data || []).forEach((fu: any) => {
         if (!fu.scheduled_at) return
         const d = new Date(fu.scheduled_at)
         const dateStr = format(d, 'yyyy-MM-dd')
         const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         const lead = fu.lead as any
-        const personName = lead?.full_name || (fu.notes ? `Reminder: ${fu.notes}` : 'Standalone Reminder')
-        const courseName = lead?.course?.name
+        const leadName = lead?.full_name || ''
+        const rawType = (fu.type || 'task').toLowerCase()
+
+        let eventType: CalendarEvent['type'] = 'task'
+        let prefix = '📝 Task'
+        if (rawType.includes('meeting')) {
+          eventType = 'meeting'
+          prefix = '🤝 Meeting'
+        } else if (rawType.includes('reminder')) {
+          eventType = 'reminder'
+          prefix = '📌 Reminder'
+        } else if (rawType.includes('followup') || rawType.includes('call')) {
+          eventType = 'followup'
+          prefix = '📞 Follow-up'
+        }
+
+        const titleText = leadName ? `${prefix}: ${leadName}` : `${prefix}: ${fu.notes || 'General'}`
 
         events.push({
           id: `fu-${fu.id}`,
-          title: `Follow-up: ${personName}`,
+          title: titleText,
           date: dateStr,
           time: timeStr,
-          type: 'followup',
+          type: eventType,
           status: fu.status === 'completed' ? 'completed' : fu.status === 'overdue' ? 'overdue' : 'pending',
-          description: fu.notes || `Scheduled ${fu.type || 'follow-up'} call`,
+          description: fu.notes || `${prefix} scheduled`,
           counselorId: fu.assigned_to,
           counselorName: fu.assignee?.name,
           leadId: lead?.id,
-          personName,
+          personName: leadName || fu.notes || 'Personal Item',
           mobile: lead?.mobile,
-          courseName,
+          courseName: lead?.course?.name,
           raw: fu,
         })
       })
 
-      // Normalize Installments
+      // Normalize Fee Installments
       ;(instRes.data || []).forEach((inst: any) => {
         if (!inst.due_date) return
         const student = inst.student as any
         if (counselorId && student?.assigned_counselor_id !== counselorId) return
 
-        const personName = student?.full_name || 'Student'
-        const courseName = student?.course?.name
-
         events.push({
           id: `inst-${inst.id}`,
-          title: `Fee Due: ${personName} (₹${inst.amount})`,
+          title: `💳 Fee Due: ₹${inst.amount?.toLocaleString('en-IN')} - ${student?.full_name || 'Student'}`,
           date: inst.due_date,
-          time: 'Due Date',
           type: 'installment',
-          status: inst.status as any,
-          description: `Installment #${inst.installment_number} — ₹${inst.amount} due`,
+          status: inst.status === 'paid' ? 'paid' : inst.status === 'partial' ? 'partial' : 'pending',
+          description: `Installment #${inst.installment_number} due for ${student?.course?.name || 'Course'}`,
           counselorId: student?.assigned_counselor_id,
           studentId: student?.id,
-          personName,
+          personName: student?.full_name || 'Student',
           mobile: student?.mobile,
-          courseName,
+          courseName: student?.course?.name,
           amount: inst.amount,
           raw: inst,
         })
       })
 
-      // Normalize Demos/Expected Joining
+      // Normalize Leads Expected Joining / Demos
       ;(leadRes.data || []).forEach((l: any) => {
         if (!l.expected_joining_date) return
-        const personName = l.full_name || 'Lead'
-        const courseName = l.course?.name
-
         events.push({
-          id: `lead-${l.id}`,
-          title: `Demo/Joining: ${personName}`,
+          id: `lead-join-${l.id}`,
+          title: `🎓 Expected Joining: ${l.full_name}`,
           date: l.expected_joining_date,
-          time: 'Expected Joining',
           type: 'demo',
-          status: l.status === 'admitted' || l.status === 'enrolled' ? 'completed' : 'upcoming',
-          description: `Expected demo or joining date for ${personName}`,
+          status: 'upcoming',
+          description: `Lead expected to join. Mobile: ${l.mobile || 'N/A'}`,
           counselorId: l.assigned_counselor_id,
           counselorName: l.counselor?.name,
           leadId: l.id,
-          personName,
+          personName: l.full_name,
           mobile: l.mobile,
-          courseName,
+          courseName: l.course?.name,
           raw: l,
         })
       })

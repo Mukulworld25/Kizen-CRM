@@ -68,18 +68,15 @@ export default function CalendarPage() {
   const [rescheduleNotes, setRescheduleNotes] = useState<string>('')
 
   // Date range for fetching
-  const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(currentMonth)
-  const startDateStr = format(startOfWeek(monthStart), 'yyyy-MM-dd')
-  const endDateStr = format(endOfWeek(monthEnd), 'yyyy-MM-dd')
-
-  const { data: events = [] } = useCalendarEvents(startDateStr, endDateStr, counselorId)
+  const { data: events = [] } = useCalendarEvents(currentMonth, counselorId)
   const { data: counselors = [] } = useCounselors()
   const { data: leadsData } = useLeads({ pageSize: 1000 })
   const queryClient = useQueryClient()
   const createFollowUp = useCreateFollowUp()
   const completeFollowUp = useCompleteFollowUp()
   const rescheduleFollowUp = useRescheduleFollowUp()
+
+  const [scheduleType, setScheduleType] = useState<'reminder' | 'meeting' | 'task'>('reminder')
 
   const handleOpenReschedule = () => {
     if (!selectedEvent) return
@@ -154,23 +151,26 @@ export default function CalendarPage() {
   const handleScheduleSubmit = async () => {
     if (!createDate) return
     const scheduledAt = new Date(`${createDate}T${followupTime}:00`).toISOString()
+    const targetLeadId = selectedLeadId.startsWith('stu-') ? null : (selectedLeadId === 'none' ? null : selectedLeadId)
+
     await createFollowUp.mutateAsync({
-      lead_id: selectedLeadId === 'none' ? null : (selectedLeadId || null),
+      lead_id: targetLeadId || null,
       scheduled_at: scheduledAt,
       notes: followupNotes,
       assigned_to: counselorId || null,
-      type: 'call',
+      type: scheduleType,
       status: 'pending',
     })
-    // Ensure calendar data is refetched before closing modal
     await queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
     setIsCreateModalOpen(false)
     setFollowupNotes('')
-    setSelectedLeadId('')
+    setSelectedLeadId('none')
     setLeadSearchText('')
   }
 
   // Days array for month view grid
+  const monthStart = startOfMonth(currentMonth)
+  const monthEnd = endOfMonth(currentMonth)
   const daysInMonth = eachDayOfInterval({
     start: startOfWeek(monthStart),
     end: endOfWeek(monthEnd),
@@ -569,53 +569,89 @@ export default function CalendarPage() {
         </DialogContent>
       </Dialog>
 
-      {/* CREATE FOLLOW-UP MODAL */}
+      {/* CREATE ITEM MODAL (3 OPTIONS: REMINDER, MEETING, TASK) */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Schedule Follow-up Task</DialogTitle>
+            <DialogTitle>Add Calendar Schedule</DialogTitle>
           </DialogHeader>
 
+          {/* 3 Option Tabs */}
+          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-center text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setScheduleType('reminder')}
+              className={cn(
+                'py-2 rounded-lg transition-all',
+                scheduleType === 'reminder' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              )}
+            >
+              📌 Reminder
+            </button>
+            <button
+              type="button"
+              onClick={() => setScheduleType('meeting')}
+              className={cn(
+                'py-2 rounded-lg transition-all',
+                scheduleType === 'meeting' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              )}
+            >
+              🤝 Meeting
+            </button>
+            <button
+              type="button"
+              onClick={() => setScheduleType('task')}
+              className={cn(
+                'py-2 rounded-lg transition-all',
+                scheduleType === 'task' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              )}
+            >
+              📝 Task
+            </button>
+          </div>
+
           <div className="space-y-4 py-2">
-            <div>
-              <label className="text-xs font-semibold text-slate-700">Select Lead / Student / Reminder</label>
-              <Input
-                placeholder="Search lead or student by name or mobile..."
-                value={leadSearchText}
-                onChange={(e) => setLeadSearchText(e.target.value)}
-                className="mt-1 mb-2 text-xs"
-              />
-              <Select value={selectedLeadId || 'none'} onValueChange={setSelectedLeadId}>
-                <SelectTrigger><SelectValue placeholder="Choose a lead, student, or general reminder" /></SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="none">General / Personal Reminder (No Lead)</SelectItem>
-                  {allLeads
-                    .filter((l) =>
-                      !leadSearchText ||
-                      l.full_name.toLowerCase().includes(leadSearchText.toLowerCase()) ||
-                      (l.mobile && l.mobile.includes(leadSearchText))
-                    )
-                    .slice(0, 50)
-                    .map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        📋 {l.full_name} {l.mobile ? `(${l.mobile})` : ''}
-                      </SelectItem>
-                    ))}
-                  {allStudents
-                    .filter((s: any) =>
-                      !leadSearchText ||
-                      (s.full_name && s.full_name.toLowerCase().includes(leadSearchText.toLowerCase())) ||
-                      (s.mobile && s.mobile.includes(leadSearchText))
-                    )
-                    .slice(0, 20)
-                    .map((s: any) => (
-                      <SelectItem key={`stu-${s.id}`} value={`stu-${s.id}`}>
-                        🎓 {s.full_name} {s.mobile ? `(${s.mobile})` : ''} [Student]
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {scheduleType !== 'reminder' && (
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Link to Lead or Student (Optional)</label>
+                <Input
+                  placeholder="Search lead or student by name or mobile..."
+                  value={leadSearchText}
+                  onChange={(e) => setLeadSearchText(e.target.value)}
+                  className="mt-1 mb-2 text-xs"
+                />
+                <Select value={selectedLeadId || 'none'} onValueChange={setSelectedLeadId}>
+                  <SelectTrigger><SelectValue placeholder="Choose a lead or student" /></SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="none">General / No Lead Linked</SelectItem>
+                    {allLeads
+                      .filter((l) =>
+                        !leadSearchText ||
+                        l.full_name.toLowerCase().includes(leadSearchText.toLowerCase()) ||
+                        (l.mobile && l.mobile.includes(leadSearchText))
+                      )
+                      .slice(0, 50)
+                      .map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          📋 {l.full_name} {l.mobile ? `(${l.mobile})` : ''}
+                        </SelectItem>
+                      ))}
+                    {allStudents
+                      .filter((s: any) =>
+                        !leadSearchText ||
+                        (s.full_name && s.full_name.toLowerCase().includes(leadSearchText.toLowerCase())) ||
+                        (s.mobile && s.mobile.includes(leadSearchText))
+                      )
+                      .slice(0, 20)
+                      .map((s: any) => (
+                        <SelectItem key={`stu-${s.id}`} value={`stu-${s.id}`}>
+                          🎓 {s.full_name} {s.mobile ? `(${s.mobile})` : ''} [Student]
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -629,9 +665,17 @@ export default function CalendarPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700">Follow-up Notes</label>
+              <label className="text-xs font-semibold text-slate-700">
+                {scheduleType === 'reminder' ? '📌 Reminder Details' : scheduleType === 'meeting' ? '🤝 Meeting Agenda & Location/Link' : '📝 Task Description & Actions'}
+              </label>
               <textarea
-                placeholder="Details of call or discussion needed..."
+                placeholder={
+                  scheduleType === 'reminder'
+                    ? 'Enter reminder details...'
+                    : scheduleType === 'meeting'
+                    ? 'Enter meeting agenda, location or online link...'
+                    : 'Enter task actions and notes...'
+                }
                 value={followupNotes}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFollowupNotes(e.target.value)}
                 className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -643,7 +687,7 @@ export default function CalendarPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
             <Button onClick={handleScheduleSubmit} disabled={!createDate || createFollowUp.isPending}>
-              {createFollowUp.isPending ? 'Scheduling...' : 'Schedule Task'}
+              {createFollowUp.isPending ? 'Scheduling...' : scheduleType === 'reminder' ? 'Add Reminder' : scheduleType === 'meeting' ? 'Schedule Meeting' : 'Add Task'}
             </Button>
           </DialogFooter>
         </DialogContent>

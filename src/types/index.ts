@@ -13,7 +13,7 @@ export type Priority = 'high' | 'medium' | 'low'
 export type LeadTemperature = 'hot' | 'warm' | 'cold'
 
 export type FollowUpStatus = 'pending' | 'completed' | 'overdue' | 'cancelled'
-export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo' | 'task'
+export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'demo' | 'task' | 'reminder'
 
 export type ActivityType = 'call' | 'whatsapp' | 'email' | 'meeting' | 'note' | 'status_change'
 

@@ -1,79 +1,71 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { ShieldCheck, Check, RotateCcw, Lock } from 'lucide-react'
+import { ShieldCheck, Lock, Check, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { getDynamicRolePermissions, saveDynamicRolePermissions, roleLabels, type Permission } from '@/lib/permissions'
+import { useFeaturePermissions, DEFAULT_FACULTY_FEATURES, DEFAULT_COUNSELOR_FEATURES, DEFAULT_RECEPTION_FEATURES } from '@/hooks/useFeaturePermissions'
+import { roleLabels } from '@/lib/permissions'
 import type { UserRole } from '@/types'
 
-const TARGET_ROLES: UserRole[] = ['counselor', 'reception', 'faculty', 'accounts', 'bdm']
+const TARGET_ROLES: UserRole[] = ['faculty', 'counselor', 'reception', 'accounts', 'bdm']
 
-interface PermissionItem {
-  key: Permission
+interface TabFeatureConfig {
+  key: string
   label: string
   category: string
   description: string
 }
 
-const PERMISSION_CONFIG: PermissionItem[] = [
-  { key: 'viewDashboard', label: 'Dashboard & Metrics', category: 'General', description: 'View system dashboard analytics and KPIs' },
-  { key: 'viewLeads', label: 'View Leads', category: 'Leads', description: 'Access leads list and detail pages' },
-  { key: 'addLeads', label: 'Add & Import Leads', category: 'Leads', description: 'Create new leads or import csv data' },
-  { key: 'editLeads', label: 'Edit Leads', category: 'Leads', description: 'Modify lead details, stage, and contact info' },
-  { key: 'assignCounselor', label: 'Reassign Counselor', category: 'Leads', description: 'Reassign leads to other counselors' },
-  { key: 'exportData', label: 'Export Excel Data', category: 'General', description: 'Permission to export system data to Excel files' },
-  { key: 'viewFollowUps', label: 'Calendar & Follow-ups', category: 'Follow-ups', description: 'Access follow-up task list and event calendar' },
-  { key: 'viewStudents', label: 'Student Admissions', category: 'Students', description: 'View admitted student profiles and documents' },
-  { key: 'viewFees', label: 'Fee Management', category: 'Finance', description: 'View student fee structures and payment plans' },
-  { key: 'recordPayments', label: 'Record Fee Payments', category: 'Finance', description: 'Collect and record fee payments' },
-  { key: 'viewRevenue', label: 'Revenue Reports', category: 'Finance', description: 'Access financial revenue and collection metrics' },
-  { key: 'viewReports', label: 'Analytics Reports', category: 'Finance', description: 'Generate and download financial reports' },
-  { key: 'viewInstitutions', label: 'Institutions & Faculty', category: 'Academic', description: 'View institutions, courses, and active batches' },
-  { key: 'importData', label: 'Bulk Data Intake', category: 'System', description: 'Access bulk data import pipeline' },
+const TAB_FEATURES: TabFeatureConfig[] = [
+  { key: 'dashboard', label: 'Dashboard & Metrics', category: 'General', description: 'Access main KPI analytics dashboard' },
+  { key: 'leads', label: 'Leads Directory', category: 'Leads', description: 'Access leads list and detail pages' },
+  { key: 'tasks', label: 'Tasks & Follow-ups', category: 'Follow-ups', description: 'Access tasks list and follow-up activities' },
+  { key: 'calendar', label: 'Calendar Schedule', category: 'Follow-ups', description: 'Interactive schedule calendar for reminders, meetings & tasks' },
+  { key: 'students', label: 'Student Directory', category: 'Academic', description: 'View admitted student profiles and documents' },
+  { key: 'batches', label: 'Batches & Timings', category: 'Academic', description: 'View active student batches and course timings' },
+  { key: 'fees', label: 'Fee Management', category: 'Finance', description: 'View student fee structures and payment plans' },
+  { key: 'expenses', label: 'Expense Recording', category: 'Finance', description: 'Record and monitor institute operational expenses' },
+  { key: 'study_materials', label: 'Faculty & Study Material Upload', category: 'Faculty', description: 'Faculty HOD portal for managing student classes, notes & study materials' },
+  { key: 'institutions', label: 'Institutions & Colleges', category: 'Academic', description: 'View partner schools, colleges, and institution data' },
+  { key: 'reports', label: 'Analytics Reports', category: 'Finance', description: 'Generate and download financial and admission reports' },
+  { key: 'import', label: 'Bulk Data Import', category: 'System', description: 'Access Excel bulk data intake pipeline' },
 ]
 
 export function RolePermissionsTab() {
-  const [rolePermissions, setRolePermissions] = useState<Record<UserRole, Permission[]>>({} as Record<UserRole, Permission[]>)
-  const [hasChanges, setHasChanges] = useState(false)
+  const { dbPermissions, togglePermission, isUpdating, isLoading } = useFeaturePermissions()
+  const [updatingKey, setUpdatingKey] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadPermissions()
-  }, [])
+  const isFeatureEnabledForRole = (role: UserRole, featureKey: string): boolean => {
+    const rolePerm = dbPermissions.find(
+      (p) => p.feature_key === featureKey && p.role === role && !p.user_id
+    )
+    if (rolePerm !== undefined) return rolePerm.can_view
 
-  const loadPermissions = () => {
-    const initial: Partial<Record<UserRole, Permission[]>> = {}
-    TARGET_ROLES.forEach(r => {
-      initial[r] = getDynamicRolePermissions(r)
-    })
-    setRolePermissions(initial as Record<UserRole, Permission[]>)
-    setHasChanges(false)
+    // Defaults
+    if (role === 'faculty' || role === 'hod') return DEFAULT_FACULTY_FEATURES.includes(featureKey)
+    if (role === 'counselor') return DEFAULT_COUNSELOR_FEATURES.includes(featureKey)
+    if (role === 'reception') return DEFAULT_RECEPTION_FEATURES.includes(featureKey)
+    return false
   }
 
-  const togglePermission = (role: UserRole, key: Permission) => {
-    const current = rolePermissions[role] || []
-    const updated = current.includes(key)
-      ? current.filter(p => p !== key)
-      : [...current, key]
-
-    setRolePermissions(prev => ({
-      ...prev,
-      [role]: updated
-    }))
-    setHasChanges(true)
-  }
-
-  const handleSaveAll = () => {
-    TARGET_ROLES.forEach(role => {
-      saveDynamicRolePermissions(role, rolePermissions[role] || [])
-    })
-    setHasChanges(false)
-    toast.success('Role access permissions saved and updated in real-time!', {
-      icon: '🛡️',
-      duration: 4000
-    })
+  const handleToggle = async (role: UserRole, featureKey: string, currentStatus: boolean) => {
+    setUpdatingKey(`${role}-${featureKey}`)
+    try {
+      await togglePermission({
+        feature_key: featureKey,
+        role: role,
+        user_id: null,
+        can_view: !currentStatus,
+        can_edit: !currentStatus,
+      })
+      toast.success(`Updated ${featureKey} tab access for ${roleLabels[role]}!`, { icon: '🛡️' })
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update feature_permissions table')
+    } finally {
+      setUpdatingKey(null)
+    }
   }
 
   return (
@@ -83,84 +75,86 @@ export function RolePermissionsTab() {
           <div>
             <CardTitle className="text-xl font-bold flex items-center gap-2 text-amber-400">
               <ShieldCheck className="w-6 h-6 text-amber-400" />
-              Owner Role Access Control & Permission Matrix
+              Role-Based Tab Visibility & Feature Permissions
             </CardTitle>
             <CardDescription className="text-slate-400 mt-1">
-              Dynamically enable or restrict module access for Counselors, Reception, and Faculty in real-time.
+              Read and write tab access directly to the Supabase <code className="text-amber-300 font-mono text-xs">feature_permissions</code> table.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3">
-            {hasChanges && (
-              <Button variant="outline" size="sm" onClick={loadPermissions} className="border-slate-700 text-slate-300">
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Discard
-              </Button>
-            )}
-            <Button
-              onClick={handleSaveAll}
-              disabled={!hasChanges}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
-            >
-              <Check className="w-4 h-4 mr-2" />
-              Save Role Permissions
-            </Button>
-          </div>
+          <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/30 px-3 py-1">
+            Live Database Connected
+          </Badge>
         </CardHeader>
 
         <CardContent>
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
-            <Table>
-              <TableHeader className="bg-slate-950/80">
-                <TableRow>
-                  <TableHead className="w-[300px] text-amber-400 font-bold">Module / Capability</TableHead>
-
-                  {TARGET_ROLES.map(role => (
-                    <TableHead key={role} className="text-center font-bold text-slate-200">
-                      <div className="flex flex-col items-center gap-1">
-                        <span>{roleLabels[role]}</span>
-                        <Badge variant="outline" className="text-[10px] bg-slate-900 border-amber-500/30 text-amber-400 uppercase">
-                          {role}
-                        </Badge>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {PERMISSION_CONFIG.map((perm) => (
-                  <TableRow key={perm.key} className="hover:bg-slate-800/40 border-b border-slate-800/60">
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span className="text-slate-100 font-semibold">{perm.label}</span>
-                        <span className="text-xs text-slate-400">{perm.description}</span>
-                      </div>
-                    </TableCell>
-
-                    {TARGET_ROLES.map(role => {
-                      const isEnabled = (rolePermissions[role] || []).includes(perm.key)
-                      return (
-                        <TableCell key={`${role}-${perm.key}`} className="text-center">
-                          <div className="flex justify-center items-center">
-                            <Switch
-                              checked={isEnabled}
-                              onCheckedChange={() => togglePermission(role, perm.key)}
-                              className="data-[state=checked]:bg-amber-500"
-                            />
-                          </div>
-                        </TableCell>
-                      )
-                    })}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin mr-2 text-amber-400" />
+              Loading permissions matrix...
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-800">
+              <Table>
+                <TableHeader className="bg-slate-950/80">
+                  <TableRow>
+                    <TableHead className="w-[320px] text-amber-400 font-bold">Tab / Module Feature</TableHead>
+                    {TARGET_ROLES.map((role) => (
+                      <TableHead key={role} className="text-center font-bold text-slate-200">
+                        <div className="flex flex-col items-center gap-1">
+                          <span>{roleLabels[role]}</span>
+                          <Badge variant="outline" className="text-[10px] bg-slate-900 border-amber-500/30 text-amber-400 uppercase">
+                            {role}
+                          </Badge>
+                        </div>
+                      </TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+
+                <TableBody>
+                  {TAB_FEATURES.map((feature) => (
+                    <TableRow key={feature.key} className="hover:bg-slate-800/40 border-b border-slate-800/60">
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span className="text-slate-100 font-semibold flex items-center gap-1.5">
+                            {feature.label}
+                          </span>
+                          <span className="text-xs text-slate-400">{feature.description}</span>
+                        </div>
+                      </TableCell>
+
+                      {TARGET_ROLES.map((role) => {
+                        const isEnabled = isFeatureEnabledForRole(role, feature.key)
+                        const keyId = `${role}-${feature.key}`
+                        const isThisUpdating = isUpdating && updatingKey === keyId
+
+                        return (
+                          <TableCell key={keyId} className="text-center">
+                            <div className="flex justify-center items-center">
+                              {isThisUpdating ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                              ) : (
+                                <Switch
+                                  checked={isEnabled}
+                                  onCheckedChange={() => handleToggle(role, feature.key, isEnabled)}
+                                  className="data-[state=checked]:bg-amber-500"
+                                />
+                              )}
+                            </div>
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           <div className="mt-4 p-3 bg-amber-950/20 border border-amber-500/20 rounded-lg flex items-center gap-3 text-xs text-amber-300">
             <Lock className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              <strong>Owner Privilege Notice:</strong> As Owner, you maintain 100% full administrative access to all modules at all times. Toggles above control what employee staff (Counselor, Reception, Faculty, etc.) can view or edit when logged into their accounts.
+              <strong>Owner Role Privilege:</strong> As Owner, you maintain 100% full access to all tabs, all data, and no filters at all times. Toggles above directly modify the <code className="text-amber-200">feature_permissions</code> table in Supabase.
             </span>
           </div>
         </CardContent>

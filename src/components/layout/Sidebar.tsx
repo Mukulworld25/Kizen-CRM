@@ -14,21 +14,23 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import kizenLogo from '@/assets/kizen-logo.jpg'
 import sagedoLogo from '@/assets/sagedo-logo.jpeg'
 
+import { useFeaturePermissions } from '@/hooks/useFeaturePermissions'
+
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'viewDashboard' as const },
-  { path: '/leads', label: 'Leads', icon: Users, permission: 'viewLeads' as const },
-  { path: '/followups', label: 'Follow-ups', icon: Clock, permission: 'viewFollowUps' as const, badge: true },
-  { path: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'viewFollowUps' as const },
-  { path: '/institutions', label: 'Institutions', icon: Building2, permission: 'viewInstitutions' as const },
-  { path: '/students', label: 'Students', icon: GraduationCap, permission: 'viewStudents' as const },
-  { path: '/batches', label: 'Batches', icon: Users, permission: 'viewStudents' as const },
-  { path: '/fees', label: 'Fee Management', icon: IndianRupee, permission: 'viewFees' as const },
-  { path: '/expenses', label: 'Expenses', icon: Wallet, permission: 'viewExpenses' as const },
-  { path: '/faculty', label: 'Faculty', icon: BookOpen, permission: 'viewFacultyDashboard' as const },
-  { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'viewReports' as const },
-  { path: '/knowledge', label: 'Knowledge Base', icon: BookOpen, permission: 'viewKnowledgeBase' as const },
-  { path: '/settings', label: 'Settings', icon: Settings, permission: 'manageUsers' as const },
-  { path: '/import', label: 'Import', icon: Upload, permission: 'importData' as const },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'viewDashboard' as const, featureKey: 'dashboard' },
+  { path: '/leads', label: 'Leads', icon: Users, permission: 'viewLeads' as const, featureKey: 'leads' },
+  { path: '/followups', label: 'Tasks', icon: Clock, permission: 'viewFollowUps' as const, badge: true, featureKey: 'tasks' },
+  { path: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'viewFollowUps' as const, featureKey: 'calendar' },
+  { path: '/institutions', label: 'Institutions', icon: Building2, permission: 'viewInstitutions' as const, featureKey: 'institutions' },
+  { path: '/students', label: 'Students', icon: GraduationCap, permission: 'viewStudents' as const, featureKey: 'students' },
+  { path: '/batches', label: 'Batches', icon: Users, permission: 'viewStudents' as const, featureKey: 'batches' },
+  { path: '/fees', label: 'Fee Management', icon: IndianRupee, permission: 'viewFees' as const, featureKey: 'fees' },
+  { path: '/expenses', label: 'Expenses', icon: Wallet, permission: 'viewExpenses' as const, featureKey: 'expenses' },
+  { path: '/faculty', label: 'Faculty & Study Materials', icon: BookOpen, permission: 'viewFacultyDashboard' as const, featureKey: 'study_materials' },
+  { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'viewReports' as const, featureKey: 'reports' },
+  { path: '/knowledge', label: 'Knowledge Base', icon: BookOpen, permission: 'viewKnowledgeBase' as const, featureKey: 'knowledge' },
+  { path: '/settings', label: 'Settings', icon: Settings, permission: 'manageUsers' as const, featureKey: 'settings' },
+  { path: '/import', label: 'Import', icon: Upload, permission: 'importData' as const, featureKey: 'import' },
 ]
 
 interface SidebarProps {
@@ -41,6 +43,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProps) {
   const location = useLocation()
   const { profile, can } = useAuth()
+  const { canViewFeature } = useFeaturePermissions()
   const { data: overdueCount = 0 } = useOverdueCount()
   const [, setPermTick] = useState(0)
 
@@ -50,7 +53,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     return () => window.removeEventListener('kizen_permissions_updated', handleUpdate)
   }, [])
 
-  const visibleItems = navItems.filter((item) => can(item.permission))
+  const visibleItems = navItems.filter((item) => canViewFeature(item.featureKey) && can(item.permission))
 
   return (
     <aside

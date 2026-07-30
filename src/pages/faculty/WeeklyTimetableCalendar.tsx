@@ -53,18 +53,12 @@ export default function WeeklyTimetableCalendar({
     return true
   })
 
-  // Helper to check if a batch falls on a specific day
-  const isBatchOnDay = (batch: Batch, dayKey: string, dayFull: string, batchIndex: number) => {
+  // Helper to check if a batch falls on a specific day (NO FAKE DATA FALLBACK)
+  const isBatchOnDay = (batch: Batch, dayKey: string, dayFull: string) => {
     const daysStr = (batch.days_of_week || batch.schedule_days || '').toLowerCase()
     
-    // If no schedule specified, distribute across alternating days to avoid spamming all days
-    if (!daysStr) {
-      if (batchIndex % 2 === 0) {
-        return dayKey === 'Mon' || dayKey === 'Wed' || dayKey === 'Fri'
-      } else {
-        return dayKey === 'Tue' || dayKey === 'Thu' || dayKey === 'Sat'
-      }
-    }
+    // If no schedule days explicitly set by user, DO NOT show on calendar
+    if (!daysStr.trim()) return false
 
     if (daysStr.includes('daily') || daysStr.includes('mon to sat') || daysStr.includes('all days')) return true
     if (daysStr.includes(dayKey.toLowerCase()) || daysStr.includes(dayFull.toLowerCase())) return true
@@ -88,7 +82,7 @@ export default function WeeklyTimetableCalendar({
                   className="bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-sm h-9 px-3 gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
-                  + Add Class Schedule
+                  Add Class Schedule
                 </Button>
               )}
             </div>
@@ -160,7 +154,7 @@ export default function WeeklyTimetableCalendar({
       {/* WEEKLY TIMETABLE GRID (Mon to Sat) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {DAYS_OF_WEEK.map((day) => {
-          const dayBatches = filteredBatches.filter((b, idx) => isBatchOnDay(b, day.key, day.full, idx))
+          const dayBatches = filteredBatches.filter((b) => isBatchOnDay(b, day.key, day.full))
 
           return (
             <Card key={day.key} className="shadow-sm border border-slate-200/90 flex flex-col h-full bg-white">

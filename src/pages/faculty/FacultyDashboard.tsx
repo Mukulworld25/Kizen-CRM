@@ -166,7 +166,7 @@ export default function FacultyDashboard() {
               className="bg-primary hover:bg-primary/90 text-white font-bold shadow-md gap-1.5"
             >
               <Plus className="h-4 w-4" />
-              + Add Class Schedule
+              Add Class Schedule
             </Button>
           )}
           {(isOwner || profile?.role === 'admin') && (

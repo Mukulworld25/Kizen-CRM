@@ -653,11 +653,11 @@ export function useMarkAttendance() {
   })
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(dateRange?: { start?: string; end?: string }) {
   const { profile, isOwner } = useAuth()
 
   return useQuery({
-    queryKey: ['dashboard', profile?.id, isOwner],
+    queryKey: ['dashboard', profile?.id, isOwner, dateRange?.start, dateRange?.end],
     queryFn: async () => {
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -666,6 +666,19 @@ export function useDashboardStats() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
       let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true })
+      let admissionsQuery = supabase.from('students').select('*', { count: 'exact', head: true })
+      let feesQuery = (isOwner || profile?.role === 'accounts') ? supabase.from('fees').select('amount_paid, pending_balance, created_at') : Promise.resolve({ data: [] })
+      let sourcesQuery = supabase.from('leads').select('source, created_at')
+
+      if (dateRange?.start && dateRange?.end) {
+        leadsQuery = leadsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
+        admissionsQuery = admissionsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
+        if (feesQuery && typeof (feesQuery as any).gte === 'function') {
+          feesQuery = (feesQuery as any).gte('created_at', dateRange.start).lte('created_at', dateRange.end)
+        }
+        sourcesQuery = sourcesQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
+      }
+
       if (!isOwner && profile?.role === 'counselor') {
         leadsQuery = leadsQuery.eq('assigned_counselor_id', profile.id)
       }
@@ -686,11 +699,11 @@ export function useDashboardStats() {
         supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
         supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStart).lt('created_at', todayStart),
         supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', weekStart),
-        supabase.from('students').select('*', { count: 'exact', head: true }).gte('admission_date', monthStart.split('T')[0]),
-        isOwner || profile?.role === 'accounts' ? supabase.from('fees').select('amount_paid, pending_balance') : Promise.resolve({ data: [] }),
+        admissionsQuery,
+        feesQuery,
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).gte('scheduled_at', todayStart).lte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()).eq('status', 'pending'),
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
-        supabase.from('leads').select('source'),
+        sourcesQuery,
         supabase.from('students').select('course_id, created_at, course:courses(name)').gte('created_at', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString()),
       ])
 
@@ -721,15 +734,23 @@ export function useDashboardStats() {
   })
 }
 
-export function useExpenses() {
+export function useExpenses(dateRange?: { start?: string; end?: string }) {
   const { profile } = useAuth()
   return useQuery({
-    queryKey: ['expenses'],
+    queryKey: ['expenses', dateRange?.start, dateRange?.end],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('institute_expenses')
         .select('*')
         .order('expense_date', { ascending: false })
+
+      if (dateRange?.start && dateRange?.end) {
+        const startDateOnly = dateRange.start.split('T')[0]
+        const endDateOnly = dateRange.end.split('T')[0]
+        query = query.gte('expense_date', startDateOnly).lte('expense_date', endDateOnly)
+      }
+
+      const { data, error } = await query
       if (error) throw error
       return (data ?? []) as InstituteExpense[]
     },

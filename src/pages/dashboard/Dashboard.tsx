@@ -361,9 +361,36 @@ function DashboardKpiCard({
 
 /* ── Owner Dashboard ── */
 function OwnerDashboard() {
-  const { data: stats } = useDashboardStats()
+  type DateFilterType = 'today' | 'month' | 'till_date' | 'custom'
+  const [filterType, setFilterType] = useState<DateFilterType>('till_date')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
+  const getActiveDateRange = () => {
+    const now = new Date()
+    if (filterType === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+      return { start, end }
+    }
+    if (filterType === 'month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+      return { start, end }
+    }
+    if (filterType === 'custom' && customFrom && customTo) {
+      const start = new Date(`${customFrom}T00:00:00`).toISOString()
+      const end = new Date(`${customTo}T23:59:59`).toISOString()
+      return { start, end }
+    }
+    return undefined
+  }
+
+  const activeDateRange = getActiveDateRange()
+
+  const { data: stats } = useDashboardStats(activeDateRange)
   const { data: insights } = useDashboardInsights()
-  const { data: expenses = [] } = useExpenses()
+  const { data: expenses = [] } = useExpenses(activeDateRange)
   const { data: todayFollowUps = [] } = useFollowUps('today')
   const { profile } = useAuth()
   const [editOpen, setEditOpen] = useState(false)
@@ -902,6 +929,80 @@ function OwnerDashboard() {
             <MoreHorizontal style={{ width: 15, height: 15 }} />
           </button>
         </div>
+      </div>
+
+      {/* DATE RANGE FILTER CONTROLS BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-sm animate-card-in">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mr-1 flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 text-amber-500" /> Date Filter:
+          </span>
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              onClick={() => setFilterType('today')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterType === 'today'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
+              }`}
+            >
+              Today (Day View)
+            </button>
+            <button
+              onClick={() => setFilterType('month')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterType === 'month'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
+              }`}
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setFilterType('till_date')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterType === 'till_date'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
+              }`}
+            >
+              Till Date (All Time)
+            </button>
+            <button
+              onClick={() => setFilterType('custom')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                filterType === 'custom'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
+              }`}
+            >
+              Custom Range
+            </button>
+          </div>
+        </div>
+
+        {filterType === 'custom' && (
+          <div className="flex items-center gap-2 animate-card-in bg-slate-50 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <span>From:</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 px-2 text-xs rounded-lg border border-slate-300 bg-white font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <span>To:</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 px-2 text-xs rounded-lg border border-slate-300 bg-white font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {prefsLoading ? (

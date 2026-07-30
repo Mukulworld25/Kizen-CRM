@@ -126,26 +126,30 @@ export default function Settings() {
 
   const handleInvite = async (data: InviteForm) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const baseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
-      const res = await fetch(`${baseUrl}/functions/v1/invite-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Invite failed')
-      }
-      toast.success('Invitation sent')
+      const { data: newUser, error } = await supabase.from('users').insert({
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        is_active: true,
+      }).select().single()
+      if (error) throw error
+
+      toast.success(`User ${data.name} added successfully!`)
       reset()
       setInviteOpen(false)
       refetchUsers()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Invite failed')
+      toast.error(err instanceof Error ? err.message : 'Failed to add user')
+    }
+  }
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently remove ${userName}?`)) return
+    const { error } = await supabase.from('users').delete().eq('id', userId)
+    if (error) toast.error(error.message)
+    else {
+      toast.success(`User ${userName} removed successfully`)
+      refetchUsers()
     }
   }
 
@@ -308,6 +312,17 @@ export default function Settings() {
                         >
                           <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                         </Button>
+                        {profile?.is_owner && !u.is_owner && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteUser(u.id, u.name)}
+                            className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            title="Delete User"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

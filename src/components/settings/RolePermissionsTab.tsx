@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { ShieldCheck, Lock, Check, Loader2 } from 'lucide-react'
+import { ShieldCheck, Lock, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -70,39 +70,39 @@ export function RolePermissionsTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-amber-500/30 bg-slate-900/60 backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="border-amber-200 bg-white shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
           <div>
-            <CardTitle className="text-xl font-bold flex items-center gap-2 text-amber-400">
-              <ShieldCheck className="w-6 h-6 text-amber-400" />
+            <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
+              <ShieldCheck className="w-6 h-6 text-amber-600" />
               Role-Based Tab Visibility & Feature Permissions
             </CardTitle>
-            <CardDescription className="text-slate-400 mt-1">
-              Read and write tab access directly to the Supabase <code className="text-amber-300 font-mono text-xs">feature_permissions</code> table.
+            <CardDescription className="text-slate-600 mt-1">
+              Read and write tab access directly to the Supabase <code className="text-amber-700 font-mono text-xs bg-amber-50 px-1 py-0.5 rounded border border-amber-200">feature_permissions</code> table.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-950/30 px-3 py-1">
+          <Badge variant="outline" className="border-amber-300 text-amber-800 bg-amber-50 font-semibold px-3 py-1">
             Live Database Connected
           </Badge>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-slate-400">
-              <Loader2 className="w-6 h-6 animate-spin mr-2 text-amber-400" />
+            <div className="flex items-center justify-center py-12 text-slate-600 font-medium">
+              <Loader2 className="w-6 h-6 animate-spin mr-2 text-amber-600" />
               Loading permissions matrix...
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-800">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
               <Table>
-                <TableHeader className="bg-slate-950/80">
+                <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableHead className="w-[320px] text-amber-400 font-bold">Tab / Module Feature</TableHead>
+                    <TableHead className="w-[320px] text-slate-900 font-bold">Tab / Module Feature</TableHead>
                     {TARGET_ROLES.map((role) => (
-                      <TableHead key={role} className="text-center font-bold text-slate-200">
+                      <TableHead key={role} className="text-center font-bold text-slate-900">
                         <div className="flex flex-col items-center gap-1">
-                          <span>{roleLabels[role]}</span>
-                          <Badge variant="outline" className="text-[10px] bg-slate-900 border-amber-500/30 text-amber-400 uppercase">
+                          <span className="text-sm">{roleLabels[role]}</span>
+                          <Badge variant="secondary" className="text-[10px] bg-slate-200 text-slate-800 uppercase font-semibold">
                             {role}
                           </Badge>
                         </div>
@@ -113,13 +113,13 @@ export function RolePermissionsTab() {
 
                 <TableBody>
                   {TAB_FEATURES.map((feature) => (
-                    <TableRow key={feature.key} className="hover:bg-slate-800/40 border-b border-slate-800/60">
+                    <TableRow key={feature.key} className="hover:bg-slate-50/70 border-b border-slate-100">
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
-                          <span className="text-slate-100 font-semibold flex items-center gap-1.5">
+                          <span className="text-slate-900 font-bold text-sm flex items-center gap-1.5">
                             {feature.label}
                           </span>
-                          <span className="text-xs text-slate-400">{feature.description}</span>
+                          <span className="text-xs text-slate-600 font-medium">{feature.description}</span>
                         </div>
                       </TableCell>
 
@@ -132,12 +132,12 @@ export function RolePermissionsTab() {
                           <TableCell key={keyId} className="text-center">
                             <div className="flex justify-center items-center">
                               {isThisUpdating ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
                               ) : (
                                 <Switch
                                   checked={isEnabled}
                                   onCheckedChange={() => handleToggle(role, feature.key, isEnabled)}
-                                  className="data-[state=checked]:bg-amber-500"
+                                  className="data-[state=checked]:bg-amber-600"
                                 />
                               )}
                             </div>
@@ -151,10 +151,10 @@ export function RolePermissionsTab() {
             </div>
           )}
 
-          <div className="mt-4 p-3 bg-amber-950/20 border border-amber-500/20 rounded-lg flex items-center gap-3 text-xs text-amber-300">
-            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 text-xs text-amber-900 font-medium">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
             <span>
-              <strong>Owner Role Privilege:</strong> As Owner, you maintain 100% full access to all tabs, all data, and no filters at all times. Toggles above directly modify the <code className="text-amber-200">feature_permissions</code> table in Supabase.
+              <strong>Owner Role Privilege:</strong> As Owner, you maintain 100% full access to all tabs, all data, and no filters at all times. Toggles above directly modify the <code className="text-amber-800 font-semibold">feature_permissions</code> table in Supabase.
             </span>
           </div>
         </CardContent>

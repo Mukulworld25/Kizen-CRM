@@ -29,7 +29,7 @@ import ActivityLog from '@/components/shared/ActivityLog'
 import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
 import { PasswordResetModal } from '@/components/shared/PasswordResetModal'
 import { RolePermissionsTab } from '@/components/settings/RolePermissionsTab'
-import type { User, UserRole } from '@/types'
+import type { User, UserRole, Course, Batch } from '@/types'
 
 const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
 
@@ -58,6 +58,19 @@ export default function Settings() {
   const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
   const [wiping, setWiping] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
+
+  // Edit Course Modal State
+  const [editCourseModal, setEditCourseModal] = useState<Course | null>(null)
+  const [editCourseName, setEditCourseName] = useState('')
+  const [editCourseDuration, setEditCourseDuration] = useState<number | ''>('')
+  const [editCourseFee, setEditCourseFee] = useState<number | ''>('')
+
+  // Edit Batch Modal State
+  const [editBatchModal, setEditBatchModal] = useState<Batch | null>(null)
+  const [editBatchName, setEditBatchName] = useState('')
+  const [editBatchCourseId, setEditBatchCourseId] = useState('')
+  const [editBatchFacultyId, setEditBatchFacultyId] = useState('')
+  const [editBatchSeats, setEditBatchSeats] = useState<number>(40)
 
   const handleDownloadBackup = async () => {
     setBackingUp(true)
@@ -95,7 +108,6 @@ export default function Settings() {
   const handleWipeTestData = async () => {
     setWiping(true)
     try {
-      // Sequence deletion respecting FK dependencies
       await supabase.from('fee_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('installments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('fees').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -126,7 +138,7 @@ export default function Settings() {
 
   const handleInvite = async (data: InviteForm) => {
     try {
-      const { data: newUser, error } = await supabase.from('users').insert({
+      const { error } = await supabase.from('users').insert({
         name: data.name,
         email: data.email,
         role: data.role,
@@ -156,7 +168,6 @@ export default function Settings() {
   const handleUpdateUser = async () => {
     if (!editUser) return
     const updates: Record<string, unknown> = { name: editName }
-    // Save role and active status from the edit dialog state
     if (!editUser.is_owner) {
       updates.role = editUser.role
       updates.is_active = editUser.is_active
@@ -200,12 +211,39 @@ export default function Settings() {
     }
   }
 
+  const handleSaveCourse = async () => {
+    if (!editCourseModal || !editCourseName.trim()) return
+    const { error } = await supabase.from('courses').update({
+      name: editCourseName.trim(),
+      duration_days: editCourseDuration !== '' ? Number(editCourseDuration) : null,
+      total_fee: editCourseFee !== '' ? Number(editCourseFee) : null,
+    }).eq('id', editCourseModal.id)
+
+    if (error) toast.error(error.message)
+    else {
+      toast.success('Course updated successfully')
+      setEditCourseModal(null)
+      refetchCourses()
+    }
+  }
+
+  const handleDeleteCourse = async (courseId: string, courseName: string) => {
+    if (!confirm(`Are you sure you want to delete course "${courseName}"?`)) return
+    const { error } = await supabase.from('courses').delete().eq('id', courseId)
+    if (error) toast.error(error.message)
+    else {
+      toast.success(`Course "${courseName}" deleted`)
+      refetchCourses()
+    }
+  }
+
   const handleAddBatch = async () => {
     if (!newBatch.name.trim()) return
     const { error } = await supabase.from('batches').insert({
       batch_name: newBatch.name,
       course_id: newBatch.courseId || null,
       faculty_id: newBatch.facultyId || null,
+      total_seats: 40,
     })
     if (error) toast.error(error.message)
     else {
@@ -215,9 +253,36 @@ export default function Settings() {
     }
   }
 
+  const handleSaveBatch = async () => {
+    if (!editBatchModal || !editBatchName.trim()) return
+    const { error } = await supabase.from('batches').update({
+      batch_name: editBatchName.trim(),
+      course_id: editBatchCourseId || null,
+      faculty_id: editBatchFacultyId || null,
+      total_seats: editBatchSeats || 40,
+    }).eq('id', editBatchModal.id)
+
+    if (error) toast.error(error.message)
+    else {
+      toast.success('Batch updated successfully')
+      setEditBatchModal(null)
+      refetchBatches()
+    }
+  }
+
+  const handleDeleteBatch = async (batchId: string, batchName: string) => {
+    if (!confirm(`Are you sure you want to delete batch "${batchName}"?`)) return
+    const { error } = await supabase.from('batches').delete().eq('id', batchId)
+    if (error) toast.error(error.message)
+    else {
+      toast.success(`Batch "${batchName}" deleted`)
+      refetchBatches()
+    }
+  }
+
   return (
     <div>
-      <PageHeader title="Settings" description="Manage users, courses, and system configuration" />
+      <PageHeader title="Settings" description="Manage users, courses, batches, and system configuration" />
 
       <Tabs defaultValue="users">
         <TabsList>
@@ -249,11 +314,11 @@ export default function Settings() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Name</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Email</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Role</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Active</TableHead>
-                    <TableHead className="font-medium text-right" style={{ color: 'var(--muted-foreground)' }}>Actions</TableHead>
+                    <TableHead className="font-medium">Name</TableHead>
+                    <TableHead className="font-medium">Email</TableHead>
+                    <TableHead className="font-medium">Role</TableHead>
+                    <TableHead className="font-medium">Active</TableHead>
+                    <TableHead className="font-medium text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -307,7 +372,7 @@ export default function Settings() {
                           variant="outline"
                           size="sm"
                           onClick={() => { setEditUser(u); setEditName(u.name); setEditEmail(u.email) }}
-                          className="h-8 px-2 text-xs"
+                          className="h-8 px-2 text-xs text-slate-700 hover:text-primary"
                           title="Edit User Name & Settings"
                         >
                           <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
@@ -333,24 +398,27 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="courses" className="mt-4">
-          <div className="mb-4 flex gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+          <div className="mb-4 flex gap-2 rounded-xl border border-border p-3 shadow-sm bg-card">
             <Input placeholder="Course name" value={newCourse} onChange={(e) => setNewCourse(e.target.value)} />
-            <Button onClick={handleAddCourse}>Add Course</Button>
+            <Button onClick={handleAddCourse} className="gap-1.5 bg-primary text-white">
+              <Plus className="h-4 w-4" /> Add Course
+            </Button>
           </div>
           <Card className="shadow-sm">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Name</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Duration</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Fee</TableHead>
+                    <TableHead className="font-semibold">Course Name</TableHead>
+                    <TableHead className="font-semibold">Duration</TableHead>
+                    <TableHead className="font-semibold">Fee</TableHead>
+                    <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {courses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-12">
+                      <TableCell colSpan={4} className="text-center py-12">
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <p className="text-sm font-medium">No courses added yet</p>
                           <p className="text-xs">Add your first course above.</p>
@@ -359,9 +427,34 @@ export default function Settings() {
                     </TableRow>
                   ) : (courses.map((c) => (
                     <TableRow key={c.id}>
-                      <TableCell>{c.name}</TableCell>
-                      <TableCell>{c.duration_days ? `${c.duration_days} days` : '—'}</TableCell>
-                      <TableCell>{c.total_fee ? `₹${c.total_fee}` : '—'}</TableCell>
+                      <TableCell className="font-bold text-slate-900">{c.name}</TableCell>
+                      <TableCell className="text-slate-600">{c.duration_days ? `${c.duration_days} days` : '—'}</TableCell>
+                      <TableCell className="font-semibold text-slate-800">{c.total_fee ? `₹${c.total_fee}` : '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-slate-700 hover:text-primary rounded-lg"
+                            onClick={() => {
+                              setEditCourseModal(c)
+                              setEditCourseName(c.name)
+                              setEditCourseDuration(c.duration_days ?? '')
+                              setEditCourseFee(c.total_fee ?? '')
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                            onClick={() => handleDeleteCourse(c.id, c.name)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   )))}
                 </TableBody>
@@ -371,7 +464,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="batches" className="mt-4">
-          <div className="mb-4 grid gap-2 sm:grid-cols-4 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+          <div className="mb-4 grid gap-2 sm:grid-cols-4 rounded-xl border border-border p-3 shadow-sm bg-card">
             <Input placeholder="Batch name" value={newBatch.name} onChange={(e) => setNewBatch((b) => ({ ...b, name: e.target.value }))} />
             <Select value={newBatch.courseId} onValueChange={(v) => setNewBatch((b) => ({ ...b, courseId: v }))}>
               <SelectTrigger><SelectValue placeholder="Course" /></SelectTrigger>
@@ -387,26 +480,55 @@ export default function Settings() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={handleAddBatch}>Add Batch</Button>
+            <Button onClick={handleAddBatch} className="gap-1.5 bg-primary text-white">
+              <Plus className="h-4 w-4" /> Add Batch
+            </Button>
           </div>
           <Card className="shadow-sm">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Batch</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Course</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Seats</TableHead>
-                    <TableHead className="font-medium" style={{ color: 'var(--muted-foreground)' }}>Faculty</TableHead>
+                    <TableHead className="font-semibold">Batch Name</TableHead>
+                    <TableHead className="font-semibold">Course</TableHead>
+                    <TableHead className="font-semibold">Seats</TableHead>
+                    <TableHead className="font-semibold">Assigned Faculty</TableHead>
+                    <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {batches.map((b) => (
                     <TableRow key={b.id}>
-                      <TableCell>{b.batch_name}</TableCell>
-                      <TableCell>{(b as { course?: { name: string } }).course?.name ?? '—'}</TableCell>
-                      <TableCell>{b.enrolled_count}/{b.total_seats}</TableCell>
-                      <TableCell>{(b as { faculty?: { name: string } }).faculty?.name ?? '—'}</TableCell>
+                      <TableCell className="font-bold text-slate-900">{b.batch_name}</TableCell>
+                      <TableCell className="text-slate-600">{(b as { course?: { name: string } }).course?.name ?? '—'}</TableCell>
+                      <TableCell className="font-medium text-slate-700">{b.enrolled_count}/{b.total_seats}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{(b as { faculty?: { name: string } }).faculty?.name ?? 'Unassigned'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-slate-700 hover:text-primary rounded-lg"
+                            onClick={() => {
+                              setEditBatchModal(b)
+                              setEditBatchName(b.batch_name)
+                              setEditBatchCourseId(b.course_id || '')
+                              setEditBatchFacultyId(b.faculty_id || '')
+                              setEditBatchSeats(b.total_seats || 40)
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                            onClick={() => handleDeleteBatch(b.id, b.batch_name)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -475,7 +597,6 @@ export default function Settings() {
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {/* Backup Button */}
                   <Button
                     type="button"
                     onClick={handleDownloadBackup}
@@ -495,7 +616,6 @@ export default function Settings() {
                     )}
                   </Button>
 
-                  {/* Wipe Button with Explicit Red Background */}
                   <Button
                     type="button"
                     onClick={() => setWipeConfirmOpen(true)}
@@ -530,7 +650,6 @@ export default function Settings() {
 
         <TabsContent value="dashboard" className="mt-4">
           <p className="text-sm text-muted-foreground mb-4">Dashboard widget configuration is available on the Dashboard page via the "Edit Dashboard" button.</p>
-          <p className="text-sm text-muted-foreground">Notification preferences and default landing pages will be added here in a future update.</p>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
@@ -543,6 +662,76 @@ export default function Settings() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Edit Course Dialog */}
+      <Dialog open={!!editCourseModal} onOpenChange={(o) => { if (!o) setEditCourseModal(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit Course</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-xs font-semibold">Course Name *</Label>
+              <Input value={editCourseName} onChange={(e) => setEditCourseName(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Duration (Days)</Label>
+              <Input type="number" placeholder="e.g. 15" value={editCourseDuration} onChange={(e) => setEditCourseDuration(e.target.value ? Number(e.target.value) : '')} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Total Fee (₹)</Label>
+              <Input type="number" placeholder="e.g. 45000" value={editCourseFee} onChange={(e) => setEditCourseFee(e.target.value ? Number(e.target.value) : '')} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setEditCourseModal(null)}>Cancel</Button>
+            <Button onClick={handleSaveCourse} className="bg-primary text-white">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Batch Dialog */}
+      <Dialog open={!!editBatchModal} onOpenChange={(o) => { if (!o) setEditBatchModal(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit Batch</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-xs font-semibold">Batch Name *</Label>
+              <Input value={editBatchName} onChange={(e) => setEditBatchName(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Course</Label>
+              <Select value={editBatchCourseId} onValueChange={setEditBatchCourseId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Course" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No Specific Course</SelectItem>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Assigned Faculty</Label>
+              <Select value={editBatchFacultyId} onValueChange={setEditBatchFacultyId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Faculty" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {users.filter((u) => u.role === 'faculty').map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Total Seats</Label>
+              <Input type="number" value={editBatchSeats} onChange={(e) => setEditBatchSeats(Number(e.target.value) || 40)} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setEditBatchModal(null)}>Cancel</Button>
+            <Button onClick={handleSaveBatch} className="bg-primary text-white">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent>

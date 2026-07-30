@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Calendar as CalendarIcon, Clock, User, BookOpen, Filter, Pencil, UserCheck } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, User, BookOpen, Filter, Pencil, UserCheck, Plus, Trash2 } from 'lucide-react'
 import type { Batch, User as UserType, Course } from '@/types'
 
 interface WeeklyTimetableCalendarProps {
@@ -12,7 +12,9 @@ interface WeeklyTimetableCalendarProps {
   facultyMembers: UserType[]
   courses: Course[]
   onEditBatch: (batch: Batch) => void
-  isManagementView: boolean
+  onAddNewSchedule: () => void
+  onDeleteBatch?: (batchId: string) => void
+  canEdit: boolean
 }
 
 const DAYS_OF_WEEK = [
@@ -29,7 +31,9 @@ export default function WeeklyTimetableCalendar({
   facultyMembers,
   courses,
   onEditBatch,
-  isManagementView,
+  onAddNewSchedule,
+  onDeleteBatch,
+  canEdit,
 }: WeeklyTimetableCalendarProps) {
   const [selectedFaculty, setSelectedFaculty] = useState<string>('all')
   const [selectedCourse, setSelectedCourse] = useState<string>('all')
@@ -50,9 +54,18 @@ export default function WeeklyTimetableCalendar({
   })
 
   // Helper to check if a batch falls on a specific day
-  const isBatchOnDay = (batch: Batch, dayKey: string, dayFull: string) => {
+  const isBatchOnDay = (batch: Batch, dayKey: string, dayFull: string, batchIndex: number) => {
     const daysStr = (batch.days_of_week || batch.schedule_days || '').toLowerCase()
-    if (!daysStr) return true // Default show if unassigned
+    
+    // If no schedule specified, distribute across alternating days to avoid spamming all days
+    if (!daysStr) {
+      if (batchIndex % 2 === 0) {
+        return dayKey === 'Mon' || dayKey === 'Wed' || dayKey === 'Fri'
+      } else {
+        return dayKey === 'Tue' || dayKey === 'Thu' || dayKey === 'Sat'
+      }
+    }
+
     if (daysStr.includes('daily') || daysStr.includes('mon to sat') || daysStr.includes('all days')) return true
     if (daysStr.includes(dayKey.toLowerCase()) || daysStr.includes(dayFull.toLowerCase())) return true
     return false
@@ -60,18 +73,29 @@ export default function WeeklyTimetableCalendar({
 
   return (
     <div className="space-y-4">
-      {/* FILTER HEADER */}
+      {/* FILTER & ACTION HEADER */}
       <Card className="shadow-sm border border-slate-200 bg-slate-50/50">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <Filter className="h-4 w-4 text-primary" />
-              <span>Timetable Filters:</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                <Filter className="h-4 w-4 text-primary" />
+                <span>Timetable Filters:</span>
+              </div>
+              {canEdit && (
+                <Button
+                  onClick={onAddNewSchedule}
+                  className="bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-sm h-9 px-3 gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  + Add Class Schedule
+                </Button>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 flex-1 max-w-3xl">
+            <div className="flex flex-wrap items-center gap-3 flex-1 max-w-3xl justify-end">
               {/* Search */}
-              <div className="min-w-[180px] flex-1">
+              <div className="min-w-[160px] max-w-[220px]">
                 <Input
                   placeholder="Search batch or course..."
                   value={searchQuery}
@@ -81,7 +105,7 @@ export default function WeeklyTimetableCalendar({
               </div>
 
               {/* Faculty Filter */}
-              <div className="w-[180px]">
+              <div className="w-[170px]">
                 <Select value={selectedFaculty} onValueChange={setSelectedFaculty}>
                   <SelectTrigger className="h-9 text-xs bg-white">
                     <SelectValue placeholder="All Faculty" />
@@ -98,7 +122,7 @@ export default function WeeklyTimetableCalendar({
               </div>
 
               {/* Course Filter */}
-              <div className="w-[180px]">
+              <div className="w-[170px]">
                 <Select value={selectedCourse} onValueChange={setSelectedCourse}>
                   <SelectTrigger className="h-9 text-xs bg-white">
                     <SelectValue placeholder="All Courses" />
@@ -125,7 +149,7 @@ export default function WeeklyTimetableCalendar({
                   }}
                   className="h-9 text-xs text-rose-600 hover:text-rose-700"
                 >
-                  Reset Filters
+                  Reset
                 </Button>
               )}
             </div>
@@ -136,17 +160,17 @@ export default function WeeklyTimetableCalendar({
       {/* WEEKLY TIMETABLE GRID (Mon to Sat) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {DAYS_OF_WEEK.map((day) => {
-          const dayBatches = filteredBatches.filter((b) => isBatchOnDay(b, day.key, day.full))
+          const dayBatches = filteredBatches.filter((b, idx) => isBatchOnDay(b, day.key, day.full, idx))
 
           return (
             <Card key={day.key} className="shadow-sm border border-slate-200/90 flex flex-col h-full bg-white">
-              <CardHeader className="py-2.5 px-3 bg-slate-100/80 border-b border-slate-200 rounded-t-xl flex flex-row items-center justify-between">
+              <CardHeader className="py-2.5 px-3 bg-slate-100/90 border-b border-slate-200 rounded-t-xl flex flex-row items-center justify-between">
                 <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <CalendarIcon className="h-3.5 w-3.5 text-primary" />
                   {day.label}
                 </CardTitle>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold bg-slate-200 text-slate-700">
-                  {dayBatches.length} Classes
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-bold bg-slate-200 text-slate-800">
+                  {dayBatches.length} {dayBatches.length === 1 ? 'Class' : 'Classes'}
                 </Badge>
               </CardHeader>
 
@@ -155,6 +179,16 @@ export default function WeeklyTimetableCalendar({
                   <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center p-3 text-slate-400">
                     <Clock className="h-6 w-6 mb-1 text-slate-300 stroke-[1.5]" />
                     <p className="text-[11px] italic">No classes scheduled</p>
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onAddNewSchedule}
+                        className="mt-2 text-[10px] h-7 text-primary hover:underline"
+                      >
+                        + Add Schedule
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   dayBatches.map((b) => (
@@ -169,7 +203,7 @@ export default function WeeklyTimetableCalendar({
                         </Badge>
                         <Badge
                           variant={b.status === 'ongoing' ? 'success' : 'secondary'}
-                          className="text-[9px] px-1 py-0 uppercase tracking-wider"
+                          className="text-[9px] px-1 py-0 uppercase tracking-wider font-semibold"
                         >
                           {b.status || 'ongoing'}
                         </Badge>
@@ -181,27 +215,40 @@ export default function WeeklyTimetableCalendar({
                       </div>
 
                       {/* Timing */}
-                      <div className="text-[11px] text-amber-700 font-semibold flex items-center gap-1 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/60">
+                      <div className="text-[11px] text-amber-800 font-bold flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
                         <Clock className="h-3 w-3 text-amber-600 shrink-0" />
                         <span className="truncate">{b.timing || '10:00 AM - 12:00 PM'}</span>
                       </div>
 
-                      {/* Faculty */}
+                      {/* Faculty & Action Buttons */}
                       <div className="text-[11px] text-slate-600 flex items-center justify-between pt-1 border-t border-slate-100">
-                        <div className="flex items-center gap-1 truncate max-w-[120px]">
+                        <div className="flex items-center gap-1 truncate max-w-[110px]">
                           <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                          <span className="font-medium truncate">{b.faculty?.name || 'Unassigned'}</span>
+                          <span className="font-semibold text-slate-800 truncate">{b.faculty?.name || 'Unassigned'}</span>
                         </div>
-                        {isManagementView && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 opacity-80 group-hover:opacity-100 hover:bg-slate-100 rounded"
-                            onClick={() => onEditBatch(b)}
-                            title="Edit Class Schedule"
-                          >
-                            <Pencil className="h-3 w-3 text-slate-500 hover:text-primary" />
-                          </Button>
+                        {canEdit && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-slate-600 hover:text-primary hover:bg-slate-100 rounded"
+                              onClick={() => onEditBatch(b)}
+                              title="Edit Class Schedule"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            {onDeleteBatch && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                onClick={() => onDeleteBatch(b.id)}
+                                title="Remove Class Schedule"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

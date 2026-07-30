@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useBatches, useUpdateBatch, useUsers } from '@/hooks/useStudents'
+import { useBatches, useUpdateBatch, useCreateBatch, useDeleteBatch, useUsers } from '@/hooks/useStudents'
 import { useCourses } from '@/hooks/useLeads'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatsCard } from '@/components/shared/StatsCard'
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
-import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus } from 'lucide-react'
+import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus, Trash2 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
@@ -26,19 +26,29 @@ export default function FacultyDashboard() {
   const { data: batches = [], isLoading: batchesLoading } = useBatches()
   const { data: allUsers = [] } = useUsers()
   const { data: courses = [] } = useCourses()
+  const createBatch = useCreateBatch()
   const updateBatch = useUpdateBatch()
+  const deleteBatch = useDeleteBatch()
 
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [editBatchModal, setEditBatchModal] = useState<Batch | null>(null)
+  const [newScheduleModalOpen, setNewScheduleModalOpen] = useState(false)
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0])
   const [addFacultyOpen, setAddFacultyOpen] = useState(false)
 
-  // Edit Batch State
+  // Edit Schedule State
   const [editFacultyId, setEditFacultyId] = useState<string>('')
-  const [editDays, setEditDays] = useState<string>('')
-  const [editTiming, setEditTiming] = useState<string>('')
+  const [editDays, setEditDays] = useState<string>('Mon, Wed, Fri')
+  const [editTiming, setEditTiming] = useState<string>('10:00 AM - 12:00 PM')
   const [editStatus, setEditStatus] = useState<string>('ongoing')
+
+  // New Schedule State
+  const [newBatchName, setNewBatchName] = useState<string>('')
+  const [newCourseId, setNewCourseId] = useState<string>('')
+  const [newFacultyId, setNewFacultyId] = useState<string>('')
+  const [newDays, setNewDays] = useState<string>('Mon, Wed, Fri')
+  const [newTiming, setNewTiming] = useState<string>('10:00 AM - 12:00 PM')
 
   // Filter faculty members (role = 'faculty' only)
   const facultyMembers = allUsers.filter((u) => u.role === 'faculty')
@@ -92,7 +102,7 @@ export default function FacultyDashboard() {
   const handleOpenEditBatch = (batch: Batch) => {
     setEditBatchModal(batch)
     setEditFacultyId(batch.faculty_id || '')
-    setEditDays(batch.days_of_week || 'Mon, Wed, Fri')
+    setEditDays(batch.days_of_week || batch.schedule_days || 'Mon, Wed, Fri')
     setEditTiming(batch.timing || '10:00 AM - 12:00 PM')
     setEditStatus(batch.status || 'ongoing')
   }
@@ -112,20 +122,59 @@ export default function FacultyDashboard() {
     setEditBatchModal(null)
   }
 
-  const isManagementView = isOwner || profile?.role === 'admin' || profile?.role === 'reception' || profile?.role === 'accounts'
+  const handleCreateNewSchedule = async () => {
+    if (!newBatchName.trim()) {
+      toast.error('Please enter a Batch / Class Name')
+      return
+    }
+
+    await createBatch.mutateAsync({
+      batch_name: newBatchName.trim(),
+      course_id: newCourseId && newCourseId !== 'none' ? newCourseId : null,
+      faculty_id: newFacultyId && newFacultyId !== 'none' ? newFacultyId : (profile?.role === 'faculty' ? profile.id : null),
+      days_of_week: newDays,
+      schedule_days: newDays,
+      timing: newTiming,
+      status: 'ongoing',
+      total_seats: 30,
+    })
+
+    setNewScheduleModalOpen(false)
+    setNewBatchName('')
+  }
+
+  const handleDeleteSchedule = async (batchId: string) => {
+    if (confirm('Are you sure you want to remove this class schedule?')) {
+      await deleteBatch.mutateAsync(batchId)
+    }
+  }
+
+  // ALLOW EDIT FOR ALL FACULTY, HOD, OWNER, ADMIN, ACCOUNTS, RECEPTION
+  const canEdit = isOwner || profile?.role === 'admin' || profile?.role === 'faculty' || profile?.role === 'reception' || profile?.role === 'accounts'
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <PageHeader
-          title={isManagementView ? 'Faculty & Timetable Management' : 'Faculty Dashboard'}
-          description={isManagementView ? 'Manage faculty assignments, course timetables, class days, and batch rosters' : 'Manage your batches and enrolled students'}
+          title="Faculty & Timetable Management"
+          description="Manage course timetables, class schedules, faculty assignments, and batch rosters"
         />
-        {isManagementView && (
-          <Button onClick={() => setAddFacultyOpen(true)} className="shrink-0 bg-primary hover:bg-primary/90 text-white shadow-md">
-            <Plus className="mr-2 h-4 w-4" /> Add Faculty Member
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Button
+              onClick={() => setNewScheduleModalOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-white font-bold shadow-md gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              + Add Class Schedule
+            </Button>
+          )}
+          {(isOwner || profile?.role === 'admin') && (
+            <Button onClick={() => setAddFacultyOpen(true)} variant="outline" className="shrink-0 border-slate-300">
+              <Plus className="mr-1 h-4 w-4" /> Add Faculty Member
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
@@ -152,7 +201,9 @@ export default function FacultyDashboard() {
             facultyMembers={facultyMembers}
             courses={courses}
             onEditBatch={handleOpenEditBatch}
-            isManagementView={isManagementView}
+            onAddNewSchedule={() => setNewScheduleModalOpen(true)}
+            onDeleteBatch={handleDeleteSchedule}
+            canEdit={canEdit}
           />
         </TabsContent>
 
@@ -209,10 +260,11 @@ export default function FacultyDashboard() {
 
                     <div className="pt-2 flex items-center justify-between border-t border-border/40 text-xs">
                       <span className="text-muted-foreground">Enrolled Students: <strong className="text-slate-800">{facStudentsCount}</strong></span>
-                      {isManagementView && (
+                      {canEdit && (
                         <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg" onClick={() => {
                           const targetBatch = facBatches[0] || batches[0]
                           if (targetBatch) handleOpenEditBatch({ ...targetBatch, faculty_id: fac.id })
+                          else setNewScheduleModalOpen(true)
                         }}>
                           <Pencil className="h-3 w-3 mr-1" /> Edit Schedule
                         </Button>
@@ -228,11 +280,13 @@ export default function FacultyDashboard() {
         {/* TAB 2: BATCH LIST */}
         <TabsContent value="batches">
           <Card className="shadow-sm">
-            <CardHeader className="border-b border-border/50 pb-3">
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>All Batch Timetables & Schedules</span>
-                <span className="text-xs text-muted-foreground font-normal">Click "Edit Schedule" to update Faculty, Days, or Class Timings</span>
-              </CardTitle>
+            <CardHeader className="border-b border-border/50 pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">All Batch Timetables & Schedules</CardTitle>
+              {canEdit && (
+                <Button size="sm" onClick={() => setNewScheduleModalOpen(true)} className="gap-1 bg-primary text-white text-xs">
+                  <Plus className="h-3.5 w-3.5" /> Add Class Schedule
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -284,8 +338,8 @@ export default function FacultyDashboard() {
                           <Button size="sm" variant="outline" className="h-8 text-xs rounded-lg" onClick={() => { setSelectedBatch(b.id); setAttendanceOpen(true) }}>
                             Mark Attendance
                           </Button>
-                          {isManagementView && (
-                            <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={() => handleOpenEditBatch(b)}>
+                          {canEdit && (
+                            <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg text-slate-700 hover:text-primary" onClick={() => handleOpenEditBatch(b)}>
                               <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                             </Button>
                           )}
@@ -367,6 +421,84 @@ export default function FacultyDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* CREATE NEW CLASS SCHEDULE MODAL */}
+      <Dialog open={newScheduleModalOpen} onOpenChange={setNewScheduleModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>+ Add New Class Schedule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-xs font-semibold">Batch / Class Name *</Label>
+              <Input
+                placeholder="e.g. ACCA Skill Level Batch C"
+                value={newBatchName}
+                onChange={(e) => setNewBatchName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Course</Label>
+              <Select value={newCourseId} onValueChange={setNewCourseId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Course (e.g. ACC)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">General / No Specific Course</SelectItem>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Assign Faculty Member</Label>
+              <Select value={newFacultyId} onValueChange={setNewFacultyId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Faculty" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned / Assign Later</SelectItem>
+                  {facultyMembers.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name} ({f.role})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Schedule Class Days</Label>
+              <Select value={newDays} onValueChange={setNewDays}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Schedule Days" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mon, Wed, Fri">Mon, Wed, Fri</SelectItem>
+                  <SelectItem value="Tue, Thu, Sat">Tue, Thu, Sat</SelectItem>
+                  <SelectItem value="Mon to Sat">Mon to Sat (Daily)</SelectItem>
+                  <SelectItem value="Saturday & Sunday">Saturday & Sunday (Weekend)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Class Timing</Label>
+              <Select value={newTiming} onValueChange={setNewTiming}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select Class Timing" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM (Morning)</SelectItem>
+                  <SelectItem value="01:00 PM - 03:00 PM">01:00 PM - 03:00 PM (Afternoon)</SelectItem>
+                  <SelectItem value="03:00 PM - 05:00 PM">03:00 PM - 05:00 PM (Evening)</SelectItem>
+                  <SelectItem value="05:00 PM - 07:00 PM">05:00 PM - 07:00 PM (Late Evening)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setNewScheduleModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateNewSchedule} disabled={createBatch.isPending} className="bg-primary text-white">
+              {createBatch.isPending ? 'Creating...' : 'Create Class Schedule'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* EDIT BATCH SCHEDULE & FACULTY MODAL */}
       <Dialog open={!!editBatchModal} onOpenChange={(o) => { if (!o) setEditBatchModal(null) }}>

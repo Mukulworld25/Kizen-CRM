@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useBatches, useUpdateBatch, useUsers } from '@/hooks/useStudents'
+import { useCourses } from '@/hooks/useLeads'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +17,7 @@ import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus } from '
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
+import WeeklyTimetableCalendar from '@/pages/faculty/WeeklyTimetableCalendar'
 import type { Student, Batch } from '@/types'
 
 export default function FacultyDashboard() {
@@ -23,6 +25,7 @@ export default function FacultyDashboard() {
   const queryClient = useQueryClient()
   const { data: batches = [], isLoading: batchesLoading } = useBatches()
   const { data: allUsers = [] } = useUsers()
+  const { data: courses = [] } = useCourses()
   const updateBatch = useUpdateBatch()
 
   const [selectedBatch, setSelectedBatch] = useState<string>('')
@@ -52,8 +55,6 @@ export default function FacultyDashboard() {
       return (data ?? []) as Student[]
     },
   })
-
-
 
   const { data: batchStudents = [] } = useQuery({
     queryKey: ['batch-students', selectedBatch],
@@ -88,8 +89,6 @@ export default function FacultyDashboard() {
     onError: (err) => toast.error(err.message),
   })
 
-
-
   const handleOpenEditBatch = (batch: Batch) => {
     setEditBatchModal(batch)
     setEditFacultyId(batch.faculty_id || '')
@@ -105,7 +104,7 @@ export default function FacultyDashboard() {
       updates: {
         faculty_id: editFacultyId || null,
         days_of_week: editDays,
-        schedule_days: editDays, // Keep columns in sync
+        schedule_days: editDays,
         timing: editTiming,
         status: editStatus as 'upcoming' | 'ongoing' | 'completed',
       },
@@ -135,14 +134,29 @@ export default function FacultyDashboard() {
         <StatsCard title="Classes Today" value={batches.filter((b) => b.status === 'ongoing').length} icon={Clock} color="bg-success" loading={batchesLoading} />
       </div>
 
-      <Tabs defaultValue="directory">
+      <Tabs defaultValue="timetable">
         <TabsList className="mb-4">
+          <TabsTrigger value="timetable" className="font-bold flex items-center gap-1.5">
+            <Calendar className="h-4 w-4 text-primary" />
+            Weekly Timetable Calendar (Mon-Sat)
+          </TabsTrigger>
           <TabsTrigger value="directory">Faculty Directory & Schedule</TabsTrigger>
-          <TabsTrigger value="batches">Batch Timetables ({batches.length})</TabsTrigger>
+          <TabsTrigger value="batches">Batch List ({batches.length})</TabsTrigger>
           <TabsTrigger value="task_sheet">Task Sheet & Notes</TabsTrigger>
         </TabsList>
 
-        {/* TAB 1: FACULTY DIRECTORY & SCHEDULE */}
+        {/* TAB 0: WEEKLY TIMETABLE CALENDAR GRID */}
+        <TabsContent value="timetable" className="space-y-4">
+          <WeeklyTimetableCalendar
+            batches={batches}
+            facultyMembers={facultyMembers}
+            courses={courses}
+            onEditBatch={handleOpenEditBatch}
+            isManagementView={isManagementView}
+          />
+        </TabsContent>
+
+        {/* TAB 1: FACULTY DIRECTORY */}
         <TabsContent value="directory" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {facultyMembers.map((fac) => {
@@ -211,7 +225,7 @@ export default function FacultyDashboard() {
           </div>
         </TabsContent>
 
-        {/* TAB 2: BATCH TIMETABLES GRID */}
+        {/* TAB 2: BATCH LIST */}
         <TabsContent value="batches">
           <Card className="shadow-sm">
             <CardHeader className="border-b border-border/50 pb-3">

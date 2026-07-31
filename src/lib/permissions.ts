@@ -138,7 +138,8 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
 
 export function getDefaultRoute(role: UserRole): string {
   switch (role) {
-    case 'faculty': return '/students'
+    case 'faculty': return '/faculty'
+    case 'hod': return '/faculty'
     case 'accounts': return '/fees'
     default: return '/dashboard'
   }

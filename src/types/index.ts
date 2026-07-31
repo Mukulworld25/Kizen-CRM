@@ -31,6 +31,7 @@ export interface User {
   phone: string | null
   role: UserRole
   is_owner: boolean
+  is_hod?: boolean
   is_active: boolean
   avatar_url: string | null
   created_at: string

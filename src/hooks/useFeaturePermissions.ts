@@ -13,9 +13,9 @@ export interface FeaturePermissionRow {
   granted_at?: string
 }
 
-export const DEFAULT_FACULTY_FEATURES = ['students', 'tasks', 'calendar', 'study_materials', 'dashboard']
-export const DEFAULT_COUNSELOR_FEATURES = ['dashboard', 'leads', 'tasks', 'calendar', 'students', 'fees']
-export const DEFAULT_RECEPTION_FEATURES = ['dashboard', 'leads', 'tasks', 'calendar', 'students']
+export const DEFAULT_FACULTY_FEATURES = ['students', 'tasks', 'calendar', 'study_materials', 'dashboard', 'faculty_timetable']
+export const DEFAULT_COUNSELOR_FEATURES = ['dashboard', 'leads', 'tasks', 'calendar', 'students', 'fees', 'batches', 'faculty_timetable']
+export const DEFAULT_RECEPTION_FEATURES = ['dashboard', 'leads', 'tasks', 'calendar', 'students', 'batches', 'faculty_timetable']
 
 export function useFeaturePermissions() {
   const queryClient = useQueryClient()
@@ -36,7 +36,7 @@ export function useFeaturePermissions() {
 
   // Check if a specific feature is accessible to current user
   const canViewFeature = (featureKey: string): boolean => {
-    if (isOwner) return true // Owner role: full access to all tabs, all data, no filters
+    if (isOwner) return true // Owner role: full access to all tabs
 
     const userRole = profile?.role
     const userId = profile?.id

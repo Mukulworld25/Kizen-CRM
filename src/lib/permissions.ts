@@ -110,12 +110,18 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
   if (!role) return false
   if (isOwner) return true
 
+  const base = '/' + path.split('/').filter(Boolean)[0]
+  if (role === 'reception' && base === '/fees') {
+    return false
+  }
+
   const routePermissions: Record<string, Permission> = {
     '/dashboard': 'viewDashboard',
     '/leads': 'viewLeads',
     '/followups': 'viewFollowUps',
     '/calendar': 'viewFollowUps',
     '/students': 'viewStudents',
+    '/batches': 'viewStudents',
     '/fees': 'viewFees',
     '/reports': 'viewReports',
     '/settings': 'manageUsers',
@@ -125,7 +131,6 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
     '/import': 'importData',
   }
 
-  const base = '/' + path.split('/').filter(Boolean)[0]
   const permission = routePermissions[base]
   if (!permission) return true
   return hasPermission(role, permission, isOwner)

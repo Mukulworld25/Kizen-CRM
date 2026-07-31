@@ -53,7 +53,15 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     return () => window.removeEventListener('kizen_permissions_updated', handleUpdate)
   }, [])
 
-  const visibleItems = navItems.filter((item) => canViewFeature(item.featureKey) && can(item.permission))
+  const visibleItems = navItems.filter((item) => {
+    // Check dynamic DB feature permissions first
+    if (!canViewFeature(item.featureKey)) return false
+    // Special exception for Faculty Time Table and Batches which are read-only for Counselor and Receptionist
+    if (item.featureKey === 'batches' || item.featureKey === 'faculty_timetable' || item.featureKey === 'study_materials') {
+      return true
+    }
+    return can(item.permission)
+  })
 
   return (
     <aside

@@ -1295,7 +1295,7 @@ function AccountsDashboard({ stats, isLoading }: { stats: any; isLoading: boolea
 
 function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boolean }) {
   const [tasks, setTasks] = useState<any[]>([])
-  const [payments, setPayments] = useState<any[]>([])
+  const [recentLeads, setRecentLeads] = useState<any[]>([])
   const [batches, setBatches] = useState<any[]>([])
   
   useEffect(() => {
@@ -1305,37 +1305,40 @@ function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boole
       const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59).toISOString()
 
       // 1. Today's follow-up tasks
-      const { data: followUps } = await supabase
-        .from('follow_ups')
-        .select('*, lead:leads(full_name, mobile, course:courses(name))')
-        .gte('scheduled_at', todayStart)
-        .lte('scheduled_at', nextWeek)
-        .eq('status', 'pending')
-        .order('scheduled_at', { ascending: true })
+      try {
+        const { data: followUps } = await supabase
+          .from('follow_ups')
+          .select('*, lead:leads(full_name, mobile, course:courses(name))')
+          .gte('scheduled_at', todayStart)
+          .lte('scheduled_at', nextWeek)
+          .eq('status', 'pending')
+          .order('scheduled_at', { ascending: true })
 
-      if (followUps) {
-        setTasks(followUps.filter(f => new Date(f.scheduled_at) <= new Date(new Date().setHours(23,59,59))))
-      }
+        if (followUps) {
+          setTasks(followUps.filter(f => new Date(f.scheduled_at) <= new Date(new Date().setHours(23,59,59))))
+        }
+      } catch {}
 
-      // 2. Pending payments due this week
-      const { data: insts } = await supabase
-        .from('installments')
-        .select('*, fee:fees(student:students(full_name))')
-        .eq('status', 'pending')
-        .gte('due_date', todayStart)
-        .lte('due_date', nextWeek)
-        .order('due_date', { ascending: true })
+      // 2. Recent Walk-in / Today's Leads
+      try {
+        const { data: leads } = await supabase
+          .from('leads')
+          .select('id, full_name, mobile, created_at, source')
+          .order('created_at', { ascending: false })
+          .limit(5)
 
-      if (insts) setPayments(insts)
+        if (leads) setRecentLeads(leads)
+      } catch {}
 
       // 3. Active batches & faculty
-      const { data: activeBatches } = await supabase
-        .from('batches')
-        .select('*, course:courses(name), faculty:users(name)')
-        .eq('status', 'ongoing')
-        .order('batch_name')
-      
-      if (activeBatches) setBatches(activeBatches)
+      try {
+        const { data: activeBatches } = await supabase
+          .from('batches')
+          .select('*, course:courses(name), faculty:users(name)')
+          .order('batch_name')
+        
+        if (activeBatches) setBatches(activeBatches)
+      } catch {}
     }
     loadData()
   }, [])
@@ -1383,26 +1386,26 @@ function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boole
           </CardContent>
         </Card>
 
-        {/* Pending Payments Due this Week */}
+        {/* Recent Registered Leads */}
         <Card className="border-border/50 shadow-sm">
           <div className="p-4 border-b border-border/50 bg-slate-50/50 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><IndianRupee className="w-4 h-4 text-warning" /> Payments Due (7 Days)</h3>
-            <span className="text-xs font-medium bg-warning/10 text-warning px-2 py-0.5 rounded-full">{payments.length} pending</span>
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Users className="w-4 h-4 text-amber-500" /> Recent Leads</h3>
+            <span className="text-xs font-medium bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{recentLeads.length} leads</span>
           </div>
           <CardContent className="p-0">
-            {payments.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">No payments due this week.</div>
+            {recentLeads.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No recent leads found.</div>
             ) : (
               <div className="divide-y divide-border/50 max-h-[300px] overflow-auto">
-                {payments.map(p => (
-                  <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                {recentLeads.map(l => (
+                  <div key={l.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                     <div>
-                      <p className="font-semibold text-slate-800 text-sm">{p.fee?.student?.full_name}</p>
-                      <p className="text-xs text-danger font-medium mt-0.5 flex items-center gap-1">
-                        <CalendarDays className="w-3 h-3" /> Due: {format(new Date(p.due_date), 'MMM d')}
-                      </p>
+                      <p className="font-semibold text-slate-800 text-sm">{l.full_name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{l.mobile || 'No Mobile'} • Source: {l.source || 'Direct'}</p>
                     </div>
-                    <p className="font-bold text-slate-800">{formatCurrency(p.amount)}</p>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">
+                      {format(new Date(l.created_at), 'MMM d')}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1431,10 +1434,10 @@ function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boole
                   {batches.map(b => (
                     <tr key={b.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-medium text-slate-800">{b.batch_name}</td>
-                      <td className="px-4 py-3 text-slate-600">{b.course?.name}</td>
-                      <td className="px-4 py-3 text-slate-600"><span className="bg-slate-100 px-2 py-0.5 rounded text-xs">{b.timing}</span></td>
-                      <td className="px-4 py-3 text-slate-600 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] text-accent font-bold">{b.faculty?.name?.slice(0,2).toUpperCase()}</div>{b.faculty?.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{b.enrolled_count ?? 0} / {b.max_students}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.course?.name || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600"><span className="bg-slate-100 px-2 py-0.5 rounded text-xs">{b.timing || '—'}</span></td>
+                      <td className="px-4 py-3 text-slate-600 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] text-accent font-bold">{(b.faculty?.name || 'Unassigned').slice(0,2).toUpperCase()}</div>{b.faculty?.name || 'Unassigned'}</td>
+                      <td className="px-4 py-3 text-slate-600">{b.enrolled_count ?? 0} / {b.total_seats || 40}</td>
                     </tr>
                   ))}
                   {batches.length === 0 && (

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
-import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap, Users, Clock, Calendar, Pencil, UserCheck, Plus, Trash2, BookOpen } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
@@ -149,14 +149,15 @@ export default function FacultyDashboard() {
     }
   }
 
-  // ALLOW EDIT FOR ALL FACULTY, HOD, OWNER, ADMIN, ACCOUNTS, RECEPTION
-  const canEdit = isOwner || profile?.role === 'admin' || profile?.role === 'faculty' || profile?.role === 'reception' || profile?.role === 'accounts'
+  // ALLOW EDIT ONLY FOR HOD (user.is_hod === true), OWNER, ADMIN
+  const isHod = profile?.is_hod || profile?.role === 'hod'
+  const canEdit = isOwner || profile?.role === 'admin' || isHod
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <PageHeader
-          title="Faculty & Timetable Management"
+          title={isHod ? "Faculty HOD & Timetable Management" : "Faculty & Timetable Portal"}
           description="Manage course timetables, class schedules, faculty assignments, and batch rosters"
         />
         <div className="flex items-center gap-2">
@@ -191,7 +192,7 @@ export default function FacultyDashboard() {
           </TabsTrigger>
           <TabsTrigger value="directory">Faculty Directory & Schedule</TabsTrigger>
           <TabsTrigger value="batches">Batch List ({batches.length})</TabsTrigger>
-          <TabsTrigger value="task_sheet">Task Sheet & Notes</TabsTrigger>
+          <TabsTrigger value="materials">Study Materials Vault</TabsTrigger>
         </TabsList>
 
         {/* TAB 0: WEEKLY TIMETABLE CALENDAR GRID */}
@@ -419,6 +420,30 @@ export default function FacultyDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* TAB 4: STUDY MATERIALS VAULT STUB */}
+        <TabsContent value="materials" className="space-y-4">
+          <Card className="shadow-sm border border-slate-200">
+            <CardHeader className="border-b pb-3 bg-slate-50 rounded-t-xl">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                Faculty Study Materials Vault
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8 text-center space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <BookOpen className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">Faculty Study Material Repository</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Share lecture notes, mock test papers, syllabus outlines, and reference guides across your batches.
+              </p>
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs px-3 py-1 font-semibold">
+                File Upload API Integration Coming Soon
+              </Badge>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

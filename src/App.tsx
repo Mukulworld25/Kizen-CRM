@@ -76,8 +76,22 @@ function AppContent() {
             <Route path="students" element={<StudentList />} />
             <Route path="students/:id" element={<StudentDetail />} />
             <Route path="batches" element={<BatchManagement />} />
-            <Route path="fees" element={<FeeManagement />} />
-            <Route path="fees/:id" element={<FeeDetail />} />
+            <Route
+              path="fees"
+              element={
+                <RoleGuard permission="viewFees" fallback={<Navigate to="/dashboard" replace />}>
+                  <FeeManagement />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="fees/:id"
+              element={
+                <RoleGuard permission="viewFees" fallback={<Navigate to="/dashboard" replace />}>
+                  <FeeDetail />
+                </RoleGuard>
+              }
+            />
             <Route
               path="reports"
               element={

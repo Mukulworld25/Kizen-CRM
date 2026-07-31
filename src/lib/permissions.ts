@@ -148,9 +148,19 @@ export const roleLabels: Record<UserRole, string> = {
   owner: 'Owner',
   admin: 'Admin',
   counselor: 'Counselor & Accounts',
-  faculty: 'Faculty HOD',
+  faculty: 'Faculty Member',
   accounts: 'Counselor & Accounts',
   reception: 'Reception',
   bdm: 'BDM',
   hod: 'Faculty HOD',
+}
+
+export function isUserHod(user: { email?: string | null; role?: string | null; is_hod?: boolean; name?: string | null; is_owner?: boolean } | null | undefined): boolean {
+  if (!user) return false
+  if (user.is_owner || user.role === 'owner' || user.role === 'admin') return true
+  if (user.role === 'hod') return true
+  if (user.is_hod) return true
+  if (user.email === 'faculty.hod@kizen.edu') return true
+  if (user.name?.toLowerCase().includes('hod')) return true
+  return false
 }

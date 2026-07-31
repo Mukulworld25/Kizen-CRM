@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
 import WeeklyTimetableCalendar from '@/pages/faculty/WeeklyTimetableCalendar'
+import { isUserHod } from '@/lib/permissions'
 import type { Student, Batch } from '@/types'
 
 export default function FacultyDashboard() {
@@ -149,8 +150,8 @@ export default function FacultyDashboard() {
     }
   }
 
-  // ALLOW EDIT ONLY FOR HOD (user.is_hod === true), OWNER, ADMIN
-  const isHod = profile?.is_hod || profile?.role === 'hod'
+  // ALLOW EDIT ONLY FOR HOD (user.is_hod === true or email === faculty.hod@kizen.edu), OWNER, ADMIN
+  const isHod = isUserHod(profile)
   const canEdit = isOwner || profile?.role === 'admin' || isHod
 
   return (

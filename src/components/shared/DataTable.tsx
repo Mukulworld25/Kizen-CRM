@@ -109,9 +109,10 @@ export function DataTable<T>({
     return columns.filter(c => visibility[c.key] !== false)
   }, [columns, visibility])
 
-  const toggleColumn = useCallback((key: string) => {
+  const toggleColumn = useCallback((key: string, value?: boolean) => {
     setVisibility(prev => {
-      const next = { ...prev, [key]: !(prev[key] ?? true) }
+      const nextValue = value !== undefined ? value : !(prev[key] ?? true)
+      const next = { ...prev, [key]: nextValue }
       if (tableKey) saveVisibility(tableKey, next)
       return next
     })
@@ -230,7 +231,8 @@ export function DataTable<T>({
                   <DropdownMenuCheckboxItem
                     key={col.key}
                     checked={visibility[col.key] !== false}
-                    onCheckedChange={() => toggleColumn(col.key)}
+                    onCheckedChange={(checked) => toggleColumn(col.key, checked)}
+                    onSelect={(e) => e.preventDefault()}
                   >
                     {col.header}
                   </DropdownMenuCheckboxItem>

@@ -205,6 +205,7 @@ export default function FeeManagement() {
         data={fees}
         loading={isLoading}
         searchable
+        tableKey="fees"
         showExport={isOwner}
         onExport={async () => {
           const { data } = await supabase.from('fees').select('*, student:students(full_name), course:courses(name)')

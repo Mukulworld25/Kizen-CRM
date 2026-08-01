@@ -26,7 +26,7 @@ const navItems = [
   { path: '/batches', label: 'Batches', icon: Users, permission: 'viewStudents' as const, featureKey: 'batches' },
   { path: '/fees', label: 'Fee Management', icon: IndianRupee, permission: 'viewFees' as const, featureKey: 'fees' },
   { path: '/expenses', label: 'Expenses', icon: Wallet, permission: 'viewExpenses' as const, featureKey: 'expenses' },
-  { path: '/faculty', label: 'Faculty & Study Materials', icon: BookOpen, permission: 'viewFacultyDashboard' as const, featureKey: 'study_materials' },
+  { path: '/faculty', label: 'Faculty & Study Materials', icon: BookOpen, permission: 'viewFacultyDashboard' as const, featureKey: 'faculty_timetable' },
   { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'viewReports' as const, featureKey: 'reports' },
   { path: '/knowledge', label: 'Knowledge Base', icon: BookOpen, permission: 'viewKnowledgeBase' as const, featureKey: 'knowledge' },
   { path: '/settings', label: 'Settings', icon: Settings, permission: 'manageUsers' as const, featureKey: 'settings' },
@@ -55,7 +55,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
 
   const visibleItems = navItems.filter((item) => {
     // Check dynamic DB feature permissions first
-    if (!canViewFeature(item.featureKey)) return false
+    const hasFeature = canViewFeature(item.featureKey) || (item.featureKey === 'faculty_timetable' && canViewFeature('study_materials'))
+    if (!hasFeature) return false
     // Special exception for Faculty Time Table and Batches which are read-only for Counselor and Receptionist
     if (item.featureKey === 'batches' || item.featureKey === 'faculty_timetable' || item.featureKey === 'study_materials') {
       return true

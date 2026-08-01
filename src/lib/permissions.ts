@@ -48,17 +48,17 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
-    'viewFollowUps', 'viewStudents', 'editStudents', 'viewFees', 'recordPayments', 'generateInvoices', 'viewCalendar',
+    'viewFollowUps', 'viewStudents', 'editStudents', 'viewFees', 'recordPayments', 'generateInvoices', 'viewCalendar', 'viewFacultyDashboard',
   ],
   faculty: [
     'viewDashboard', 'viewStudents', 'editStudents', 'viewFacultyDashboard',
     'viewFollowUps', 'assignCounselor', 'markAttendance', 'viewCalendar',
   ],
   accounts: [
-    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments', 'generateInvoices',
+    'viewDashboard', 'viewStudents', 'viewFees', 'recordPayments', 'generateInvoices', 'viewFacultyDashboard',
   ],
   reception: [
-    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewCalendar',
+    'viewDashboard', 'viewLeads', 'addLeads', 'viewFollowUps', 'viewStudents', 'viewCalendar', 'viewFacultyDashboard',
   ],
   bdm: [
     'viewBdmDashboard', 'viewInstitutions', 'editInstitutions',

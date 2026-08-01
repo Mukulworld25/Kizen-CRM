@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, CreditCard } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useFees, useRecordPayment } from '@/hooks/useStudents'
+import { useFees, useRecordPayment, useUpdateFee } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { DataTable, type Column } from '@/components/shared/DataTable'
@@ -18,6 +18,7 @@ import FlagDot from '@/components/ui/FlagDot'
 import type { Fee, PaymentMethod } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
 import { supabase } from '@/lib/supabase'
+import toast from 'react-hot-toast'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
@@ -34,6 +35,19 @@ export default function FeeManagement() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
   const recordPayment = useRecordPayment()
+  const updateFee = useUpdateFee()
+
+  // Edit Fee Modal State
+  const [editFeeModalOpen, setEditFeeModalOpen] = useState(false)
+  const [editFeeId, setEditFeeId] = useState<string | null>(null)
+  const [editTotalFee, setEditTotalFee] = useState('')
+  const [editDiscount, setEditDiscount] = useState('')
+  const [editScholarship, setEditScholarship] = useState('')
+  const [editRegAmount, setEditRegAmount] = useState('')
+
+  // Delete Fee Modal State
+  const [deleteFeeOpen, setDeleteFeeOpen] = useState(false)
+  const [deleteFeeId, setDeleteFeeId] = useState<string | null>(null)
 
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('upi')
@@ -45,6 +59,27 @@ export default function FeeManagement() {
   const totalCollected = fees.reduce((s, f) => s + Number(f.amount_paid), 0)
   const totalPending = fees.reduce((s, f) => s + Number(f.pending_balance), 0)
   const overdueCount = fees.filter((f) => f.pending_balance > 0).length
+
+  const handleOpenEditFee = (fee: Fee) => {
+    setEditFeeId(fee.id)
+    setEditTotalFee(fee.total_fee.toString())
+    setEditDiscount((fee.discount || 0).toString())
+    setEditScholarship((fee.scholarship || 0).toString())
+    setEditRegAmount((fee.registration_amount || 0).toString())
+    setEditFeeModalOpen(true)
+  }
+
+  const handleSaveEditFee = async () => {
+    if (!editFeeId) return
+    await updateFee.mutateAsync({
+      id: editFeeId,
+      total_fee: parseFloat(editTotalFee) || 0,
+      discount: parseFloat(editDiscount) || 0,
+      scholarship: parseFloat(editScholarship) || 0,
+      registration_amount: parseFloat(editRegAmount) || 0,
+    })
+    setEditFeeModalOpen(false)
+  }
 
   const columns: Column<Fee>[] = [
     {
@@ -117,13 +152,25 @@ export default function FeeManagement() {
     },
     {
       key: 'actions',
-      header: '',
+      header: 'Actions',
       render: (r) => (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/fees/${r.id}`) }}>View</Button>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/fees/${r.id}`)} title="View Fee Details">
+            <Eye className="h-4 w-4" />
+          </Button>
+          {(isOwner || can('recordPayments')) && (
+            <Button variant="ghost" size="icon" onClick={() => handleOpenEditFee(r)} title="Edit Fee Structure">
+              <Pencil className="h-4 w-4 text-sky-600" />
+            </Button>
+          )}
           {can('recordPayments') && (
-            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFee(r); setPaymentOpen(true) }}>
-              Record
+            <Button variant="outline" size="sm" onClick={() => { setSelectedFee(r); setPaymentOpen(true) }} className="h-8 px-2 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200">
+              <CreditCard className="h-3.5 w-3.5 mr-1" /> Record
+            </Button>
+          )}
+          {(isOwner || can('recordPayments')) && (
+            <Button variant="ghost" size="icon" onClick={() => { setDeleteFeeId(r.id); setDeleteFeeOpen(true); }} title="Delete Fee Record">
+              <Trash2 className="h-4 w-4 text-rose-600" />
             </Button>
           )}
         </div>
@@ -217,6 +264,7 @@ export default function FeeManagement() {
         emptyDescription="Fees are created when leads are converted to students."
       />
 
+      {/* RECORD PAYMENT MODAL */}
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
@@ -256,6 +304,75 @@ export default function FeeManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* EDIT FEE STRUCTURE MODAL */}
+      <Dialog open={editFeeModalOpen} onOpenChange={setEditFeeModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Fee Structure</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Total Course Fee (₹)</Label>
+              <Input type="number" value={editTotalFee} onChange={(e) => setEditTotalFee(e.target.value)} />
+            </div>
+            <div>
+              <Label>Discount Allowed (₹)</Label>
+              <Input type="number" value={editDiscount} onChange={(e) => setEditDiscount(e.target.value)} />
+            </div>
+            <div>
+              <Label>Scholarship Granted (₹)</Label>
+              <Input type="number" value={editScholarship} onChange={(e) => setEditScholarship(e.target.value)} />
+            </div>
+            <div>
+              <Label>Registration Fee Amount (₹)</Label>
+              <Input type="number" value={editRegAmount} onChange={(e) => setEditRegAmount(e.target.value)} />
+            </div>
+            <div className="p-3 bg-slate-50 border rounded-xl text-xs space-y-1">
+              <p className="flex justify-between font-semibold">
+                <span>Calculated Net Fee:</span>
+                <span className="text-sky-700">₹{(Math.max(0, (parseFloat(editTotalFee) || 0) - (parseFloat(editDiscount) || 0) - (parseFloat(editScholarship) || 0))).toLocaleString()}</span>
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setEditFeeModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEditFee} disabled={updateFee.isPending} className="bg-sky-600 hover:bg-sky-700 text-white font-bold">
+              {updateFee.isPending ? 'Updating...' : 'Save Fee Structure'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE FEE CONFIRMATION MODAL */}
+      <Dialog open={deleteFeeOpen} onOpenChange={setDeleteFeeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-rose-600 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Delete Fee Record
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-slate-700 space-y-2">
+            <p>Are you sure you want to remove this fee record?</p>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+              <p className="font-semibold">Database Protection Notice:</p>
+              <p className="mt-1">Fee deletion archives the full row to <code className="font-mono bg-rose-100 px-1 rounded">audit_removed_fees</code> before removal. Awaiting your DB function definition to finalize deletion execution.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteFeeOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                toast.error('Deletion awaiting DB function confirmation from Administrator.')
+                setDeleteFeeOpen(false)
+              }}
+            >
+              Confirm Deletion Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
-}
+}

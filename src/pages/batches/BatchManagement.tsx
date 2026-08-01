@@ -147,7 +147,7 @@ export default function BatchManagement() {
     },
     {
       key: 'actions',
-      header: '',
+      header: 'Actions',
       render: (r) => (
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/students?batchId=${r.id}`)} title="View Students">

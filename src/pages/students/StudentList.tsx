@@ -2,19 +2,25 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStudents, useBatches, useFees } from '@/hooks/useStudents'
 import { useCourses } from '@/hooks/useLeads'
+import { useAuth } from '@/hooks/useAuth'
+import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
 import FlagDot from '@/components/ui/FlagDot'
 import type { Student } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Plus, CheckCircle, AlertTriangle, Clock, CreditCard } from 'lucide-react'
+import { Plus, CheckCircle, AlertTriangle, Clock, CreditCard, Eye, Pencil, Trash2 } from 'lucide-react'
 import { AddStudentModal } from '@/pages/students/AddStudentModal'
 
 export default function StudentList() {
   const navigate = useNavigate()
+  const { can, isOwner } = useAuth()
+  const softDelete = useSoftDelete()
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'all' | 'admissions'>('all')
   const [searchParams] = useSearchParams()
   const initialBatchId = searchParams.get('batchId') ?? undefined
@@ -99,6 +105,21 @@ export default function StudentList() {
       header: 'Status',
       render: (r) => <Badge variant={r.is_active ? 'success' : 'secondary'}>{r.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (r) => (
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/students/${r.id}`)} title="View Student"><Eye className="h-4 w-4" /></Button>
+          {(isOwner || can('editStudents')) && (
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/students/${r.id}`)} title="Edit Student Profile"><Pencil className="h-4 w-4 text-sky-600" /></Button>
+          )}
+          {(isOwner || can('editStudents')) && (
+            <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Delete Student"><Trash2 className="h-4 w-4 text-danger" /></Button>
+          )}
+        </div>
+      ),
+    },
   ]
 
   return (
@@ -166,6 +187,7 @@ export default function StudentList() {
         data={students}
         loading={isLoading}
         searchable
+        tableKey="students"
         rowKey={(r) => r.id}
         onRowClick={(r) => navigate(`/students/${r.id}`)}
         emptyTitle="No students yet"
@@ -173,6 +195,19 @@ export default function StudentList() {
       />
 
       <AddStudentModal open={addModalOpen} onOpenChange={setAddModalOpen} />
+
+      <SoftDeleteDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        title="Delete Student?"
+        entityType="student"
+        entityName={rawStudents.find((s) => s.id === deleteId)?.full_name ?? ''}
+        onConfirm={async () => {
+          if (!deleteId) return
+          await softDelete.mutateAsync({ table: 'students', id: deleteId })
+          setDeleteId(null)
+        }}
+      />
     </div>
   )
 }

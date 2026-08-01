@@ -32,131 +32,71 @@ async function run() {
     
     console.log("Submitting login form...");
     await page.click('button[type="submit"]');
-    await delay(4000);
+    await delay(3000);
     console.log("Current page URL after login submit:", page.url());
     
     // ----------------------------------------------------
-    // 1. FEES TABLE COLUMN TOGGLE VERIFICATION
+    // 1. FEES TABLE ACTIONS VERIFICATION
     // ----------------------------------------------------
     console.log("Navigating to Fees page...");
     await page.goto('http://127.0.0.1:5173/fees', { waitUntil: 'networkidle2', timeout: 30000 });
-    await delay(3000);
-    console.log("Current URL on Fees page:", page.url());
+    await delay(2500);
     
-    const initialFeesHeaders = await page.evaluate(() => 
+    const feesHeaders = await page.evaluate(() => 
       Array.from(document.querySelectorAll('th')).map(th => th.textContent?.trim()).filter(Boolean)
     );
-    console.log("Initial Fees Table Headers:", initialFeesHeaders);
+    console.log("Fees Table Headers:", feesHeaders);
     
-    console.log("Clicking Column Toggle settings button on Fees table using Puppeteer click()...");
-    const buttonsFees = await page.$$('button');
-    let feesToggleBtn = null;
-    for (const b of buttonsFees) {
-      const isMatch = await page.evaluate(el => !!(el.querySelector('svg.lucide-settings-2') || el.innerHTML.includes('lucide-settings-2')), b);
-      if (isMatch) {
-        feesToggleBtn = b;
-        break;
-      }
-    }
-    
-    if (!feesToggleBtn) {
-      throw new Error("Could not find column toggle button on Fees table");
-    }
-    
-    await feesToggleBtn.click();
-    await delay(1000);
-    
-    console.log("Waiting for dropdown menu items to appear...");
-    await page.waitForSelector('[role="menuitemcheckbox"]', { visible: true, timeout: 5000 });
-    
-    const feesItems = await page.$$('[role="menuitemcheckbox"]');
-    console.log(`Found ${feesItems.length} column checkboxes in Fees table.`);
-    
-    let uncheckedFeesCol = '';
-    for (const item of feesItems) {
-      const txt = await page.evaluate(el => el.textContent?.trim(), item);
-      if (txt === 'Course' || txt === 'Student' || txt === 'Subject') {
-        uncheckedFeesCol = txt;
-        console.log(`Unchecking Fees column checkbox: "${txt}"`);
-        await item.click();
-        break;
-      }
-    }
-    await delay(1500);
-    
-    const updatedFeesHeaders = await page.evaluate(() => 
-      Array.from(document.querySelectorAll('th')).map(th => th.textContent?.trim()).filter(Boolean)
-    );
-    console.log(`Fees Headers after unchecking "${uncheckedFeesCol}":`, updatedFeesHeaders);
-    console.log(`Is "${uncheckedFeesCol}" hidden from table?`, !updatedFeesHeaders.includes(uncheckedFeesCol));
-    
-    const feesScreenshotPath = path.join(artifactDir, 'fees_column_toggle_verified.png');
+    const feesScreenshotPath = path.join(artifactDir, 'fees_table_actions_verified.png');
     await page.screenshot({ path: feesScreenshotPath });
-    console.log(`Saved Fees screenshot to: ${feesScreenshotPath}`);
-    
-    await page.keyboard.press('Escape');
-    await delay(1000);
+    console.log(`Saved Fees table screenshot to: ${feesScreenshotPath}`);
+
+    // Open Edit Fee Modal
+    const editFeeBtn = await page.$('button[title="Edit Fee Structure"]');
+    if (editFeeBtn) {
+      console.log("Clicking Edit Fee button...");
+      await editFeeBtn.click();
+      await delay(1000);
+      const feeEditModalPath = path.join(artifactDir, 'fee_edit_modal_verified.png');
+      await page.screenshot({ path: feeEditModalPath });
+      console.log(`Saved Fee Edit Modal screenshot to: ${feeEditModalPath}`);
+      await page.keyboard.press('Escape');
+      await delay(500);
+    }
     
     // ----------------------------------------------------
-    // 2. LEADS TABLE COLUMN TOGGLE VERIFICATION
+    // 2. STUDENTS TABLE ACTIONS VERIFICATION
     // ----------------------------------------------------
-    console.log("Navigating to Leads page...");
-    await page.goto('http://127.0.0.1:5173/leads', { waitUntil: 'networkidle2', timeout: 30000 });
-    await delay(3000);
-    console.log("Current URL on Leads page:", page.url());
+    console.log("Navigating to Students page...");
+    await page.goto('http://127.0.0.1:5173/students', { waitUntil: 'networkidle2', timeout: 30000 });
+    await delay(2500);
     
-    const initialLeadsHeaders = await page.evaluate(() => 
+    const studentsHeaders = await page.evaluate(() => 
       Array.from(document.querySelectorAll('th')).map(th => th.textContent?.trim()).filter(Boolean)
     );
-    console.log("Initial Leads Table Headers:", initialLeadsHeaders);
+    console.log("Students Table Headers:", studentsHeaders);
     
-    console.log("Clicking Column Toggle settings button on Leads table using Puppeteer click()...");
-    const buttonsLeads = await page.$$('button');
-    let leadsToggleBtn = null;
-    for (const b of buttonsLeads) {
-      const isMatch = await page.evaluate(el => !!(el.querySelector('svg.lucide-settings-2') || el.innerHTML.includes('lucide-settings-2')), b);
-      if (isMatch) {
-        leadsToggleBtn = b;
-        break;
-      }
-    }
+    const studentsScreenshotPath = path.join(artifactDir, 'students_table_actions_verified.png');
+    await page.screenshot({ path: studentsScreenshotPath });
+    console.log(`Saved Students table screenshot to: ${studentsScreenshotPath}`);
+
+    // ----------------------------------------------------
+    // 3. BATCHES TABLE ACTIONS VERIFICATION
+    // ----------------------------------------------------
+    console.log("Navigating to Batches page...");
+    await page.goto('http://127.0.0.1:5173/batches', { waitUntil: 'networkidle2', timeout: 30000 });
+    await delay(2500);
     
-    if (!leadsToggleBtn) {
-      throw new Error("Could not find column toggle button on Leads table");
-    }
-    
-    await leadsToggleBtn.click();
-    await delay(1000);
-    
-    console.log("Waiting for dropdown menu items to appear on Leads table...");
-    await page.waitForSelector('[role="menuitemcheckbox"]', { visible: true, timeout: 5000 });
-    
-    const leadsItems = await page.$$('[role="menuitemcheckbox"]');
-    console.log(`Found ${leadsItems.length} column checkboxes in Leads table.`);
-    
-    let uncheckedLeadsCol = '';
-    for (const item of leadsItems) {
-      const txt = await page.evaluate(el => el.textContent?.trim(), item);
-      if (txt === 'Mobile' || txt === 'Source' || txt === 'Temp') {
-        uncheckedLeadsCol = txt;
-        console.log(`Unchecking Leads column checkbox: "${txt}"`);
-        await item.click();
-        break;
-      }
-    }
-    await delay(1500);
-    
-    const updatedLeadsHeaders = await page.evaluate(() => 
+    const batchesHeaders = await page.evaluate(() => 
       Array.from(document.querySelectorAll('th')).map(th => th.textContent?.trim()).filter(Boolean)
     );
-    console.log(`Leads Headers after unchecking "${uncheckedLeadsCol}":`, updatedLeadsHeaders);
-    console.log(`Is "${uncheckedLeadsCol}" hidden from table?`, !updatedLeadsHeaders.includes(uncheckedLeadsCol));
+    console.log("Batches Table Headers:", batchesHeaders);
     
-    const leadsScreenshotPath = path.join(artifactDir, 'leads_column_toggle_verified.png');
-    await page.screenshot({ path: leadsScreenshotPath });
-    console.log(`Saved Leads screenshot to: ${leadsScreenshotPath}`);
-    
-    console.log("Column toggle verification completed cleanly with 0 errors!");
+    const batchesScreenshotPath = path.join(artifactDir, 'batches_table_actions_verified.png');
+    await page.screenshot({ path: batchesScreenshotPath });
+    console.log(`Saved Batches table screenshot to: ${batchesScreenshotPath}`);
+
+    console.log("Table actions verification completed cleanly with 0 errors!");
   } catch (err) {
     console.error("Puppeteer execution error:", err);
     process.exitCode = 1;

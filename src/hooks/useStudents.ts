@@ -395,6 +395,55 @@ export function useRecordPayment() {
   })
 }
 
+export function useUpdateFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, total_fee, discount, scholarship, registration_amount }: {
+      id: string
+      total_fee: number
+      discount: number
+      scholarship: number
+      registration_amount: number
+    }) => {
+      const { data: existing, error: fetchErr } = await supabase
+        .from('fees')
+        .select('amount_paid')
+        .eq('id', id)
+        .single()
+
+      if (fetchErr) throw fetchErr
+
+      const net_fee = Math.max(0, total_fee - discount - scholarship)
+      const pending_balance = Math.max(0, net_fee - (existing?.amount_paid || 0))
+
+      const { data, error } = await supabase
+        .from('fees')
+        .update({
+          total_fee,
+          discount,
+          scholarship,
+          registration_amount,
+          net_fee,
+          pending_balance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] })
+      queryClient.invalidateQueries({ queryKey: ['fees', vars.id] })
+      toast.success('Fee structure updated successfully')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
 export function useNotifications() {
   const { profile } = useAuth()
 

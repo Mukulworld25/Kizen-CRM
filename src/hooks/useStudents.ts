@@ -870,3 +870,22 @@ export function useGlobalSearch(query: string) {
     enabled: !!profile && query.length >= 2,
   })
 }
+
+export function useDeleteFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ feeId, reason }: { feeId: string; reason?: string }) => {
+      const { error } = await supabase.rpc('delete_fee_with_audit', {
+        p_fee_id: feeId,
+        p_reason: reason ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] })
+      toast.success('Fee record deleted')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}

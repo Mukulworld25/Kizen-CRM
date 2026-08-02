@@ -36,6 +36,7 @@ export default function FeeManagement() {
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
   const recordPayment = useRecordPayment()
   const updateFee = useUpdateFee()
+  const deleteFee = useDeleteFee()
 
   // Edit Fee Modal State
   const [editFeeModalOpen, setEditFeeModalOpen] = useState(false)
@@ -353,22 +354,25 @@ export default function FeeManagement() {
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-slate-700 space-y-2">
-            <p>Are you sure you want to remove this fee record?</p>
+            <p>Are you sure you want to permanently remove this fee record?</p>
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-              <p className="font-semibold">Database Protection Notice:</p>
-              <p className="mt-1">Fee deletion archives the full row to <code className="font-mono bg-rose-100 px-1 rounded">audit_removed_fees</code> before removal. Awaiting your DB function definition to finalize deletion execution.</p>
+              <p className="font-semibold">Audit Logging Enabled:</p>
+              <p className="mt-1">Fee deletion automatically archives the complete record and metadata into <code className="font-mono bg-rose-100 px-1 rounded">audit_removed_fees</code> via the <code className="font-mono bg-rose-100 px-1 rounded">delete_fee_with_audit</code> RPC procedure.</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteFeeOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                toast.error('Deletion awaiting DB function confirmation from Administrator.')
+              disabled={deleteFee.isPending}
+              onClick={async () => {
+                if (deleteFeeId) {
+                  await deleteFee.mutateAsync({ feeId: deleteFeeId })
+                }
                 setDeleteFeeOpen(false)
               }}
             >
-              Confirm Deletion Request
+              {deleteFee.isPending ? 'Deleting...' : 'Confirm Deletion'}
             </Button>
           </DialogFooter>
         </DialogContent>

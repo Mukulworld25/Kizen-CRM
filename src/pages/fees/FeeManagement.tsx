@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Eye, Pencil, Trash2, CreditCard } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useFees, useRecordPayment, useUpdateFee } from '@/hooks/useStudents'
+import { useFees, useRecordPayment, useUpdateFee, useDeleteFee } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatsCard } from '@/components/shared/StatsCard'
 import { DataTable, type Column } from '@/components/shared/DataTable'
@@ -45,6 +45,10 @@ export default function FeeManagement() {
   const [editDiscount, setEditDiscount] = useState('')
   const [editScholarship, setEditScholarship] = useState('')
   const [editRegAmount, setEditRegAmount] = useState('')
+  const [editDuration, setEditDuration] = useState('')
+  const [editInstallments, setEditInstallments] = useState<
+    Array<{ id?: string; installment_number: number; amount: number; due_date: string; status?: 'pending' | 'paid' | 'overdue' }>
+  >([])
 
   // Delete Fee Modal State
   const [deleteFeeOpen, setDeleteFeeOpen] = useState(false)
@@ -67,7 +71,44 @@ export default function FeeManagement() {
     setEditDiscount((fee.discount || 0).toString())
     setEditScholarship((fee.scholarship || 0).toString())
     setEditRegAmount((fee.registration_amount || 0).toString())
+    setEditDuration((fee as any).duration || (fee.course?.duration_days ? `${fee.course.duration_days} days` : ''))
+    
+    // Sort existing installments by installment_number
+    const existingInsts = fee.installments
+      ? [...fee.installments].sort((a, b) => a.installment_number - b.installment_number)
+      : []
+    setEditInstallments(
+      existingInsts.map((i) => ({
+        id: i.id,
+        installment_number: i.installment_number,
+        amount: i.amount,
+        due_date: i.due_date,
+        status: i.status,
+      }))
+    )
     setEditFeeModalOpen(true)
+  }
+
+  const handleAddInstallmentRow = () => {
+    setEditInstallments((prev) => [
+      ...prev,
+      {
+        installment_number: prev.length + 1,
+        amount: 0,
+        due_date: format(new Date(), 'yyyy-MM-dd'),
+        status: 'pending',
+      },
+    ])
+  }
+
+  const handleRemoveInstallmentRow = (index: number) => {
+    setEditInstallments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleInstallmentChange = (index: number, field: 'amount' | 'due_date', value: any) => {
+    setEditInstallments((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
   }
 
   const handleSaveEditFee = async () => {
@@ -78,6 +119,8 @@ export default function FeeManagement() {
       discount: parseFloat(editDiscount) || 0,
       scholarship: parseFloat(editScholarship) || 0,
       registration_amount: parseFloat(editRegAmount) || 0,
+      duration: editDuration,
+      installments: editInstallments,
     })
     setEditFeeModalOpen(false)
   }
@@ -308,34 +351,112 @@ export default function FeeManagement() {
 
       {/* EDIT FEE STRUCTURE MODAL */}
       <Dialog open={editFeeModalOpen} onOpenChange={setEditFeeModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Fee Structure</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div>
-              <Label>Total Course Fee (₹)</Label>
-              <Input type="number" value={editTotalFee} onChange={(e) => setEditTotalFee(e.target.value)} />
+            {/* Fee fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Total Course Fee (₹)</Label>
+                <Input type="number" value={editTotalFee} onChange={(e) => setEditTotalFee(e.target.value)} />
+              </div>
+              <div>
+                <Label>Course Duration</Label>
+                <Input
+                  placeholder="e.g. 6 Months, 1 Year"
+                  value={editDuration}
+                  onChange={(e) => setEditDuration(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Discount Allowed (₹)</Label>
+                <Input type="number" value={editDiscount} onChange={(e) => setEditDiscount(e.target.value)} />
+              </div>
+              <div>
+                <Label>Scholarship Granted (₹)</Label>
+                <Input type="number" value={editScholarship} onChange={(e) => setEditScholarship(e.target.value)} />
+              </div>
+              <div>
+                <Label>Registration Fee Amount (₹)</Label>
+                <Input type="number" value={editRegAmount} onChange={(e) => setEditRegAmount(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <Label>Discount Allowed (₹)</Label>
-              <Input type="number" value={editDiscount} onChange={(e) => setEditDiscount(e.target.value)} />
-            </div>
-            <div>
-              <Label>Scholarship Granted (₹)</Label>
-              <Input type="number" value={editScholarship} onChange={(e) => setEditScholarship(e.target.value)} />
-            </div>
-            <div>
-              <Label>Registration Fee Amount (₹)</Label>
-              <Input type="number" value={editRegAmount} onChange={(e) => setEditRegAmount(e.target.value)} />
-            </div>
+
             <div className="p-3 bg-slate-50 border rounded-xl text-xs space-y-1">
               <p className="flex justify-between font-semibold">
                 <span>Calculated Net Fee:</span>
                 <span className="text-sky-700">₹{(Math.max(0, (parseFloat(editTotalFee) || 0) - (parseFloat(editDiscount) || 0) - (parseFloat(editScholarship) || 0))).toLocaleString()}</span>
               </p>
             </div>
+
+            {/* Installments Editor */}
+            <div className="border rounded-xl p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Installment Schedule</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddInstallmentRow}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <Plus className="h-3 w-3" /> Add Installment
+                </Button>
+              </div>
+              {editInstallments.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-2">No installments configured. Click "Add Installment" to create one.</p>
+              )}
+              {editInstallments.map((inst, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-1 text-xs text-slate-500 text-center font-medium">{idx + 1}</div>
+                  <div className="col-span-4">
+                    <Input
+                      type="number"
+                      placeholder="Amount (₹)"
+                      value={inst.amount || ''}
+                      onChange={(e) => handleInstallmentChange(idx, 'amount', parseFloat(e.target.value) || 0)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="col-span-5">
+                    <Input
+                      type="date"
+                      value={inst.due_date}
+                      onChange={(e) => handleInstallmentChange(idx, 'due_date', e.target.value)}
+                      disabled={inst.status === 'paid'}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2 flex items-center gap-1">
+                    {inst.status === 'paid' ? (
+                      <span className="text-xs text-green-600 font-medium">Paid</span>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-rose-500"
+                        onClick={() => handleRemoveInstallmentRow(idx)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {editInstallments.length > 0 && (
+                <div className="pt-1 border-t text-xs flex justify-between text-slate-500">
+                  <span>Total Scheduled:</span>
+                  <span className="font-semibold text-slate-700">
+                    ₹{editInstallments.reduce((s, i) => s + (i.amount || 0), 0).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
+
           <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setEditFeeModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveEditFee} disabled={updateFee.isPending} className="bg-sky-600 hover:bg-sky-700 text-white font-bold">

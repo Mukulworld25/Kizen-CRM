@@ -399,16 +399,32 @@ export function useUpdateFee() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, total_fee, discount, scholarship, registration_amount }: {
+    mutationFn: async ({
+      id,
+      total_fee,
+      discount,
+      scholarship,
+      registration_amount,
+      duration,
+      installments,
+    }: {
       id: string
       total_fee: number
       discount: number
       scholarship: number
       registration_amount: number
+      duration?: string
+      installments?: Array<{
+        id?: string
+        installment_number: number
+        amount: number
+        due_date: string
+        status?: 'pending' | 'paid' | 'overdue'
+      }>
     }) => {
       const { data: existing, error: fetchErr } = await supabase
         .from('fees')
-        .select('amount_paid')
+        .select('amount_paid, student_id')
         .eq('id', id)
         .single()
 
@@ -417,22 +433,58 @@ export function useUpdateFee() {
       const net_fee = Math.max(0, total_fee - discount - scholarship)
       const pending_balance = Math.max(0, net_fee - (existing?.amount_paid || 0))
 
+      const updatePayload: any = {
+        total_fee,
+        discount,
+        scholarship,
+        registration_amount,
+        net_fee,
+        pending_balance,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (duration !== undefined) {
+        updatePayload.duration = duration
+      }
+
       const { data, error } = await supabase
         .from('fees')
-        .update({
-          total_fee,
-          discount,
-          scholarship,
-          registration_amount,
-          net_fee,
-          pending_balance,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
+
+      if (installments && Array.isArray(installments)) {
+        // Remove existing non-paid installments for this fee
+        await supabase
+          .from('installments')
+          .delete()
+          .eq('fee_id', id)
+          .neq('status', 'paid')
+
+        // Insert new/updated unpaid installments
+        if (installments.length > 0) {
+          const installmentPayload = installments.map((inst, index) => ({
+            fee_id: id,
+            student_id: existing.student_id,
+            installment_number: inst.installment_number || index + 1,
+            amount: inst.amount,
+            due_date: inst.due_date,
+            status: inst.status || 'pending',
+          }))
+
+          const { error: instErr } = await supabase
+            .from('installments')
+            .insert(installmentPayload)
+
+          if (instErr) {
+            console.error('Failed to update installments:', instErr.message)
+          }
+        }
+      }
+
       return data
     },
     onSuccess: (_, vars) => {

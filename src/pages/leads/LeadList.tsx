@@ -69,6 +69,10 @@ export default function LeadList() {
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—', exportValue: (r) => r.course?.name ?? '' },
     { key: 'source', header: 'Source', render: (r) => r.source?.replace('_', ' ') ?? '—', exportValue: (r) => r.source ?? '' },
     { key: 'status', header: 'Status', render: (r) => <LeadStatusBadge status={r.status} /> },
+    { key: 'call_status', header: 'Call Status', render: (r) => r.call_status ?? '—' },
+    { key: 'disposition', header: 'Disposition', render: (r) => r.disposition ?? '—' },
+    { key: 'tap_date', header: 'Tap Date', render: (r) => r.tap_date ? format(new Date(r.tap_date), 'MMM d, yyyy') : '—' },
+    { key: 'followup_1', header: 'Follow-up 1', render: (r) => r.followup_date_1 ? <div className="text-xs"><div>{format(new Date(r.followup_date_1), 'MMM d')}</div><div className="text-slate-400 truncate max-w-[120px]">{r.followup_remarks_1}</div></div> : '—' },
     { key: 'temperature', header: 'Temp', render: (r) => <TemperatureBadge temperature={r.temperature} /> },
     { key: 'budget', header: 'Budget', render: (r) => r.budget ? `₹${r.budget.toLocaleString()}` : '—' },
     { key: 'lead_score', header: 'Score', sortable: true, render: (r) => r.lead_score != null ? (
@@ -213,57 +217,160 @@ export default function LeadList() {
 
       {/* QUICK EDIT LEAD MODAL */}
       <Dialog open={!!editLead} onOpenChange={(o) => !o && setEditLead(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Lead Details</DialogTitle>
           </DialogHeader>
           {editLead && (
             <div className="space-y-3 py-2 text-sm">
-              <div>
-                <Label>Full Name</Label>
-                <Input
-                  value={editLead.full_name || ''}
-                  onChange={(e) => setEditLead({ ...editLead, full_name: e.target.value })}
-                  className="mt-1"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input
+                    value={editLead.full_name || ''}
+                    onChange={(e) => setEditLead({ ...editLead, full_name: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Mobile</Label>
+                  <Input
+                    value={editLead.mobile || ''}
+                    onChange={(e) => setEditLead({ ...editLead, mobile: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    value={editLead.email || ''}
+                    onChange={(e) => setEditLead({ ...editLead, email: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>City</Label>
+                  <Input
+                    value={editLead.city || ''}
+                    onChange={(e) => setEditLead({ ...editLead, city: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={editLead.status} onValueChange={(v) => setEditLead({ ...editLead, status: v as LeadStatus })}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {LEAD_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>{LEAD_STATUS_LABELS[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Temperature</Label>
+                  <Select value={editLead.temperature || 'warm'} onValueChange={(v) => setEditLead({ ...editLead, temperature: v as LeadTemperature })}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hot">Hot</SelectItem>
+                      <SelectItem value="warm">Warm</SelectItem>
+                      <SelectItem value="cold">Cold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label>Mobile</Label>
-                <Input
-                  value={editLead.mobile || ''}
-                  onChange={(e) => setEditLead({ ...editLead, mobile: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input
-                  value={editLead.email || ''}
-                  onChange={(e) => setEditLead({ ...editLead, email: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={editLead.status} onValueChange={(v) => setEditLead({ ...editLead, status: v as LeadStatus })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {LEAD_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>{LEAD_STATUS_LABELS[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Temperature</Label>
-                <Select value={editLead.temperature || 'warm'} onValueChange={(v) => setEditLead({ ...editLead, temperature: v as LeadTemperature })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hot">Hot</SelectItem>
-                    <SelectItem value="warm">Warm</SelectItem>
-                    <SelectItem value="cold">Cold</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Sheet-parity fields */}
+              <div className="border-t pt-3 space-y-3">
+                <div className="font-semibold text-xs text-slate-500 uppercase tracking-wider">Sheet Tracking Fields</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Tap Date</Label>
+                    <Input
+                      type="date"
+                      value={editLead.tap_date ? editLead.tap_date.split('T')[0] : ''}
+                      onChange={(e) => setEditLead({ ...editLead, tap_date: e.target.value || null })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label>Call Status</Label>
+                    <Select
+                      value={editLead.call_status || 'none'}
+                      onValueChange={(v) => setEditLead({ ...editLead, call_status: v === 'none' ? null : v })}
+                    >
+                      <SelectTrigger className="mt-1 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- None --</SelectItem>
+                        <SelectItem value="Connected">Connected</SelectItem>
+                        <SelectItem value="Not Connected">Not Connected</SelectItem>
+                        <SelectItem value="Call Back">Call Back</SelectItem>
+                        <SelectItem value="Switched Off">Switched Off</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Disposition</Label>
+                    <Input
+                      placeholder="e.g. Pitching, DNP, Interested"
+                      value={editLead.disposition || ''}
+                      onChange={(e) => setEditLead({ ...editLead, disposition: e.target.value })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Follow-up 1 Date</Label>
+                    <Input
+                      type="date"
+                      value={editLead.followup_date_1 ? editLead.followup_date_1.split('T')[0] : ''}
+                      onChange={(e) => setEditLead({ ...editLead, followup_date_1: e.target.value || null })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label>Follow-up 1 Remarks</Label>
+                    <Input
+                      placeholder="Remarks after follow-up 1"
+                      value={editLead.followup_remarks_1 || ''}
+                      onChange={(e) => setEditLead({ ...editLead, followup_remarks_1: e.target.value })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Follow-up 2 Date</Label>
+                    <Input
+                      type="date"
+                      value={editLead.followup_date_2 ? editLead.followup_date_2.split('T')[0] : ''}
+                      onChange={(e) => setEditLead({ ...editLead, followup_date_2: e.target.value || null })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label>Follow-up 2 Remarks</Label>
+                    <Input
+                      placeholder="Remarks after follow-up 2"
+                      value={editLead.followup_remarks_2 || ''}
+                      onChange={(e) => setEditLead({ ...editLead, followup_remarks_2: e.target.value })}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Remarks / Notes</Label>
+                  <Input
+                    placeholder="General remarks..."
+                    value={editLead.notes || ''}
+                    onChange={(e) => setEditLead({ ...editLead, notes: e.target.value })}
+                    className="mt-1 text-xs"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -277,8 +384,17 @@ export default function LeadList() {
                   full_name: editLead.full_name,
                   mobile: editLead.mobile,
                   email: editLead.email,
+                  city: editLead.city,
                   status: editLead.status,
                   temperature: editLead.temperature,
+                  tap_date: editLead.tap_date,
+                  call_status: editLead.call_status,
+                  disposition: editLead.disposition,
+                  followup_date_1: editLead.followup_date_1,
+                  followup_remarks_1: editLead.followup_remarks_1,
+                  followup_date_2: editLead.followup_date_2,
+                  followup_remarks_2: editLead.followup_remarks_2,
+                  notes: editLead.notes,
                 })
                 toast.success('Lead updated successfully')
                 setEditLead(null)

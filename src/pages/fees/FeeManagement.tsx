@@ -46,6 +46,8 @@ export default function FeeManagement() {
   const [editScholarship, setEditScholarship] = useState('')
   const [editRegAmount, setEditRegAmount] = useState('')
   const [editDuration, setEditDuration] = useState('')
+  const [editSubject, setEditSubject] = useState('')
+  const [editRegDate, setEditRegDate] = useState('')
   const [editInstallments, setEditInstallments] = useState<
     Array<{ id?: string; installment_number: number; amount: number; due_date: string; status?: 'pending' | 'paid' | 'overdue' }>
   >([])
@@ -72,6 +74,8 @@ export default function FeeManagement() {
     setEditScholarship((fee.scholarship || 0).toString())
     setEditRegAmount((fee.registration_amount || 0).toString())
     setEditDuration((fee as any).duration || (fee.course?.duration_days ? `${fee.course.duration_days} days` : ''))
+    setEditSubject(fee.subject || fee.course?.description || '')
+    setEditRegDate(fee.registration_date ? fee.registration_date.split('T')[0] : '')
     
     // Sort existing installments by installment_number
     const existingInsts = fee.installments
@@ -120,6 +124,8 @@ export default function FeeManagement() {
       scholarship: parseFloat(editScholarship) || 0,
       registration_amount: parseFloat(editRegAmount) || 0,
       duration: editDuration,
+      subject: editSubject,
+      registration_date: editRegDate || null,
       installments: editInstallments,
     })
     setEditFeeModalOpen(false)
@@ -143,6 +149,7 @@ export default function FeeManagement() {
     { key: 'discount', header: 'Discount', render: (r) => formatCurrency(r.discount) },
     { key: 'scholarship', header: 'Scholarship', render: (r) => formatCurrency(r.scholarship) },
     { key: 'registration_amount', header: 'Reg Amt', render: (r) => formatCurrency(r.registration_amount) },
+    { key: 'registration_date', header: 'Reg Date', render: (r) => r.registration_date ? format(new Date(r.registration_date), 'dd/MM/yy') : '—' },
     { key: 'net_fee', header: 'Net Fee', render: (r) => formatCurrency(r.net_fee) },
     { key: 'amount_paid', header: 'Paid', render: (r) => formatCurrency(r.amount_paid) },
     { key: 'pending_balance', header: 'Balance', render: (r) => (
@@ -379,8 +386,20 @@ export default function FeeManagement() {
                 <Input type="number" value={editScholarship} onChange={(e) => setEditScholarship(e.target.value)} />
               </div>
               <div>
+                <Label>Subject / Modules</Label>
+                <Input
+                  placeholder="e.g. BT, FA, MA"
+                  value={editSubject}
+                  onChange={(e) => setEditSubject(e.target.value)}
+                />
+              </div>
+              <div>
                 <Label>Registration Fee Amount (₹)</Label>
                 <Input type="number" value={editRegAmount} onChange={(e) => setEditRegAmount(e.target.value)} />
+              </div>
+              <div>
+                <Label>Registration Date</Label>
+                <Input type="date" value={editRegDate} onChange={(e) => setEditRegDate(e.target.value)} />
               </div>
             </div>
 

@@ -90,6 +90,15 @@ export interface Lead {
   expected_joining_date: string | null
   lead_score: number | null
   notes: string | null
+  tap_date?: string | null
+  call_status?: string | null
+  disposition?: string | null
+  followup_date_1?: string | null
+  followup_remarks_1?: string | null
+  followup_date_2?: string | null
+  followup_remarks_2?: string | null
+  followup_date_3?: string | null
+  followup_remarks_3?: string | null
   referred_by_lead_id?: string | null
   referred_by_student_id?: string | null
   flag_color?: 'red' | 'yellow' | null
@@ -174,6 +183,7 @@ export interface Fee {
   discount: number
   scholarship: number
   registration_amount: number
+  registration_date?: string | null
   net_fee: number
   amount_paid: number
   pending_balance: number

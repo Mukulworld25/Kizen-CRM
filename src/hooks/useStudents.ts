@@ -406,6 +406,8 @@ export function useUpdateFee() {
       scholarship,
       registration_amount,
       duration,
+      subject,
+      registration_date,
       installments,
     }: {
       id: string
@@ -414,6 +416,8 @@ export function useUpdateFee() {
       scholarship: number
       registration_amount: number
       duration?: string
+      subject?: string
+      registration_date?: string | null
       installments?: Array<{
         id?: string
         installment_number: number
@@ -445,6 +449,12 @@ export function useUpdateFee() {
 
       if (duration !== undefined) {
         updatePayload.duration = duration
+      }
+      if (subject !== undefined) {
+        updatePayload.subject = subject
+      }
+      if (registration_date !== undefined) {
+        updatePayload.registration_date = registration_date
       }
 
       const { data, error } = await supabase

@@ -13,9 +13,10 @@ interface StatsCardProps {
   color?: string
   loading?: boolean
   alert?: boolean
+  onClick?: () => void
 }
 
-export function StatsCard({ title, value, change, changeLabel, icon: Icon, color = 'bg-primary', loading, alert }: StatsCardProps) {
+export function StatsCard({ title, value, change, changeLabel, icon: Icon, color = 'bg-primary', loading, alert, onClick }: StatsCardProps) {
   if (loading) {
     return (
       <Card>
@@ -32,7 +33,14 @@ export function StatsCard({ title, value, change, changeLabel, icon: Icon, color
   }
 
   return (
-    <Card className={cn('relative overflow-hidden', alert && 'ring-2 ring-accent ring-offset-2')}>
+    <Card 
+      onClick={onClick}
+      className={cn(
+        'relative overflow-hidden transition-all duration-200', 
+        alert && 'ring-2 ring-accent ring-offset-2',
+        onClick && 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0'
+      )}
+    >
       <div className={cn('absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-1/2 translate-x-1/2 opacity-10', color)} />
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>{title}</CardTitle>

@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -24,6 +24,7 @@ import { useUpdateLead } from '@/hooks/useLeads'
 
 export default function LeadList() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { can, isOwner } = useAuth()
   const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 15 })
   const [addOpen, setAddOpen] = useState(false)
@@ -31,6 +32,15 @@ export default function LeadList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [flaggedOnly, setFlaggedOnly] = useState(false)
   const updateLead = useUpdateLead()
+
+  useEffect(() => {
+    const filterParam = searchParams.get('filter')
+    if (filterParam === 'stale') {
+      setFlaggedOnly(true)
+    } else if (filterParam === 'dormant') {
+      setFilters((f) => ({ ...f, temperature: 'cold' as LeadTemperature }))
+    }
+  }, [searchParams])
 
   const { data, isLoading } = useLeads(filters)
   const softDelete = useSoftDelete()

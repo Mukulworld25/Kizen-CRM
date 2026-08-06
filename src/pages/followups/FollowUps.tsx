@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Phone, CheckCircle, Calendar as CalendarIcon, ListChecks, CalendarDays, Plus, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,10 +26,20 @@ interface MinimalLead {
 }
 
 export default function FollowUps() {
+  const [searchParams] = useSearchParams()
   const { profile, can } = useAuth()
   const [tab, setTab] = useState('today')
   const [counselorId, setCounselorId] = useState<string>()
   const [selectedDate, setSelectedDate] = useState<string>('')
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') || searchParams.get('filter')
+    if (tabParam === 'overdue') {
+      setTab('overdue')
+    } else if (tabParam) {
+      setTab(tabParam)
+    }
+  }, [searchParams])
   
   // Add Task Modal State
   const [addTaskOpen, setAddTaskOpen] = useState(false)

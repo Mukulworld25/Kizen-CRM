@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Eye, Pencil, Trash2, CreditCard } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFees, useRecordPayment, useUpdateFee, useDeleteFee } from '@/hooks/useStudents'
@@ -22,11 +22,18 @@ import toast from 'react-hot-toast'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { can, isOwner } = useAuth()
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [courseLevel, setCourseLevel] = useState<string>('all')
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
   const [flaggedOnly, setFlaggedOnly] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('filter') === 'overdue') {
+      setOverdueOnly(true)
+    }
+  }, [searchParams])
   const { data: rawFees = [], isLoading } = useFees({
     overdue: overdueOnly,
     courseLevel,

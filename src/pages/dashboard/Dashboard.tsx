@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardStats, useFollowUps, useDashboardInsights, useExpenses } from '@/hooks/useStudents'
 import { useBdmDashboardStats } from '@/hooks/useInstitutions'
@@ -24,6 +25,53 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
+import { useDashboardPreferences } from '@/hooks/useDashboardPreferences'
+
+/* ── Styled KPI card (high-contrast, matches mockup) ── */
+interface DashboardKpiCardProps {
+  title: string
+  value: string | number
+  icon: React.ElementType
+  accent?: string
+  subtitle?: React.ReactNode
+  trend?: { value: string; up: boolean }
+  isAlert?: boolean
+  rightSlot?: React.ReactNode
+  onClick?: () => void
+}
+
+function DashboardKpiCard({
+  title,
+  value,
+  icon: Icon,
+  accent = 'var(--kizen-gold)',
+  subtitle,
+  trend,
+  isAlert,
+  rightSlot,
+  onClick,
+}: DashboardKpiCardProps) {
+  return (
+    <div
+      onClick={onClick}
+      className={`glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full ${
+        onClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/30' : ''
+      }`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}15` }}>
+            <Icon style={{ width: 16, height: 16, color: accent }} />
+          </div>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate">{title}</span>
+        </div>
+        <div className="text-2xl font-black tracking-tight tabular-nums mt-1">{value}</div>
+        {subtitle && <div className="text-[11px] font-medium text-muted-foreground mt-1">{subtitle}</div>}
+      </div>
+      {rightSlot && <div className="shrink-0">{rightSlot}</div>}
+    </div>
+  )
+}
 
 /* ── Widget Registry ── */
 interface WidgetDef {
@@ -287,6 +335,7 @@ interface DashboardKpiCardProps {
   trend?: { value: string; up: boolean }
   isAlert?: boolean
   rightSlot?: React.ReactNode
+  onClick?: () => void
 }
 
 function DashboardKpiCard({
@@ -298,10 +347,14 @@ function DashboardKpiCard({
   trend,
   isAlert,
   rightSlot,
+  onClick,
 }: DashboardKpiCardProps) {
   return (
     <div
-      className="glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full"
+      onClick={onClick}
+      className={`glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full ${
+        onClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/30' : ''
+      }`}
       style={{
         border: isAlert ? '1px solid rgba(239,83,80,0.35)' : '1px solid var(--glass-border)',
         background: `linear-gradient(135deg, ${accent}26 0%, ${accent}08 100%)`,
@@ -361,6 +414,7 @@ function DashboardKpiCard({
 
 /* ── Owner Dashboard ── */
 function OwnerDashboard() {
+  const navigate = useNavigate()
   type DateFilterType = 'today' | 'month' | 'till_date' | 'custom'
   const [filterType, setFilterType] = useState<DateFilterType>('till_date')
   const [customFrom, setCustomFrom] = useState('')
@@ -479,7 +533,10 @@ function OwnerDashboard() {
               <span className="text-xs font-bold uppercase tracking-wider text-red-600">Operational Risk & Alarm Radar</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+              <div 
+                onClick={() => navigate('/leads?filter=stale')}
+                className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs cursor-pointer hover:ring-2 hover:ring-red-400/30 transition-all hover:-translate-y-0.5"
+              >
                 <div>
                   <p className="text-[11px] text-slate-500 font-semibold">Stale Leads (&gt;48h Uncontacted)</p>
                   <h4 className="text-xl font-black text-red-600 mt-0.5">342</h4>
@@ -487,7 +544,10 @@ function OwnerDashboard() {
                 </div>
                 <AlertTriangle className="w-6 h-6 text-red-400 opacity-80" />
               </div>
-              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+              <div 
+                onClick={() => navigate('/fees?filter=overdue')}
+                className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs cursor-pointer hover:ring-2 hover:ring-amber-400/30 transition-all hover:-translate-y-0.5"
+              >
                 <div>
                   <p className="text-[11px] text-slate-500 font-semibold">Overdue Fee Collections</p>
                   <h4 className="text-xl font-black text-amber-600 mt-0.5">{overdueInstallments} Student Slabs</h4>
@@ -495,7 +555,10 @@ function OwnerDashboard() {
                 </div>
                 <IndianRupee className="w-6 h-6 text-amber-400 opacity-80" />
               </div>
-              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+              <div 
+                onClick={() => navigate('/followups?tab=overdue')}
+                className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs cursor-pointer hover:ring-2 hover:ring-orange-400/30 transition-all hover:-translate-y-0.5"
+              >
                 <div>
                   <p className="text-[11px] text-slate-500 font-semibold">Overdue Task Items</p>
                   <h4 className="text-xl font-black text-orange-600 mt-0.5">{overdueFus} Tasks</h4>
@@ -503,7 +566,10 @@ function OwnerDashboard() {
                 </div>
                 <Clock className="w-6 h-6 text-orange-400 opacity-80" />
               </div>
-              <div className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs">
+              <div 
+                onClick={() => navigate('/leads?filter=dormant')}
+                className="p-3 rounded-xl bg-white/70 border border-border flex items-center justify-between shadow-xs cursor-pointer hover:ring-2 hover:ring-blue-400/30 transition-all hover:-translate-y-0.5"
+              >
                 <div>
                   <p className="text-[11px] text-slate-500 font-semibold">Dormant Cold Pool</p>
                   <h4 className="text-xl font-black text-slate-700 mt-0.5">{coldLeads} Leads</h4>
@@ -626,6 +692,7 @@ function OwnerDashboard() {
             icon={IndianRupee}
             accent="#22c55e"
             subtitle="Total revenue from all fees"
+            onClick={() => navigate('/fees')}
           />
         )
       case 'admissions_goal':
@@ -636,6 +703,7 @@ function OwnerDashboard() {
             value={`${admissions}/${admissionsGoal}`}
             icon={Target}
             accent="var(--kizen-gold)"
+            onClick={() => navigate('/students')}
             subtitle={
               <div className="mt-1">
                 <div className="flex justify-between text-[10px] text-muted-foreground mb-1 font-semibold">
@@ -681,7 +749,10 @@ function OwnerDashboard() {
       case 'cash_expense':
         const netValue = revenue - totalExpenses
         return (
-          <div className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border overflow-hidden">
+          <div 
+            onClick={() => navigate('/expenses')}
+            className="glass-card rounded-2xl p-5 animate-card-in flex items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full border border-glass-border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30"
+          >
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
               <DollarSign style={{ width: 20, height: 20, color: 'var(--kizen-gold)' }} />
             </div>
@@ -720,6 +791,7 @@ function OwnerDashboard() {
             accent="#7A90B0"
             subtitle="Leads with no updates"
             isAlert={coldLeads > 0}
+            onClick={() => navigate('/leads?filter=dormant')}
           />
         )
       case 'overdue_followups':
@@ -731,6 +803,7 @@ function OwnerDashboard() {
             accent="#EF5350"
             subtitle="Missed action items"
             isAlert={overdueFus > 0}
+            onClick={() => navigate('/followups?tab=overdue')}
           />
         )
       case 'overdue_fees':
@@ -742,6 +815,7 @@ function OwnerDashboard() {
             accent="#EF5350"
             subtitle="Pending fee collection"
             isAlert={overdueInstallments > 0}
+            onClick={() => navigate('/fees?filter=overdue')}
           />
         )
       case 'batch_capacity':
@@ -1267,27 +1341,29 @@ function BdmDashboard() {
 }
 
 function CounselorDashboard({ stats, isLoading }: { stats: any; isLoading: boolean }) {
+  const navigate = useNavigate()
   return (
     <div className="space-y-4">
       <div><h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>My Dashboard</h1><p className="text-sm mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Your personal pipeline overview</p></div>
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard title="My Leads Today" value={stats?.leadsToday ?? 0} icon={Users} loading={isLoading} />
-        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
-        <StatsCard title="Admissions This Month" value={stats?.admissionsMonth ?? 0} icon={Target} color="bg-success" loading={isLoading} />
+        <StatsCard title="My Leads Today" value={stats?.leadsToday ?? 0} icon={Users} loading={isLoading} onClick={() => navigate('/leads')} />
+        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} onClick={() => navigate('/followups?tab=overdue')} />
+        <StatsCard title="Admissions This Month" value={stats?.admissionsMonth ?? 0} icon={Target} color="bg-success" loading={isLoading} onClick={() => navigate('/students')} />
       </div>
     </div>
   )
 }
 
 function AccountsDashboard({ stats, isLoading }: { stats: any; isLoading: boolean }) {
+  const navigate = useNavigate()
   return (
     <div className="space-y-4">
       <div><h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>Finance Dashboard</h1><p className="text-sm mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Revenue, fees, and payment overview</p></div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Revenue Collected" value={formatCurrency(stats?.revenue ?? 0)} icon={IndianRupee} color="bg-success" loading={isLoading} />
-        <StatsCard title="Pending Fees" value={formatCurrency(stats?.pending ?? 0)} icon={AlertTriangle} color="bg-accent" loading={isLoading} alert={(stats?.pending ?? 0) > 0} />
-        <StatsCard title="Admissions This Month" value={stats?.admissionsMonth ?? 0} icon={GraduationCap} color="bg-primary-light" loading={isLoading} />
-        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} />
+        <StatsCard title="Revenue Collected" value={formatCurrency(stats?.revenue ?? 0)} icon={IndianRupee} color="bg-success" loading={isLoading} onClick={() => navigate('/fees')} />
+        <StatsCard title="Pending Fees" value={formatCurrency(stats?.pending ?? 0)} icon={AlertTriangle} color="bg-accent" loading={isLoading} alert={(stats?.pending ?? 0) > 0} onClick={() => navigate('/fees?filter=overdue')} />
+        <StatsCard title="Admissions This Month" value={stats?.admissionsMonth ?? 0} icon={GraduationCap} color="bg-primary-light" loading={isLoading} onClick={() => navigate('/students')} />
+        <StatsCard title="Follow-ups Due" value={stats?.followUpsDue ?? 0} icon={Clock} color="bg-accent" loading={isLoading} onClick={() => navigate('/followups?tab=overdue')} />
       </div>
     </div>
   )

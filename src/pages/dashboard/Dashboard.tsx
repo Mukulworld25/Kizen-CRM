@@ -25,7 +25,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import { useDashboardPreferences } from '@/hooks/useDashboardPreferences'
 
 /* ── Styled KPI card (high-contrast, matches mockup) ── */
 interface DashboardKpiCardProps {

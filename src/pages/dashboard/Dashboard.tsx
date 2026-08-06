@@ -26,52 +26,6 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 
-/* ── Styled KPI card (high-contrast, matches mockup) ── */
-interface DashboardKpiCardProps {
-  title: string
-  value: string | number
-  icon: React.ElementType
-  accent?: string
-  subtitle?: React.ReactNode
-  trend?: { value: string; up: boolean }
-  isAlert?: boolean
-  rightSlot?: React.ReactNode
-  onClick?: () => void
-}
-
-function DashboardKpiCard({
-  title,
-  value,
-  icon: Icon,
-  accent = 'var(--kizen-gold)',
-  subtitle,
-  trend,
-  isAlert,
-  rightSlot,
-  onClick,
-}: DashboardKpiCardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className={`glass-card rounded-2xl p-5 animate-card-in flex items-start justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden h-full ${
-        onClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/30' : ''
-      }`}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}15` }}>
-            <Icon style={{ width: 16, height: 16, color: accent }} />
-          </div>
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate">{title}</span>
-        </div>
-        <div className="text-2xl font-black tracking-tight tabular-nums mt-1">{value}</div>
-        {subtitle && <div className="text-[11px] font-medium text-muted-foreground mt-1">{subtitle}</div>}
-      </div>
-      {rightSlot && <div className="shrink-0">{rightSlot}</div>}
-    </div>
-  )
-}
-
 /* ── Widget Registry ── */
 interface WidgetDef {
   key: string

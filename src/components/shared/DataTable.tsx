@@ -327,7 +327,7 @@ export function DataTable<T>({
                         const isEmpty = rawVal === null || rawVal === undefined || rawVal === ''
                         return (
                           <TableCell key={col.key}>
-                            {col.render ? col.render(row, (page - 1) * pageSize + rowIndex) : (
+                            {col.render ? col.render(row, (activePage - 1) * pageSize + rowIndex) : (
                               <span className={cn(isEmpty ? 'text-muted-foreground/50 italic text-sm' : '')}>
                                 {isEmpty ? 'No data' : String(rawVal)}
                               </span>

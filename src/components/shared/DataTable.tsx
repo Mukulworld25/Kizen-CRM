@@ -15,7 +15,7 @@ export interface Column<T> {
   key: string
   header: string
   sortable?: boolean
-  render?: (row: T) => React.ReactNode
+  render?: (row: T, index: number) => React.ReactNode
   exportValue?: (row: T) => string | number
 }
 
@@ -300,7 +300,7 @@ export function DataTable<T>({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginated.map((row) => {
+                {paginated.map((row, rowIndex) => {
                   const key = rowKey(row)
                   const isSelected = selectedKeys.has(key)
                   return (
@@ -327,7 +327,7 @@ export function DataTable<T>({
                         const isEmpty = rawVal === null || rawVal === undefined || rawVal === ''
                         return (
                           <TableCell key={col.key}>
-                            {col.render ? col.render(row) : (
+                            {col.render ? col.render(row, (page - 1) * pageSize + rowIndex) : (
                               <span className={cn(isEmpty ? 'text-muted-foreground/50 italic text-sm' : '')}>
                                 {isEmpty ? 'No data' : String(rawVal)}
                               </span>

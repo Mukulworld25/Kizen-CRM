@@ -28,6 +28,7 @@ export default function FeeManagement() {
   const [courseLevel, setCourseLevel] = useState<string>('all')
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
   const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [dateSort, setDateSort] = useState<string>('created_desc')
 
   useEffect(() => {
     if (searchParams.get('filter') === 'overdue') {
@@ -68,7 +69,27 @@ export default function FeeManagement() {
   const [txnId, setTxnId] = useState('')
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
-  const fees = flaggedOnly ? rawFees.filter((f) => f.flag_color != null) : rawFees
+  const filteredFees = flaggedOnly ? rawFees.filter((f) => f.flag_color != null) : rawFees
+
+  const fees = [...filteredFees].sort((a, b) => {
+    if (dateSort === 'created_desc') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+    if (dateSort === 'created_asc') {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    }
+    if (dateSort === 'reg_desc') {
+      const da = a.registration_date ? new Date(a.registration_date).getTime() : 0
+      const db = b.registration_date ? new Date(b.registration_date).getTime() : 0
+      return db - da
+    }
+    if (dateSort === 'reg_asc') {
+      const da = a.registration_date ? new Date(a.registration_date).getTime() : 0
+      const db = b.registration_date ? new Date(b.registration_date).getTime() : 0
+      return da - db
+    }
+    return 0
+  })
 
   const totalCollected = fees.reduce((s, f) => s + Number(f.amount_paid), 0)
   const totalPending = fees.reduce((s, f) => s + Number(f.pending_balance), 0)
@@ -140,6 +161,13 @@ export default function FeeManagement() {
 
   const columns: Column<Fee>[] = [
     {
+      key: 's_no',
+      header: 'S.No.',
+      render: (_r, index) => (
+        <span className="font-mono text-xs text-slate-500 font-bold">{index + 1}</span>
+      ),
+    },
+    {
       key: 'flag',
       header: '',
       render: (r) => (
@@ -148,7 +176,24 @@ export default function FeeManagement() {
         </div>
       ),
     },
-    { key: 'student', header: 'Student', render: (r) => r.student?.full_name ?? '—', exportValue: (r) => r.student?.full_name ?? '' },
+    {
+      key: 'student',
+      header: 'Student',
+      render: (r) => {
+        const studentId = r.student?.student_id || (r.student as any)?.display_id || r.student_id
+        return (
+          <div>
+            <div className="font-semibold text-slate-900 leading-tight">{r.student?.full_name ?? '—'}</div>
+            {studentId && (
+              <div className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                {studentId}
+              </div>
+            )}
+          </div>
+        )
+      },
+      exportValue: (r) => r.student?.full_name ?? '',
+    },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—' },
     { key: 'subject', header: 'Subject', render: (r) => (r as any).subject || r.course?.description || '—' },
     { key: 'duration', header: 'Duration', render: (r) => (r as any).duration || (r.course?.duration_days ? `${r.course.duration_days} days` : (r.course?.duration_hours ? `${r.course.duration_hours} hrs` : '—')) },
@@ -283,6 +328,16 @@ export default function FeeManagement() {
             <SelectItem value="paid">Paid in Full</SelectItem>
             <SelectItem value="pending">Pending Balance</SelectItem>
             <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={dateSort} onValueChange={setDateSort}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Sort by Date" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_desc">Created Date (Newest First)</SelectItem>
+            <SelectItem value="created_asc">Created Date (Oldest First)</SelectItem>
+            <SelectItem value="reg_desc">Registration Date (Newest)</SelectItem>
+            <SelectItem value="reg_asc">Registration Date (Oldest)</SelectItem>
           </SelectContent>
         </Select>
 

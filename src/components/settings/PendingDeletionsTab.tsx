@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input, Label } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { CheckCircle2, XCircle, ShieldAlert } from 'lucide-react'
+import { CheckCircle, X, ShieldAlert } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 
@@ -150,7 +150,7 @@ export function PendingDeletionsTab() {
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                    <CheckCircle className="h-8 w-8 text-emerald-500" />
                     <p className="text-sm font-medium text-slate-700">No pending deletion requests</p>
                     <p className="text-xs text-slate-400">All deletion requests have been processed.</p>
                   </div>
@@ -187,7 +187,7 @@ export function PendingDeletionsTab() {
                         disabled={approveMutation.isPending || rejectMutation.isPending}
                         onClick={() => handleApprove(r)}
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <CheckCircle className="h-3.5 w-3.5" />
                         Approve
                       </Button>
                       <Button
@@ -197,7 +197,7 @@ export function PendingDeletionsTab() {
                         disabled={approveMutation.isPending || rejectMutation.isPending}
                         onClick={() => handleOpenReject(r)}
                       >
-                        <XCircle className="h-3.5 w-3.5" />
+                        <X className="h-3.5 w-3.5" />
                         Reject
                       </Button>
                     </div>
@@ -214,7 +214,7 @@ export function PendingDeletionsTab() {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-rose-600 flex items-center gap-2">
-              <XCircle className="h-5 w-5" /> Reject Deletion Request
+              <X className="h-5 w-5" /> Reject Deletion Request
             </DialogTitle>
             <DialogDescription className="text-xs">
               Provide a note or reason for rejecting the deletion of{' '}

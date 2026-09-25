@@ -11,6 +11,7 @@ import type { Batch } from '@/types'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input, Label } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth'
 export default function BatchManagement() {
   const navigate = useNavigate()
   const { can, isOwner } = useAuth()
+  const canManage = isOwner || can('manageUsers') || can('manageBatches')
   const { data: batches = [], isLoading } = useBatches()
   const { data: users = [] } = useUsers()
   const { data: courses = [] } = useCourses()
@@ -90,6 +92,8 @@ export default function BatchManagement() {
       faculty_id: formData.faculty_id === 'none' ? null : formData.faculty_id,
       course_id: formData.course_id === 'none' || !formData.course_id ? null : formData.course_id,
       schedule_days: formData.days_of_week, // Keep columns in sync
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
     }
 
     if (selectedBatch) {
@@ -153,12 +157,17 @@ export default function BatchManagement() {
           <Button variant="ghost" size="icon" onClick={() => navigate(`/students?batchId=${r.id}`)} title="View Students">
             <Eye className="h-4 w-4 text-sky-600" />
           </Button>
-          {(isOwner || can('manageUsers')) && (
+          {canManage && (
             <>
               <Button variant="ghost" size="icon" onClick={() => handleOpenModal(r)}>
                 <Edit className="h-4 w-4 text-slate-600" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => { setSelectedBatch(r); setDeleteOpen(true); }}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setSelectedBatch(r); setDeleteOpen(true); }}
+                title={isOwner ? "Delete Batch" : "Request Deletion"}
+              >
                 <Trash2 className="h-4 w-4 text-red-600" />
               </Button>
             </>
@@ -171,7 +180,7 @@ export default function BatchManagement() {
   return (
     <div className="space-y-6">
       <PageHeader title="Batch Management" description="Manage class batches, schedules, and capacity allocations.">
-        {(isOwner || can('manageUsers')) && (
+        {canManage && (
           <Button onClick={() => handleOpenModal()} className="gap-2">
             <Plus className="h-4 w-4" /> Add Batch
           </Button>
@@ -320,23 +329,17 @@ export default function BatchManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DELETE CONFIRMATION MODAL */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Batch</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-600">
-            Are you sure you want to delete <span className="font-semibold text-slate-900">{selectedBatch?.batch_name}</span>? This action cannot be undone.
-          </p>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteBatch.isPending}>
-              Confirm Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* DELETE / REQUEST DELETION MODAL */}
+      <DeleteOrRequestDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        tableName="batches"
+        recordId={selectedBatch?.id}
+        recordLabel={selectedBatch?.batch_name || ''}
+        entityType="Batch"
+        onDirectDelete={handleDelete}
+        loading={deleteBatch.isPending}
+      />
     </div>
   )
 }

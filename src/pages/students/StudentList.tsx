@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
+import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
 import FlagDot from '@/components/ui/FlagDot'
 import type { Student } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
@@ -98,7 +98,7 @@ export default function StudentList() {
     {
       key: 'certification_status',
       header: 'Certification',
-      render: (r) => <Badge variant="outline" className="capitalize">{r.certification_status.replace('_', ' ')}</Badge>,
+      render: (r) => <Badge variant="outline" className="capitalize">{r.certification_status?.replace('_', ' ') || 'In Progress'}</Badge>,
     },
     {
       key: 'is_active',
@@ -196,17 +196,19 @@ export default function StudentList() {
 
       <AddStudentModal open={addModalOpen} onOpenChange={setAddModalOpen} />
 
-      <SoftDeleteDialog
+      <DeleteOrRequestDialog
         open={!!deleteId}
         onOpenChange={() => setDeleteId(null)}
-        title="Delete Student?"
-        entityType="student"
-        entityName={rawStudents.find((s) => s.id === deleteId)?.full_name ?? ''}
-        onConfirm={async () => {
+        tableName="students"
+        recordId={deleteId || ''}
+        recordLabel={rawStudents.find((s) => s.id === deleteId)?.full_name ?? ''}
+        entityType="Student"
+        onDirectDelete={async () => {
           if (!deleteId) return
           await softDelete.mutateAsync({ table: 'students', id: deleteId })
           setDeleteId(null)
         }}
+        loading={softDelete.isPending}
       />
     </div>
   )

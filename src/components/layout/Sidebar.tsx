@@ -61,6 +61,9 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     if (item.featureKey === 'batches' || item.featureKey === 'faculty_timetable' || item.featureKey === 'study_materials') {
       return true
     }
+    if (item.path === '/settings') {
+      return can('manageUsers') || can('manageCourses')
+    }
     return can(item.permission)
   })
 

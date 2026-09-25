@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, CheckCircle, Clock, User as UserIcon, FileText } from 'lucide-react'
+import { Plus, CheckCircle, Clock, User as UserIcon, FileText, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -15,7 +16,7 @@ import type { Task, Scratchpad } from '@/types'
 import type { User as UserType } from '@/types'
 
 export default function HodTaskSheet() {
-  const { profile } = useAuth()
+  const { profile, isOwner } = useAuth()
   const queryClient = useQueryClient()
 
   // Task state
@@ -24,6 +25,7 @@ export default function HodTaskSheet() {
   const [taskDesc, setTaskDesc] = useState('')
   const [taskAssignee, setTaskAssignee] = useState('')
   const [taskDueDate, setTaskDueDate] = useState('')
+  const [isPrivate, setIsPrivate] = useState(false)
 
   // Scratchpad state
   const [scratchContent, setScratchContent] = useState('')
@@ -45,18 +47,24 @@ export default function HodTaskSheet() {
   })
 
   // Fetch tasks
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['hod-tasks', profile?.id],
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ['hod-tasks', profile?.id, isOwner],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tasks')
-        .select('*, assignee:users!tasks_assigned_to_fkey(name), assigner:users!tasks_assigned_by_fkey(name)')
-        .or(`assigned_by.eq.${profile?.id},assigned_to.eq.${profile?.id}`)
+        .select('*, assignee:users!tasks_assigned_to_fkey(name), creator:users!tasks_created_by_fkey(name)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as Task[]
     },
     enabled: !!profile,
+  })
+
+  // When is_private is true, only the creator and owner-role users see it in any task list view
+  const tasks = allTasks.filter((t) => {
+    if (isOwner) return true
+    if (!t.is_private) return true
+    return t.created_by === profile?.id
   })
 
   // Fetch scratchpad
@@ -118,7 +126,11 @@ export default function HodTaskSheet() {
     mutationFn: async (task: Partial<Task>) => {
       const { data, error } = await supabase
         .from('tasks')
-        .insert({ ...task, assigned_by: profile?.id })
+        .insert({
+          ...task,
+          created_by: profile?.id,
+          is_private: isPrivate,
+        })
         .select()
         .single()
       if (error) throw error
@@ -132,6 +144,7 @@ export default function HodTaskSheet() {
       setTaskDesc('')
       setTaskAssignee('')
       setTaskDueDate('')
+      setIsPrivate(false)
     },
     onError: (err) => toast.error(err.message),
   })
@@ -184,11 +197,19 @@ export default function HodTaskSheet() {
                         <Badge variant={task.status === 'completed' ? 'success' : task.status === 'in_progress' ? 'default' : 'warning'} className="text-[10px]">
                           {task.status?.replace('_', ' ')}
                         </Badge>
+                        {task.is_private && (
+                          <Badge variant="outline" className="text-[10px] text-purple-700 bg-purple-50 border-purple-200 flex items-center gap-1">
+                            <Lock className="h-2.5 w-2.5" /> Private
+                          </Badge>
+                        )}
                       </div>
                       {task.description && (
                         <p className="text-xs text-slate-500 mt-1">{task.description}</p>
                       )}
                       <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                        {task.creator && (
+                          <span>By {task.creator.name}</span>
+                        )}
                         {task.assignee && (
                           <span className="flex items-center gap-1">
                             <UserIcon className="h-3 w-3" /> {task.assignee.name}
@@ -270,6 +291,16 @@ export default function HodTaskSheet() {
             <div>
               <Label>Due Date</Label>
               <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                  <Lock className="h-3.5 w-3.5 text-purple-600" /> Private Task
+                </Label>
+                <p className="text-[11px] text-muted-foreground">When enabled, only you and owner can view this task</p>
+              </div>
+              <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
             </div>
           </div>
           <DialogFooter>

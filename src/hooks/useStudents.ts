@@ -349,7 +349,10 @@ export function useFeePayments(feeId: string | undefined) {
         .eq('fee_id', feeId!)
         .order('payment_date', { ascending: false })
       if (error) throw error
-      return (data ?? []) as FeePayment[]
+      return ((data ?? []) as any[]).map((p) => ({
+        ...p,
+        transaction_id: p.transaction_reference || p.transaction_id || null,
+      })) as FeePayment[]
     },
     enabled: !!feeId,
   })
@@ -376,10 +379,16 @@ export function useRecordPayment() {
   const { profile } = useAuth()
 
   return useMutation({
-    mutationFn: async (payment: Partial<FeePayment>) => {
+    mutationFn: async (payment: Partial<FeePayment> & { transaction_reference?: string | null }) => {
+      const payload: any = { ...payment, recorded_by: profile?.id }
+      if ('transaction_id' in payload && !payload.transaction_reference) {
+        payload.transaction_reference = payload.transaction_id
+      }
+      delete payload.transaction_id
+
       const { data, error } = await supabase
         .from('fee_payments')
-        .insert({ ...payment, recorded_by: profile?.id })
+        .insert(payload)
         .select()
         .single()
       if (error) throw error
@@ -637,9 +646,13 @@ export function useUpdateBatch() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Batch> }) => {
+      const sanitized = { ...updates }
+      if (sanitized.start_date === '') sanitized.start_date = null as any
+      if (sanitized.end_date === '') sanitized.end_date = null as any
+
       const { data, error } = await supabase
         .from('batches')
-        .update(updates)
+        .update(sanitized)
         .eq('id', id)
         .select()
         .single()
@@ -660,9 +673,13 @@ export function useCreateBatch() {
 
   return useMutation({
     mutationFn: async (batch: Partial<Batch>) => {
+      const sanitized = { ...batch }
+      if (sanitized.start_date === '') sanitized.start_date = null as any
+      if (sanitized.end_date === '') sanitized.end_date = null as any
+
       const { data, error } = await supabase
         .from('batches')
-        .insert(batch)
+        .insert(sanitized)
         .select()
         .single()
       if (error) throw error

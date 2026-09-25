@@ -8,6 +8,7 @@ import { StatsCard } from '@/components/shared/StatsCard'
 import { DataTable, type Column } from '@/components/shared/DataTable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -272,7 +273,7 @@ export default function FeeManagement() {
             </Button>
           )}
           {(isOwner || can('recordPayments')) && (
-            <Button variant="ghost" size="icon" onClick={() => { setDeleteFeeId(r.id); setDeleteFeeOpen(true); }} title="Delete Fee Record">
+            <Button variant="ghost" size="icon" onClick={() => { setDeleteFeeId(r.id); setSelectedFee(r); setDeleteFeeOpen(true); }} title={isOwner ? "Delete Fee Record" : "Request Deletion"}>
               <Trash2 className="h-4 w-4 text-rose-600" />
             </Button>
           )}
@@ -288,7 +289,7 @@ export default function FeeManagement() {
       student_id: selectedFee.student_id,
       amount: parseFloat(amount),
       payment_method: method,
-      transaction_id: txnId || null,
+      transaction_reference: txnId || null,
       payment_date: payDate,
     })
     setPaymentOpen(false)
@@ -547,38 +548,21 @@ export default function FeeManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DELETE FEE CONFIRMATION MODAL */}
-      <Dialog open={deleteFeeOpen} onOpenChange={setDeleteFeeOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-rose-600 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Delete Fee Record
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-2 text-sm text-slate-700 space-y-2">
-            <p>Are you sure you want to permanently remove this fee record?</p>
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-              <p className="font-semibold">Audit Logging Enabled:</p>
-              <p className="mt-1">Fee deletion automatically archives the complete record and metadata into <code className="font-mono bg-rose-100 px-1 rounded">audit_removed_fees</code> via the <code className="font-mono bg-rose-100 px-1 rounded">delete_fee_with_audit</code> RPC procedure.</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteFeeOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteFee.isPending}
-              onClick={async () => {
-                if (deleteFeeId) {
-                  await deleteFee.mutateAsync({ feeId: deleteFeeId })
-                }
-                setDeleteFeeOpen(false)
-              }}
-            >
-              {deleteFee.isPending ? 'Deleting...' : 'Confirm Deletion'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* DELETE / REQUEST DELETION MODAL */}
+      <DeleteOrRequestDialog
+        open={deleteFeeOpen}
+        onOpenChange={setDeleteFeeOpen}
+        tableName="fees"
+        recordId={deleteFeeId}
+        recordLabel={selectedFee ? `Fee for ${selectedFee.student?.full_name || 'Student'} (Total: ₹${selectedFee.total_fee})` : (deleteFeeId || '')}
+        entityType="Fee Record"
+        onDirectDelete={async () => {
+          if (deleteFeeId) {
+            await deleteFee.mutateAsync({ feeId: deleteFeeId })
+          }
+        }}
+        loading={deleteFee.isPending}
+      />
     </div>
   )
-}
+}

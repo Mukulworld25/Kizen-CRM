@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isOwner = profile?.is_owner ?? false
 
   const can = (permission: Permission) =>
-    hasPermission(profile?.role, permission, isOwner)
+    hasPermission(profile?.role, permission, isOwner, profile)
 
   return (
     <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, isOwner }}>

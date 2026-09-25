@@ -17,6 +17,8 @@ export type Permission =
   | 'viewRevenue'
   | 'manageUsers'
   | 'manageCourses'
+  | 'manageBatches'
+  | 'assignFaculty'
   | 'viewAuditLogs'
   | 'assignCounselor'
   | 'viewInstitutions'
@@ -36,7 +38,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads', 'exportData',
     'viewFollowUps', 'viewStudents', 'editStudents', 'markAttendance',
     'viewFees', 'recordPayments', 'viewReports', 'viewRevenue',
-    'manageUsers', 'manageCourses', 'viewAuditLogs', 'assignCounselor',
+    'manageUsers', 'manageCourses', 'manageBatches', 'assignFaculty', 'viewAuditLogs', 'assignCounselor',
     'viewInstitutions', 'editInstitutions', 'viewExpenses', 'manageExpenses',
     'viewFacultyDashboard', 'viewBdmDashboard', 'generateInvoices', 'importData',
     'viewCalendar', 'manageCategories', 'viewKnowledgeBase',
@@ -44,7 +46,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   admin: [
     'viewDashboard', 'viewLeads', 'editLeads', 'deleteLeads', 'addLeads',
     'viewFollowUps', 'viewStudents', 'editStudents', 'markAttendance',
-    'viewFees', 'assignCounselor', 'viewCalendar',
+    'viewFees', 'assignCounselor', 'viewCalendar', 'manageCourses', 'manageBatches', 'assignFaculty',
   ],
   counselor: [
     'viewDashboard', 'viewLeads', 'editLeads', 'addLeads',
@@ -67,6 +69,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   hod: [
     'viewDashboard', 'viewStudents', 'editStudents', 'viewFacultyDashboard',
     'viewFollowUps', 'assignCounselor', 'markAttendance', 'viewCalendar',
+    'manageCourses', 'manageBatches', 'assignFaculty',
   ],
 }
 
@@ -99,20 +102,42 @@ export function saveDynamicRolePermissions(role: UserRole, permissions: Permissi
   }
 }
 
-export function hasPermission(role: UserRole | undefined, permission: Permission, isOwner = false): boolean {
+export function hasPermission(
+  role: UserRole | undefined,
+  permission: Permission,
+  isOwner = false,
+  user?: { email?: string | null; role?: string | null; is_hod?: boolean; name?: string | null; is_owner?: boolean } | null
+): boolean {
   if (!role) return false
   if (isOwner) return true
+  if (isUserHod(user) && (permission === 'manageCourses' || permission === 'manageBatches' || permission === 'assignFaculty')) {
+    return true
+  }
+  if (role === 'hod' && (permission === 'manageCourses' || permission === 'manageBatches' || permission === 'assignFaculty')) {
+    return true
+  }
   const activePermissions = getDynamicRolePermissions(role)
   return activePermissions.includes(permission)
 }
 
-export function canAccessRoute(role: UserRole | undefined, path: string, isOwner = false): boolean {
+export function canAccessRoute(
+  role: UserRole | undefined,
+  path: string,
+  isOwner = false,
+  user?: { email?: string | null; role?: string | null; is_hod?: boolean; name?: string | null; is_owner?: boolean } | null
+): boolean {
   if (!role) return false
   if (isOwner) return true
 
   const base = '/' + path.split('/').filter(Boolean)[0]
   if (role === 'reception' && base === '/fees') {
     return false
+  }
+
+  if (base === '/settings') {
+    if (isOwner) return true
+    if (isUserHod(user)) return true
+    return hasPermission(role, 'manageUsers', isOwner, user) || hasPermission(role, 'manageCourses', isOwner, user)
   }
 
   const routePermissions: Record<string, Permission> = {
@@ -133,7 +158,7 @@ export function canAccessRoute(role: UserRole | undefined, path: string, isOwner
 
   const permission = routePermissions[base]
   if (!permission) return true
-  return hasPermission(role, permission, isOwner)
+  return hasPermission(role, permission, isOwner, user)
 }
 
 export function getDefaultRoute(role: UserRole): string {

@@ -11,7 +11,7 @@ import { DataTable, type Column, type BulkAction } from '@/components/shared/Dat
 import { LeadStatusBadge, PriorityBadge, TemperatureBadge } from '@/components/shared/LeadStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
+import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
 import AddLeadModal from '@/pages/leads/AddLeadModal'
 import FlagDot from '@/components/ui/FlagDot'
 import type { Lead, LeadFilters, LeadStatus, LeadSource, Priority, LeadTemperature } from '@/types'
@@ -101,7 +101,16 @@ export default function LeadList() {
         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="icon" onClick={() => navigate(`/leads/${r.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
           {can('editLeads') && <Button variant="ghost" size="icon" onClick={() => setEditLead(r)} title="Quick Edit"><Pencil className="h-4 w-4 text-sky-600" /></Button>}
-          {can('deleteLeads') && <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Delete Lead"><Trash2 className="h-4 w-4 text-danger" /></Button>}
+          {(isOwner || can('deleteLeads') || can('viewLeads') || can('editLeads')) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteId(r.id)}
+              title={isOwner ? "Delete Lead" : "Request Deletion"}
+            >
+              <Trash2 className="h-4 w-4 text-danger" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -417,13 +426,14 @@ export default function LeadList() {
         </DialogContent>
       </Dialog>
 
-      <SoftDeleteDialog
+      <DeleteOrRequestDialog
         open={!!deleteId}
         onOpenChange={() => setDeleteId(null)}
-        title="Delete Lead?"
-        entityType="lead"
-        entityName={data?.leads?.find((l) => l.id === deleteId)?.full_name ?? ''}
-        onConfirm={() => {
+        tableName="leads"
+        recordId={deleteId}
+        recordLabel={data?.leads?.find((l) => l.id === deleteId)?.full_name ?? ''}
+        entityType="Lead"
+        onDirectDelete={() => {
           if (deleteId) softDelete.mutate({ table: 'leads', id: deleteId }, { onSuccess: () => setDeleteId(null) })
         }}
         loading={softDelete.isPending}

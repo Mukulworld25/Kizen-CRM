@@ -5,8 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses, useLeads } from '@/hooks/useLeads'
 import { useCreateFollowUp, useStudents } from '@/hooks/useStudents'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { SoftDeleteDialog } from '@/components/shared/SoftDeleteDialog'
+import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
 import { LeadStatusBadge, PriorityBadge, TemperatureBadge } from '@/components/shared/LeadStatusBadge'
 import { LeadStatusPipeline } from '@/components/shared/LeadStatusPipeline'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
@@ -165,9 +164,9 @@ export default function LeadDetail() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
                 <CardContent className="flex flex-col gap-2">
-                  {can('deleteLeads') && (
+                  {(isOwner || can('deleteLeads') || can('viewLeads') || can('editLeads')) && (
                     <Button variant="outline" className="text-danger border-danger/30 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
-                      <Trash2 className="h-4 w-4" /> Delete Lead
+                      <Trash2 className="h-4 w-4" /> {isOwner ? 'Delete Lead' : 'Request Deletion'}
                     </Button>
                   )}
                   {can('editLeads') && (
@@ -254,13 +253,14 @@ export default function LeadDetail() {
 
       <ConvertToStudentModal open={convertOpen} onOpenChange={setConvertOpen} lead={lead} />
 
-      <SoftDeleteDialog
+      <DeleteOrRequestDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Delete Lead?"
-        entityType="lead"
-        entityName={lead.full_name}
-        onConfirm={() => softDelete.mutate({ table: 'leads', id: lead.id }, { onSuccess: () => { setDeleteOpen(false); navigate('/leads') } })}
+        tableName="leads"
+        recordId={lead.id}
+        recordLabel={lead.full_name}
+        entityType="Lead"
+        onDirectDelete={() => softDelete.mutate({ table: 'leads', id: lead.id }, { onSuccess: () => { setDeleteOpen(false); navigate('/leads') } })}
         loading={softDelete.isPending}
       />
     </div>

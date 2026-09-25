@@ -29,6 +29,7 @@ import ActivityLog from '@/components/shared/ActivityLog'
 import { DataIntakeTab } from '@/components/intake/DataIntakeTab'
 import { PasswordResetModal } from '@/components/shared/PasswordResetModal'
 import { RolePermissionsTab } from '@/components/settings/RolePermissionsTab'
+import { PendingDeletionsTab } from '@/components/settings/PendingDeletionsTab'
 import type { User, UserRole, Course, Batch } from '@/types'
 
 const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
@@ -284,16 +285,23 @@ export default function Settings() {
     <div>
       <PageHeader title="Settings" description="Manage users, courses, batches, and system configuration" />
 
-      <Tabs defaultValue="users">
+      <Tabs defaultValue={(profile?.is_owner || profile?.role === 'admin') ? "users" : "courses"}>
         <TabsList>
-          <TabsTrigger value="users">Users ({userCount}/15)</TabsTrigger>
+          {(profile?.is_owner || profile?.role === 'admin') && (
+            <TabsTrigger value="users">Users ({userCount}/15)</TabsTrigger>
+          )}
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
-          <TabsTrigger value="intake">Data Intake</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
+          {(profile?.is_owner || profile?.role === 'admin') && (
+            <TabsTrigger value="intake">Data Intake</TabsTrigger>
+          )}
+          {(profile?.is_owner || profile?.role === 'admin') && (
+            <TabsTrigger value="system">System</TabsTrigger>
+          )}
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="trash">Trash</TabsTrigger>
           {profile?.is_owner && <TabsTrigger value="permissions">Role Access Matrix</TabsTrigger>}
+          {profile?.is_owner && <TabsTrigger value="pending-deletions">Pending Deletions</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
           {profile?.is_owner && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
@@ -659,6 +667,12 @@ export default function Settings() {
         {profile?.is_owner && (
           <TabsContent value="permissions" className="mt-4">
             <RolePermissionsTab />
+          </TabsContent>
+        )}
+
+        {profile?.is_owner && (
+          <TabsContent value="pending-deletions" className="mt-4">
+            <PendingDeletionsTab />
           </TabsContent>
         )}
       </Tabs>

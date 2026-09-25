@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import HodTaskSheet from '@/components/shared/HodTaskSheet'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
@@ -174,6 +175,7 @@ export default function FollowUps() {
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           {selectedDate && <TabsTrigger value="date">Date ({selectedDate})</TabsTrigger>}
           <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="staff-tasks">Team Tasks & Delegation</TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
@@ -231,6 +233,10 @@ export default function FollowUps() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="staff-tasks" className="mt-4">
+          <HodTaskSheet />
         </TabsContent>
       </Tabs>
 

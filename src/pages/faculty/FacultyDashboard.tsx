@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import AddFacultyModal from '@/pages/faculty/AddFacultyModal'
 import WeeklyTimetableCalendar from '@/pages/faculty/WeeklyTimetableCalendar'
+import HodTaskSheet from '@/components/shared/HodTaskSheet'
 import { isUserHod } from '@/lib/permissions'
 import type { Student, Batch } from '@/types'
 
@@ -357,70 +358,7 @@ export default function FacultyDashboard() {
 
         {/* TAB 3: TASK SHEET & PLAIN TYPING NOTES */}
         <TabsContent value="task_sheet">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="shadow-sm border border-slate-200">
-              <CardHeader className="border-b pb-3 bg-slate-50 rounded-t-xl">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <span>HOD Task Delegation Sheet</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <Label className="text-xs font-semibold">Delegate Task To Faculty</Label>
-                  <Select>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select Faculty Member" /></SelectTrigger>
-                    <SelectContent>
-                      {facultyMembers.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>{f.name} ({f.role})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold">Task Description</Label>
-                  <Input placeholder="e.g. Prepare Mock Test for ACCA Skill Level Batch B..." className="mt-1" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs font-semibold">Priority</Label>
-                    <Select defaultValue="medium">
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold">Due Date</Label>
-                    <Input type="date" className="mt-1" />
-                  </div>
-                </div>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-white" onClick={() => toast.success('Task delegated successfully')}>
-                  Delegate Task
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm border border-slate-200">
-              <CardHeader className="border-b pb-3 bg-slate-50 rounded-t-xl">
-                <CardTitle className="text-base font-bold flex items-center justify-between">
-                  <span>Plain Typing Notes / Scratchpad</span>
-                  <Badge variant="outline" className="text-[10px]">Auto-saved locally</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-3">
-                <textarea
-                  placeholder="Type department notes, class observations, meeting minutes, or reminders here..."
-                  className="min-h-[220px] text-sm leading-relaxed flex w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  defaultValue={localStorage.getItem('hod_scratchpad_notes') || ''}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => localStorage.setItem('hod_scratchpad_notes', e.target.value)}
-                />
-                <p className="text-[11px] text-slate-500 italic">Notes typed here persist automatically across sessions.</p>
-              </CardContent>
-            </Card>
-          </div>
+          <HodTaskSheet />
         </TabsContent>
 
         {/* TAB 4: STUDY MATERIALS VAULT STUB */}

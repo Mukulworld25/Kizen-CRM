@@ -20,6 +20,7 @@ import { formatCurrency, cn } from '@/lib/utils'
 import { InlineEdit } from '@/components/shared/InlineEdit'
 import { ReceiptModal } from '@/components/shared/ReceiptModal'
 import { InvoiceModal } from '@/components/shared/InvoiceModal'
+import { AddFeeStructureModal } from '@/components/students/AddFeeStructureModal'
 import type { FeePayment, Student } from '@/types'
 
 export default function StudentDetail() {
@@ -54,6 +55,7 @@ export default function StudentDetail() {
   const [selectedPayment, setSelectedPayment] = useState<FeePayment | null>(null)
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [invoiceOpen, setInvoiceOpen] = useState(false)
+  const [addFeeModalOpen, setAddFeeModalOpen] = useState(false)
 
   // Document Upload state
   const [docModalOpen, setDocModalOpen] = useState(false)
@@ -352,7 +354,10 @@ export default function StudentDetail() {
             </div>
           ) : (
             <Card className="p-8 text-center border-dashed">
-              <p className="text-sm text-slate-500">No fee record generated for this student.</p>
+              <p className="text-sm text-slate-500 mb-3">No fee record generated for this student.</p>
+              <Button onClick={() => setAddFeeModalOpen(true)} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Plus className="h-4 w-4" /> Add Fee Structure
+              </Button>
             </Card>
           )}
         </TabsContent>
@@ -463,6 +468,14 @@ export default function StudentDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {student && (
+        <AddFeeStructureModal
+          open={addFeeModalOpen}
+          onOpenChange={setAddFeeModalOpen}
+          student={student}
+        />
+      )}
     </div>
   )
 }

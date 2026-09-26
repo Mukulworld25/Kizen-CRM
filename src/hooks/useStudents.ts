@@ -602,16 +602,21 @@ export function useNotifications() {
         console.error('Auto fee notification error:', err)
       }
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (error) throw error
-      return data ?? []
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        if (error) return []
+        return data ?? []
+      } catch {
+        return []
+      }
     },
     enabled: !!profile,
+    retry: false,
   })
 }
 

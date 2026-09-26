@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { hasPermission, type Permission } from '@/lib/permissions'
+import { hasPermission, isUserHod, type Permission } from '@/lib/permissions'
+import { DEFAULT_FACULTY_FEATURES, DEFAULT_COUNSELOR_FEATURES, DEFAULT_RECEPTION_FEATURES, type FeaturePermissionRow } from '@/hooks/useFeaturePermissions'
 import type { User } from '@/types'
 
 interface AuthContextValue {
@@ -12,6 +13,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   can: (permission: Permission) => boolean
+  canViewFeature: (featureKey: string) => boolean
+  canEditFeature: (featureKey: string) => boolean
   isOwner: boolean
 }
 
@@ -133,13 +136,138 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
   }
 
+  const [featurePermissions, setFeaturePermissions] = useState<FeaturePermissionRow[]>([])
+
+  const fetchFeaturePermissions = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('feature_permissions').select('*')
+      if (data) setFeaturePermissions(data)
+    } catch (e) {
+      console.error('Error fetching feature permissions in AuthProvider:', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchFeaturePermissions()
+
+    const handlePermUpdate = () => {
+      fetchFeaturePermissions()
+    }
+    window.addEventListener('kizen_permissions_updated', handlePermUpdate)
+    return () => {
+      window.removeEventListener('kizen_permissions_updated', handlePermUpdate)
+    }
+  }, [fetchFeaturePermissions])
+
   const isOwner = profile?.is_owner ?? false
 
-  const can = (permission: Permission) =>
-    hasPermission(profile?.role, permission, isOwner, profile)
+  const canViewFeature = useCallback((featureKey: string): boolean => {
+    if (isOwner) return true
+
+    const userRole = profile?.role
+    const userId = profile?.id
+
+    if (userId) {
+      const userPerm = featurePermissions.find(
+        (p) => p.feature_key === featureKey && p.user_id === userId
+      )
+      if (userPerm !== undefined) return userPerm.can_view
+    }
+
+    if (userRole) {
+      const rolePerm = featurePermissions.find(
+        (p) => p.feature_key === featureKey && p.role === userRole && !p.user_id
+      )
+      if (rolePerm !== undefined) return rolePerm.can_view
+    }
+
+    if (userRole === 'faculty' || userRole === 'hod') {
+      return DEFAULT_FACULTY_FEATURES.includes(featureKey)
+    }
+    if (userRole === 'counselor') {
+      return DEFAULT_COUNSELOR_FEATURES.includes(featureKey)
+    }
+    if (userRole === 'reception') {
+      return DEFAULT_RECEPTION_FEATURES.includes(featureKey)
+    }
+
+    return true
+  }, [isOwner, profile, featurePermissions])
+
+  const canEditFeature = useCallback((featureKey: string): boolean => {
+    if (isOwner) return true
+
+    const userRole = profile?.role
+    const userId = profile?.id
+
+    if (userId) {
+      const userPerm = featurePermissions.find(
+        (p) => p.feature_key === featureKey && p.user_id === userId
+      )
+      if (userPerm !== undefined) return userPerm.can_edit
+    }
+
+    if (userRole) {
+      const rolePerm = featurePermissions.find(
+        (p) => p.feature_key === featureKey && p.role === userRole && !p.user_id
+      )
+      if (rolePerm !== undefined) return rolePerm.can_edit
+    }
+
+    return canViewFeature(featureKey)
+  }, [isOwner, profile, featurePermissions, canViewFeature])
+
+  const can = useCallback((permission: Permission): boolean => {
+    if (isOwner) return true
+
+    if (isUserHod(profile) && (permission === 'manageCourses' || permission === 'manageBatches' || permission === 'assignFaculty')) {
+      return true
+    }
+    if (profile?.role === 'hod' && (permission === 'manageCourses' || permission === 'manageBatches' || permission === 'assignFaculty')) {
+      return true
+    }
+
+    // Connect to database feature_permissions matrix
+    const permissionFeatureMap: Partial<Record<Permission, { feature: string; edit?: boolean }>> = {
+      viewDashboard: { feature: 'dashboard' },
+      viewLeads: { feature: 'leads' },
+      editLeads: { feature: 'leads', edit: true },
+      deleteLeads: { feature: 'leads', edit: true },
+      addLeads: { feature: 'leads', edit: true },
+      exportData: { feature: 'leads' },
+      viewFollowUps: { feature: 'tasks' },
+      viewStudents: { feature: 'students' },
+      editStudents: { feature: 'students', edit: true },
+      markAttendance: { feature: 'students', edit: true },
+      viewFees: { feature: 'fees' },
+      recordPayments: { feature: 'fees', edit: true },
+      generateInvoices: { feature: 'fees', edit: true },
+      viewReports: { feature: 'reports' },
+      viewRevenue: { feature: 'reports' },
+      manageCourses: { feature: 'batches', edit: true },
+      manageBatches: { feature: 'batches', edit: true },
+      assignFaculty: { feature: 'batches', edit: true },
+      assignCounselor: { feature: 'leads', edit: true },
+      viewInstitutions: { feature: 'institutions' },
+      editInstitutions: { feature: 'institutions', edit: true },
+      viewExpenses: { feature: 'expenses' },
+      manageExpenses: { feature: 'expenses', edit: true },
+      viewFacultyDashboard: { feature: 'faculty_timetable' },
+      importData: { feature: 'import', edit: true },
+      viewCalendar: { feature: 'calendar' },
+    }
+
+    const mapping = permissionFeatureMap[permission]
+    if (mapping) {
+      if (!canViewFeature(mapping.feature)) return false
+      if (mapping.edit && !canEditFeature(mapping.feature)) return false
+    }
+
+    return hasPermission(profile?.role, permission, isOwner, profile)
+  }, [isOwner, profile, canViewFeature, canEditFeature])
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, isOwner }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, canViewFeature, canEditFeature, isOwner }}>
       {children}
     </AuthContext.Provider>
   )

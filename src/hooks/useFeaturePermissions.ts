@@ -71,6 +71,30 @@ export function useFeaturePermissions() {
     return true
   }
 
+  // Check if current user can edit/perform mutations on a feature
+  const canEditFeature = (featureKey: string): boolean => {
+    if (isOwner) return true
+
+    const userRole = profile?.role
+    const userId = profile?.id
+
+    if (userId) {
+      const userPerm = dbPermissions.find(
+        (p) => p.feature_key === featureKey && p.user_id === userId
+      )
+      if (userPerm !== undefined) return userPerm.can_edit
+    }
+
+    if (userRole) {
+      const rolePerm = dbPermissions.find(
+        (p) => p.feature_key === featureKey && p.role === userRole && !p.user_id
+      )
+      if (rolePerm !== undefined) return rolePerm.can_edit
+    }
+
+    return canViewFeature(featureKey)
+  }
+
   // Toggle permission mutation in Supabase feature_permissions table
   const togglePermissionMutation = useMutation({
     mutationFn: async (payload: {
@@ -130,6 +154,7 @@ export function useFeaturePermissions() {
     isLoading,
     isOwner,
     canViewFeature,
+    canEditFeature,
     togglePermission: togglePermissionMutation.mutateAsync,
     isUpdating: togglePermissionMutation.isPending,
   }

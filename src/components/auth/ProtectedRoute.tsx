@@ -4,7 +4,7 @@ import { canAccessRoute, getDefaultRoute } from '@/lib/permissions'
 import type { Permission } from '@/lib/permissions'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, canViewFeature } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -22,7 +22,30 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (!canAccessRoute(profile.role, location.pathname, profile.is_owner)) {
+  // 1. Check feature permission from DB (Role Access Matrix in Settings)
+  const routeToFeature: Record<string, string> = {
+    '/dashboard': 'dashboard',
+    '/leads': 'leads',
+    '/followups': 'tasks',
+    '/calendar': 'calendar',
+    '/students': 'students',
+    '/batches': 'batches',
+    '/fees': 'fees',
+    '/expenses': 'expenses',
+    '/faculty': 'faculty_timetable',
+    '/institutions': 'institutions',
+    '/reports': 'reports',
+    '/import': 'import',
+  }
+  const base = '/' + location.pathname.split('/').filter(Boolean)[0]
+  const featureKey = routeToFeature[base]
+  if (featureKey && !profile.is_owner && profile.role !== 'owner') {
+    if (!canViewFeature(featureKey)) {
+      return <Navigate to={getDefaultRoute(profile.role)} replace />
+    }
+  }
+
+  if (!canAccessRoute(profile.role, location.pathname, profile.is_owner, profile)) {
     return <Navigate to={getDefaultRoute(profile.role)} replace />
   }
 

@@ -338,14 +338,18 @@ export interface Reminder {
 export interface Task {
   id: string
   title: string
-  description: string | null
-  assigned_to: string | null
-  assigned_by: string | null
-  due_date: string | null
+  description?: string | null
+  assigned_to?: string | null
+  assigned_by?: string | null
+  due_date?: string | null
+  priority?: 'low' | 'medium' | 'high'
   status: 'pending' | 'in_progress' | 'completed'
+  created_by?: string | null
   created_at: string
-  assignee?: User
-  assigner?: User
+  is_private?: boolean
+  assignee?: User | { name: string } | null
+  creator?: { name: string } | null
+  assigner?: User | null
 }
 
 export interface Scratchpad {
@@ -456,25 +460,3 @@ export const FEE_COURSE_LEVELS: { value: string; label: string }[] = [
   { value: 'B.com', label: 'B.com' },
   { value: 'Others', label: 'Others' },
 ]
-
-export interface Task {
-  id: string
-  title: string
-  description?: string | null
-  assigned_to?: string | null
-  due_date?: string | null
-  priority?: 'low' | 'medium' | 'high'
-  status?: 'pending' | 'in_progress' | 'completed'
-  created_by?: string | null
-  created_at: string
-  is_private?: boolean
-  assignee?: { name: string } | null
-  creator?: { name: string } | null
-}
-
-export interface Scratchpad {
-  id?: string
-  user_id: string
-  content: string
-  updated_at?: string
-}

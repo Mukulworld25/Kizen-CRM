@@ -10,6 +10,7 @@ import { LeadStatusBadge, PriorityBadge, TemperatureBadge } from '@/components/s
 import { LeadStatusPipeline } from '@/components/shared/LeadStatusPipeline'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { ConvertToStudentModal } from '@/pages/leads/ConvertToStudentModal'
 import { LeadDetailView } from '@/components/leads/LeadDetailView'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

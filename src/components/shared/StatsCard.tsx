@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/table'
@@ -9,7 +9,7 @@ interface StatsCardProps {
   value: string | number
   change?: number
   changeLabel?: string
-  icon: LucideIcon
+  icon: ComponentType<{ className?: string }>
   color?: string
   loading?: boolean
   alert?: boolean

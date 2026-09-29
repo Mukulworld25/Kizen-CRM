@@ -85,13 +85,16 @@ export default function FacultyDashboard() {
 
   const markAttendance = useMutation({
     mutationFn: async ({ student_id, status }: { student_id: string; status: string }) => {
-      const { error } = await supabase.from('attendance').insert({
-        student_id,
-        batch_id: selectedBatch,
-        date: attDate,
-        status,
-        marked_by: profile?.id,
-      })
+      const { error } = await supabase.from('attendance').upsert(
+        {
+          student_id,
+          batch_id: selectedBatch,
+          date: attDate,
+          status,
+          marked_by: profile?.id,
+        },
+        { onConflict: 'student_id,batch_id,date' }
+      )
       if (error) throw error
     },
     onSuccess: () => {

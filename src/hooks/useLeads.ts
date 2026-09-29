@@ -42,8 +42,11 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.temperature) query = query.eq('temperature', filters.temperature)
       if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
       if (filters.dateTo) query = query.lte('created_at', filters.dateTo + 'T23:59:59')
+      if (filters.displayId) {
+        query = query.ilike('display_id', `%${filters.displayId.trim()}%`)
+      }
       if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%,city.ilike.%${filters.search}%`)
+        query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%,city.ilike.%${filters.search}%,display_id.ilike.%${filters.search}%`)
       }
 
       const { data, error, count } = await query

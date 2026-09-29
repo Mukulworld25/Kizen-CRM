@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document, Batch } from '@/types'
+import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document, Batch, User } from '@/types'
 
 export function useFollowUps(tab: string, counselorId?: string, targetDate?: string) {
   const { profile } = useAuth()
@@ -718,12 +718,16 @@ export function useDeleteBatch() {
 }
 
 export function useUsers() {
-  const { can } = useAuth()
+  const { can, profile } = useAuth()
+  const isFacultyHod = (profile?.role === 'faculty' && Boolean(profile?.is_hod)) || profile?.role === 'hod' || profile?.email === 'faculty.hod@kizen.edu'
 
-  return useQuery({
+  return useQuery<User[]>({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('users').select('*')
+      // Safe projection: auth_id and password hashes are never exposed
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email, phone, role, is_owner, is_active, avatar_url, is_hod, created_at, updated_at')
       if (error) throw error
 
       const rolePriority: Record<string, number> = {
@@ -736,14 +740,19 @@ export function useUsers() {
         bdm: 7,
       }
 
-      return (data ?? []).sort((a, b) => {
+      const users: User[] = (data ?? []).map((u) => ({
+        ...u,
+        auth_id: null,
+      } as User))
+
+      return users.sort((a, b) => {
         const priorityA = rolePriority[a.role] ?? 99
         const priorityB = rolePriority[b.role] ?? 99
         if (priorityA !== priorityB) return priorityA - priorityB
         return a.name.localeCompare(b.name)
       })
     },
-    enabled: can('manageUsers'),
+    enabled: Boolean(can('manageUsers') || isFacultyHod),
   })
 }
 
@@ -751,8 +760,13 @@ export function useAttendance(studentId: string | undefined, month: string) {
   return useQuery({
     queryKey: ['attendance', studentId, month],
     queryFn: async () => {
+      const [yearStr, monthStr] = (month || '').split('-')
+      const year = parseInt(yearStr, 10) || new Date().getFullYear()
+      const monthNum = parseInt(monthStr, 10) || (new Date().getMonth() + 1)
+      const lastDay = new Date(year, monthNum, 0).getDate()
       const start = `${month}-01`
-      const end = `${month}-31`
+      const end = `${month}-${String(lastDay).padStart(2, '0')}`
+
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
@@ -800,12 +814,14 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
 
       let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true })
       let admissionsQuery = supabase.from('students').select('*', { count: 'exact', head: true })
+      let convertedLeadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).or('status.eq.converted,pipeline_stage.eq.enrolled')
       let feesQuery = (isOwner || profile?.role === 'accounts') ? supabase.from('fees').select('amount_paid, pending_balance, created_at') : Promise.resolve({ data: [] })
       let sourcesQuery = supabase.from('leads').select('source, created_at')
 
       if (dateRange?.start && dateRange?.end) {
         leadsQuery = leadsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
         admissionsQuery = admissionsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
+        convertedLeadsQuery = convertedLeadsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
         if (feesQuery && typeof (feesQuery as any).gte === 'function') {
           feesQuery = (feesQuery as any).gte('created_at', dateRange.start).lte('created_at', dateRange.end)
         }
@@ -814,6 +830,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
 
       if (!isOwner && profile?.role === 'counselor') {
         leadsQuery = leadsQuery.eq('assigned_counselor_id', profile.id)
+        convertedLeadsQuery = convertedLeadsQuery.eq('assigned_counselor_id', profile.id)
       }
 
       const [
@@ -822,6 +839,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         { count: leadsYesterday },
         { count: leadsWeek },
         { count: admissionsMonth },
+        { count: convertedLeads },
         { data: fees },
         { count: followUpsDue },
         { count: followUpsOverdue },
@@ -833,6 +851,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStart).lt('created_at', todayStart),
         supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', weekStart),
         admissionsQuery,
+        convertedLeadsQuery,
         feesQuery,
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).gte('scheduled_at', todayStart).lte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()).eq('status', 'pending'),
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
@@ -855,6 +874,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         leadsYesterday: leadsYesterday ?? 0,
         leadsWeek: leadsWeek ?? 0,
         admissionsMonth: admissionsMonth ?? 0,
+        convertedLeads: convertedLeads ?? admissionsMonth ?? 0,
         revenue,
         pending,
         followUpsDue: followUpsDue ?? 0,
@@ -932,26 +952,32 @@ export function useDashboardInsights() {
   })
 }
 
-export function useGlobalSearch(query: string) {
+export function useGlobalSearch(query: string, searchByIdOnly: boolean = false) {
   const { profile } = useAuth()
 
   return useQuery({
-    queryKey: ['search', query, profile?.id],
+    queryKey: ['search', query, searchByIdOnly, profile?.id],
     queryFn: async () => {
-      if (!query || query.length < 2) return []
+      const q = query.trim()
+      if (!q || q.length < 2) return []
 
-      const [leadsRes, studentsRes] = await Promise.all([
-        supabase.from('leads').select('id, display_id, full_name, mobile').or(`full_name.ilike.%${query}%,mobile.ilike.%${query}%,display_id.ilike.%${query}%`).limit(5),
-        supabase.from('students').select('id, full_name, student_id, mobile').or(`full_name.ilike.%${query}%,student_id.ilike.%${query}%,mobile.ilike.%${query}%`).limit(5),
-      ])
+      const leadsPromise = searchByIdOnly
+        ? supabase.from('leads').select('id, display_id, full_name, mobile').ilike('display_id', `%${q}%`).limit(10)
+        : supabase.from('leads').select('id, display_id, full_name, mobile').or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
+
+      const studentsPromise = searchByIdOnly
+        ? supabase.from('students').select('id, full_name, student_id, display_id, mobile').or(`student_id.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
+        : supabase.from('students').select('id, full_name, student_id, display_id, mobile').or(`full_name.ilike.%${q}%,student_id.ilike.%${q}%,display_id.ilike.%${q}%,mobile.ilike.%${q}%`).limit(10)
+
+      const [leadsRes, studentsRes] = await Promise.all([leadsPromise, studentsPromise])
 
       const results = [
         ...(leadsRes.data ?? []).map((l) => ({ ...l, display_id: (l as any).display_id, type: 'lead' as const })),
-        ...(studentsRes.data ?? []).map((s) => ({ ...s, display_id: (s as any).student_id, type: 'student' as const })),
+        ...(studentsRes.data ?? []).map((s) => ({ ...s, display_id: (s as any).display_id || (s as any).student_id, type: 'student' as const })),
       ]
       return results
     },
-    enabled: !!profile && query.length >= 2,
+    enabled: !!profile && query.trim().length >= 2,
   })
 }
 

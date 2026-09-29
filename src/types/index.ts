@@ -144,6 +144,7 @@ export interface Student {
   id: string
   lead_id: string | null
   student_id: string | null
+  display_id?: string | null
   full_name: string
   email: string | null
   mobile: string
@@ -171,6 +172,7 @@ export interface Student {
   updated_at: string
   course?: Course
   batch?: Batch
+  lead?: Lead
   referred_by_lead?: Lead
   referred_by_student?: Student
 }
@@ -389,6 +391,7 @@ export interface LeadFilters {
   dateFrom?: string
   dateTo?: string
   search?: string
+  displayId?: string
   page?: number
   pageSize?: number
 }

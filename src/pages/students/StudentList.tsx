@@ -13,6 +13,7 @@ import FlagDot from '@/components/ui/FlagDot'
 import type { Student } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Plus, CheckCircle, AlertTriangle, Clock, CreditCard, Eye, Pencil, Trash2 } from 'lucide-react'
 import { AddStudentModal } from '@/pages/students/AddStudentModal'
 
@@ -25,6 +26,7 @@ export default function StudentList() {
   const [searchParams] = useSearchParams()
   const initialBatchId = searchParams.get('batchId') ?? undefined
 
+  const [idSearch, setIdSearch] = useState('')
   const [courseId, setCourseId] = useState<string>()
   const [batchId, setBatchId] = useState<string | undefined>(initialBatchId)
   const [courseLevel, setCourseLevel] = useState<string>('all')
@@ -38,6 +40,12 @@ export default function StudentList() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
   const students = rawStudents.filter((s) => {
+    if (idSearch.trim()) {
+      const q = idSearch.trim().toLowerCase()
+      const match = (s.student_id && s.student_id.toLowerCase().includes(q)) ||
+                    (s.display_id && s.display_id.toLowerCase().includes(q))
+      if (!match) return false
+    }
     if (activeTab === 'admissions') {
       const enrollDate = s.created_at || s.admission_date
       if (enrollDate && new Date(enrollDate) < thirtyDaysAgo) return false
@@ -148,6 +156,14 @@ export default function StudentList() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+        <div className="relative w-44">
+          <Input
+            placeholder="Search by ID (STU-)..."
+            value={idSearch}
+            onChange={(e) => setIdSearch(e.target.value)}
+            className="h-10 text-xs font-mono"
+          />
+        </div>
         <Select value={courseLevel} onValueChange={setCourseLevel}>
           <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
           <SelectContent>

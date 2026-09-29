@@ -175,7 +175,7 @@ export const roleLabels: Record<UserRole, string> = {
   admin: 'Admin',
   counselor: 'Counselor & Accounts',
   faculty: 'Faculty Member',
-  accounts: 'Counselor & Accounts',
+  accounts: 'Accounts',
   reception: 'Reception',
   bdm: 'BDM',
   hod: 'Faculty HOD',

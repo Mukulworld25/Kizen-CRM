@@ -12,7 +12,7 @@ import { useUsers } from '@/hooks/useStudents'
 import { roleLabels } from '@/lib/permissions'
 import type { UserRole, User as UserType } from '@/types'
 
-const TARGET_ROLES: UserRole[] = ['faculty', 'counselor', 'reception', 'accounts', 'bdm']
+const TARGET_ROLES: UserRole[] = ['faculty', 'counselor', 'reception', 'bdm']
 
 interface TabFeatureConfig {
   key: string

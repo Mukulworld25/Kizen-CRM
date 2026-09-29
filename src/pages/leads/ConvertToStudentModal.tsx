@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+
 interface ConvertToStudentModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -17,6 +20,7 @@ interface ConvertToStudentModalProps {
 
 export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStudentModalProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const createStudent = useCreateStudent()
   const { data: courses = [] } = useCourses()
   const { data: batches = [] } = useBatches()
@@ -31,37 +35,57 @@ export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStu
   const filteredBatches = batches.filter((b) => !courseId || b.course_id === courseId)
 
   const handleConvert = async () => {
-    const { data: student, error } = await supabase
-      .from('students')
-      .insert({
-        lead_id: lead.id,
-        full_name: lead.full_name,
-        mobile: lead.mobile,
-        email: lead.email,
-        parent_name: lead.parent_name,
-        parent_contact: lead.parent_contact,
-        city: lead.city,
-        school_college: lead.school_college,
-        course_id: courseId || null,
-        batch_id: batchId || null,
-        referred_by_lead_id: referredByLeadId || null,
-        referred_by_student_id: referredByStudentId || null,
-      })
-      .select()
-      .single()
+    try {
+      const { data: student, error } = await supabase
+        .from('students')
+        .insert({
+          lead_id: lead.id,
+          full_name: lead.full_name,
+          mobile: lead.mobile,
+          email: lead.email,
+          parent_name: lead.parent_name,
+          parent_contact: lead.parent_contact,
+          city: lead.city,
+          school_college: lead.school_college,
+          course_id: courseId || null,
+          batch_id: batchId || null,
+          referred_by_lead_id: referredByLeadId || null,
+          referred_by_student_id: referredByStudentId || null,
+        })
+        .select()
+        .single()
 
-    if (error) throw error
+      if (error) throw error
 
-    if (totalFee && student) {
-      await supabase.from('fees').insert({
-        student_id: student.id,
-        course_id: courseId || null,
-        total_fee: parseFloat(totalFee),
-      })
+      // Update lead to converted & enrolled
+      await supabase
+        .from('leads')
+        .update({
+          status: 'converted',
+          pipeline_stage: 'enrolled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id)
+
+      if (totalFee && student) {
+        await supabase.from('fees').insert({
+          student_id: student.id,
+          course_id: courseId || null,
+          total_fee: parseFloat(totalFee),
+        })
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+      await queryClient.invalidateQueries({ queryKey: ['students'] })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      await queryClient.invalidateQueries({ queryKey: ['lead', lead.id] })
+
+      toast.success(`Converted ${lead.full_name} to student ${student.student_id || student.display_id || ''}!`)
+      onOpenChange(false)
+      navigate(`/students/${student.id}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to convert lead to student')
     }
-
-    onOpenChange(false)
-    navigate(`/students/${student.id}`)
   }
 
   return (

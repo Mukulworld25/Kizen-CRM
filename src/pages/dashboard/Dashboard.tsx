@@ -420,7 +420,13 @@ function OwnerDashboard() {
   const revenue = stats?.revenue ?? 0
   const admissions = stats?.admissionsMonth ?? 0
   const admissionsGoal = 500
-  const conversionRate = stats?.totalLeads ? Math.round((admissions / stats.totalLeads) * 100) : 0
+  const convertedLeads = (stats as any)?.convertedLeads ?? admissions
+  const rawConversionRate = stats?.totalLeads ? ((convertedLeads / stats.totalLeads) * 100) : 0
+  const conversionRateDisplay = rawConversionRate === 0
+    ? '0%'
+    : rawConversionRate < 1
+    ? `${rawConversionRate.toFixed(2)}%`
+    : `${rawConversionRate.toFixed(1)}%`
   const overdueFus = stats?.followUpsOverdue ?? 0
   const coldLeads = insights?.coldLeads ?? 0
   const overdueInstallments = insights?.overdueInstallments ?? 0
@@ -432,7 +438,7 @@ function OwnerDashboard() {
     { name: 'Contacted', value: Math.round((stats?.totalLeads ?? 0) * 0.25) },
     { name: 'Demo', value: Math.round((stats?.totalLeads ?? 0) * 0.2) },
     { name: 'Negotiation', value: Math.round((stats?.totalLeads ?? 0) * 0.15) },
-    { name: 'Converted', value: admissions },
+    { name: 'Converted', value: convertedLeads },
   ]
 
   const handleToggleWidget = (key: string, visible: boolean) => {
@@ -674,11 +680,11 @@ function OwnerDashboard() {
         return (
           <DashboardKpiCard
             title="Conversion Rate"
-            value={`${conversionRate}%`}
+            value={conversionRateDisplay}
             icon={TrendingUp}
             accent="var(--kizen-gold)"
-            subtitle="Leads → Admissions"
-            rightSlot={mounted && <ScoreRing score={conversionRate} size={50} />}
+            subtitle={`${convertedLeads} of ${(stats?.totalLeads ?? 0).toLocaleString()} leads converted`}
+            rightSlot={mounted && <ScoreRing score={Math.max(1, Math.round(rawConversionRate))} size={50} />}
           />
         )
       case 'pipeline_chart':

@@ -175,8 +175,32 @@ export default function StudentDetail() {
               )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Student ID: <span className="font-mono font-semibold">{student.student_id ?? '—'}</span> · Enrolled: {format(new Date(student.created_at), 'MMM d, yyyy')}
+              Student ID: <span className="font-mono font-semibold">{student.student_id ?? (student as any).display_id ?? '—'}</span> · Enrolled: {format(new Date(student.created_at), 'MMM d, yyyy')}
             </p>
+            {student.lead && (
+              <div className="mt-2.5 inline-flex flex-wrap items-center gap-2 text-xs bg-indigo-50/90 border border-indigo-200/80 text-indigo-900 px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="font-semibold text-indigo-600">Originating Lead:</span>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/leads/${student.lead?.id}`)}
+                  className="font-mono font-bold text-indigo-700 hover:text-indigo-950 underline decoration-indigo-300 underline-offset-2"
+                >
+                  {student.lead.display_id || 'KZ-Record'}
+                </button>
+                <span className="text-indigo-300">·</span>
+                <span>
+                  Originally a lead from{' '}
+                  <strong className="capitalize text-indigo-800 font-semibold">
+                    {student.lead.source ? student.lead.source.replace('_', ' ') : 'Direct'}
+                  </strong>
+                  {student.lead.created_at && (
+                    <span className="text-indigo-600">
+                      {' '}(captured {format(new Date(student.lead.created_at), 'MMM d, yyyy')})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -241,6 +265,46 @@ export default function StudentDetail() {
                 value={student.referred_by_lead_id}
                 onSave={(v) => handleSaveField('referred_by_lead_id', v || null)}
               />
+            </CardContent>
+          </Card>
+          <Card className="border border-indigo-100 bg-gradient-to-br from-indigo-50/30 to-white shadow-xs">
+            <CardHeader className="border-b border-indigo-50 pb-3">
+              <CardTitle className="text-base font-bold text-slate-900 flex items-center justify-between">
+                <span>Lead & Marketing Traceability</span>
+                {student.lead?.display_id && (
+                  <Badge variant="secondary" className="font-mono text-xs bg-indigo-100 text-indigo-700 border-indigo-200">
+                    {student.lead.display_id}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <Label className="text-xs text-slate-500 font-medium">Originating Lead</Label>
+                {student.lead ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/leads/${student.lead?.id}`)}
+                    className="mt-1 block text-left font-mono font-bold text-indigo-600 hover:underline text-sm"
+                  >
+                    {student.lead.display_id || 'View Originating Lead'} →
+                  </button>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-400">Direct admission (No originating lead)</p>
+                )}
+              </div>
+              <div>
+                <Label className="text-xs text-slate-500 font-medium">Acquisition Channel / Source</Label>
+                <p className="mt-1 text-sm font-semibold capitalize text-slate-800">
+                  {student.lead?.source ? student.lead.source.replace('_', ' ') : 'Direct / Other'}
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-500 font-medium">Lead Capture Date</Label>
+                <p className="mt-1 text-sm text-slate-700">
+                  {student.lead?.created_at ? format(new Date(student.lead.created_at), 'MMMM d, yyyy') : '—'}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -69,6 +69,17 @@ export default function LeadList() {
         </div>
       ),
     },
+    {
+      key: 'display_id',
+      header: 'Lead ID',
+      sortable: true,
+      render: (r) => (
+        <span className="font-mono text-xs font-semibold text-primary">
+          {r.display_id || '—'}
+        </span>
+      ),
+      exportValue: (r) => r.display_id ?? '',
+    },
     { key: 'full_name', header: 'Name', sortable: true, exportValue: (r) => r.full_name },
     { 
       key: 'mobile', 
@@ -138,6 +149,17 @@ export default function LeadList() {
       </PageHeader>
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+        <div className="relative w-44">
+          <Input
+            placeholder="Search by ID (KZ-)..."
+            value={filters.displayId ?? ''}
+            onChange={(e) => {
+              const val = e.target.value
+              setFilters((f) => ({ ...f, displayId: val || undefined, page: 1 }))
+            }}
+            className="h-10 text-xs font-mono"
+          />
+        </div>
         <Select value={filters.status ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, status: v === 'all' ? undefined : v as LeadStatus }))}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>

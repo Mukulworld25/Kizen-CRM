@@ -38,32 +38,20 @@ export default function Reports() {
     },
   })
 
-  const { data: leads = [] } = useQuery({
-    queryKey: ['report-leads', dateFrom, dateTo],
+  const { data: totalLeads = 0 } = useQuery({
+    queryKey: ['report-lead-count', dateFrom, dateTo],
     queryFn: async () => {
-      let q = supabase.from('leads').select('*, course:courses(name), counselor:users!leads_assigned_counselor_id_fkey(name)')
+      let q = supabase.from('leads').select('*', { count: 'exact', head: true })
       if (dateFrom) q = q.gte('created_at', dateFrom)
       if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59')
-      const { data } = await q
-      return data ?? []
-    },
-  })
-
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['report-expenses', dateFrom, dateTo],
-    queryFn: async () => {
-      let q = supabase.from('institute_expenses').select('*')
-      if (dateFrom) q = q.gte('expense_date', dateFrom)
-      if (dateTo) q = q.lte('expense_date', dateTo)
-      const { data } = await q
-      return data ?? []
+      const { count } = await q
+      return count ?? 0
     },
   })
 
   // Executive KPI Computations
-  const totalLeads = leads.length
   const totalStudents = admissions.length
-  const conversionRate = totalLeads > 0 ? ((totalStudents / totalLeads) * 100).toFixed(1) : '0'
+  const conversionRate = totalLeads > 0 ? ((totalStudents / totalLeads) * 100).toFixed(2) : '0'
 
   const totalCollectedRevenue = useMemo(() => {
     return fees.reduce((sum, f) => sum + Number(f.amount_paid || 0), 0)
@@ -84,57 +72,72 @@ export default function Reports() {
   }, [fees])
 
   // Lead Pipeline Funnel Stages Data
-  const leadPipelineData = useMemo(() => {
-    const stageMap: Record<string, number> = {
-      'new_lead': 0,
-      'contacted': 0,
-      'follow_up': 0,
-      'demo_booked': 0,
-      'negotiation': 0,
-      'converted': 0,
-      'lost': 0
-    }
-    leads.forEach(l => {
-      const st = l.status || 'new_lead'
-      stageMap[st] = (stageMap[st] || 0) + 1
-    })
-    return [
-      { stage: 'New Lead', count: stageMap.new_lead },
-      { stage: 'Contacted', count: stageMap.contacted },
-      { stage: 'Follow Up', count: stageMap.follow_up },
-      { stage: 'Demo Scheduled', count: stageMap.demo_booked },
-      { stage: 'Negotiation', count: stageMap.negotiation },
-      { stage: 'Converted (Admitted)', count: stageMap.converted },
-    ]
-  }, [leads])
+  const { data: leadPipelineData = [] } = useQuery({
+    queryKey: ['report-pipeline-stages', dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_lead_pipeline_stages', {
+        p_start: dateFrom || null,
+        p_end: dateTo || null,
+      })
+      if (error) {
+        console.error('get_lead_pipeline_stages error:', error)
+        return []
+      }
+      const stageLabels: Record<string, string> = {
+        'new_lead': 'New Lead',
+        'contacted': 'Contacted',
+        'follow_up': 'Follow Up',
+        'demo_booked': 'Demo Scheduled',
+        'negotiation': 'Negotiation',
+        'converted': 'Converted (Admitted)',
+        'registration_pending': 'Reg. Pending',
+        'lost': 'Lost',
+      }
+      return (data ?? []).map((r: any) => ({
+        stage: stageLabels[r.status] || r.status,
+        count: Number(r.count || 0),
+      }))
+    },
+  })
 
-  // Lead Sources Data
-  const sourceFunnel = useMemo(() => {
-    const map: Record<string, number> = {}
-    leads.forEach(l => {
-      const src = l.source ? l.source.replace('_', ' ').toUpperCase() : 'OTHER'
-      map[src] = (map[src] || 0) + 1
-    })
-    return Object.entries(map).map(([name, value]) => ({ name, value }))
-  }, [leads])
+  // Lead Sources Data (Live aggregation across all leads)
+  const { data: sourceFunnel = [] } = useQuery({
+    queryKey: ['report-sources', dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_lead_source_counts', {
+        p_start: dateFrom || null,
+        p_end: dateTo || null,
+      })
+      if (error) {
+        console.error('get_lead_source_counts error:', error)
+        return []
+      }
+      return (data ?? []).map((r: any) => ({
+        name: r.name,
+        value: Number(r.value || 0),
+      }))
+    },
+  })
 
-  // Monthly Financial Comparison (Revenue vs Expenses)
-  const financialTrend = useMemo(() => {
-    const monthMap: Record<string, { revenue: number; expense: number }> = {}
-    fees.forEach(f => {
-      const month = f.created_at ? f.created_at.slice(0, 7) : 'Current'
-      if (!monthMap[month]) monthMap[month] = { revenue: 0, expense: 0 }
-      monthMap[month].revenue += Number(f.amount_paid || 0)
-    })
-    expenses.forEach(e => {
-      const month = e.expense_date ? e.expense_date.slice(0, 7) : 'Current'
-      if (!monthMap[month]) monthMap[month] = { revenue: 0, expense: 0 }
-      monthMap[month].expense += Number(e.amount || 0)
-    })
-    return Object.entries(monthMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, val]) => ({ month, Revenue: val.revenue, Expense: val.expense }))
-  }, [fees, expenses])
+  // Monthly Financial Comparison (Revenue vs Expenses) - Live fee collection & installment data
+  const { data: financialTrend = [] } = useQuery({
+    queryKey: ['report-financial-trend', dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_monthly_financial_health', {
+        p_start: dateFrom || null,
+        p_end: dateTo || null,
+      })
+      if (error) {
+        console.error('get_monthly_financial_health error:', error)
+        return []
+      }
+      return (data ?? []).map((r: any) => ({
+        month: r.month,
+        Revenue: Number(r.Revenue || 0),
+        Expense: Number(r.Expense || 0),
+      }))
+    },
+  })
 
   const exportReport = (name: string, rows: Record<string, unknown>[]) => {
     const ws = XLSX.utils.json_to_sheet(rows)

@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, UserPlus, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses, useLeads } from '@/hooks/useLeads'
+import { useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import { useLead, useUpdateLead, useLeadActivities, useAddActivity, useCourses, useLeads, useCounselors } from '@/hooks/useLeads'
 import { useCreateFollowUp, useStudents } from '@/hooks/useStudents'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { DeleteOrRequestDialog } from '@/components/shared/DeleteOrRequestDialog'
@@ -30,9 +33,12 @@ export default function LeadDetail() {
   const { data: lead, isLoading } = useLead(id)
   const { data: activities = [], isLoading: activitiesLoading } = useLeadActivities(id)
   const { data: courses = [] } = useCourses()
+  const { data: counselors = [] } = useCounselors()
   const { data: leadsData } = useLeads({ pageSize: 1000 })
   const { data: students = [] } = useStudents()
   const updateLead = useUpdateLead()
+  const queryClient = useQueryClient()
+  const [assigning, setAssigning] = useState(false)
 
   const leadOptions = (leadsData?.leads ?? [])
     .filter((l) => l.id !== id)
@@ -48,6 +54,33 @@ export default function LeadDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [fuType, setFuType] = useState<FollowUpType>('call')
   const [fuDate, setFuDate] = useState('')
+
+  const handleAssignCounselor = async (counselorId: string) => {
+    if (!lead) return
+    setAssigning(true)
+    try {
+      const isUnassign = counselorId === 'unassigned'
+      const counselorObj = counselors.find((c) => c.id === counselorId)
+      const counselorName = isUnassign ? null : (counselorObj?.name || null)
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          assigned_counselor_id: isUnassign ? null : counselorId,
+          counselor_name: counselorName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id)
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['leads', lead.id] })
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success(isUnassign ? 'Lead marked as Unassigned' : `Lead assigned to ${counselorName}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update counselor')
+    } finally {
+      setAssigning(false)
+    }
+  }
   const [fuNotes, setFuNotes] = useState('')
 
   const canInlineEdit = can('editLeads') || isOwner || profile?.role === 'admin'
@@ -186,10 +219,43 @@ export default function LeadDetail() {
               </Card>
 
               <Card>
-                <CardHeader><CardTitle className="text-base">Assigned Counselor</CardTitle></CardHeader>
-                <CardContent>
-                  <p className="font-medium">{lead.counselor?.name ?? 'Unassigned'}</p>
-                  <p className="text-sm text-muted-foreground">{lead.counselor?.email}</p>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span>Assigned Counselor</span>
+                    {assigning && <span className="text-xs text-primary animate-pulse font-normal">Saving...</span>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Select
+                      value={lead.assigned_counselor_id ?? 'unassigned'}
+                      onValueChange={handleAssignCounselor}
+                      disabled={assigning}
+                    >
+                      <SelectTrigger className="w-full text-xs">
+                        <SelectValue placeholder="Select Counselor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned" className="text-xs text-amber-600">
+                          Unassigned
+                        </SelectItem>
+                        {counselors.map((c) => (
+                          <SelectItem key={c.id} value={c.id} className="text-xs">
+                            {c.name} ({c.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {lead.counselor ? (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <span className="font-medium text-slate-800 dark:text-slate-200">{lead.counselor.name}</span>
+                      <span>•</span>
+                      <span>{lead.counselor.email}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-600 italic">No counselor currently assigned</p>
+                  )}
                 </CardContent>
               </Card>
 

@@ -21,6 +21,7 @@ import { useCourses } from '@/hooks/useLeads'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { CustomizableFilterBar, type FilterItem } from '@/components/shared/CustomizableFilterBar'
+import { DynamicFilterBuilder, type FilterField, type DynamicFilterRule } from '@/components/shared/DynamicFilterBuilder'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ export default function FeeManagement() {
   const [courseId, setCourseId] = useState<string>('all')
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
   const [dateSort, setDateSort] = useState<string>('created_desc')
+  const [dynamicRules, setDynamicRules] = useState<DynamicFilterRule[]>([])
 
   useEffect(() => {
     if (searchParams.get('filter') === 'overdue') {
@@ -71,7 +73,54 @@ export default function FeeManagement() {
   const [txnId, setTxnId] = useState('')
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
-  const filteredFees = rawFees
+  const dynamicFilteredFees = rawFees.filter((fee) => {
+    if (!dynamicRules || dynamicRules.length === 0) return true
+    for (const rule of dynamicRules) {
+      let val: any
+      if (rule.fieldKey === 'payment_status') {
+        const isOverdue = fee.installments?.some((i) => i.status === 'overdue')
+        val = fee.pending_balance === 0 ? 'paid' : (isOverdue ? 'due' : 'pending')
+      } else {
+        val = (fee as any)[rule.fieldKey]
+      }
+
+      if (rule.operator === 'is_empty') {
+        if (val !== null && val !== undefined && val !== '') return false
+      } else if (rule.operator === 'is_not_empty') {
+        if (val === null || val === undefined || val === '') return false
+      } else if (rule.operator === 'equals') {
+        if (rule.fieldKey.includes('date')) {
+          const dStr = val ? format(new Date(val), 'yyyy-MM-dd') : ''
+          if (dStr !== rule.value) return false
+        } else {
+          if (String(val ?? '').toLowerCase() !== rule.value.toLowerCase()) return false
+        }
+      } else if (rule.operator === 'not_equals') {
+        if (String(val ?? '').toLowerCase() === rule.value.toLowerCase()) return false
+      } else if (rule.operator === 'contains') {
+        if (!String(val ?? '').toLowerCase().includes(rule.value.toLowerCase())) return false
+      } else if (rule.operator === 'greater_than') {
+        if (rule.fieldKey.includes('date')) {
+          const d1 = val ? new Date(val).getTime() : 0
+          const d2 = new Date(rule.value).getTime()
+          if (d1 < d2) return false
+        } else {
+          if (Number(val ?? 0) < Number(rule.value)) return false
+        }
+      } else if (rule.operator === 'less_than') {
+        if (rule.fieldKey.includes('date')) {
+          const d1 = val ? new Date(val).getTime() : 9999999999999
+          const d2 = new Date(rule.value).getTime()
+          if (d1 > d2) return false
+        } else {
+          if (Number(val ?? 0) > Number(rule.value)) return false
+        }
+      }
+    }
+    return true
+  })
+
+  const filteredFees = dynamicFilteredFees
 
   const fees = [...filteredFees].sort((a, b) => {
     if (dateSort === 'due_asc') {
@@ -472,6 +521,31 @@ export default function FeeManagement() {
     },
   ]
 
+  const feeDynamicFields: FilterField[] = [
+    {
+      key: 'course_id',
+      label: 'Course',
+      type: 'select',
+      options: courses.map((c) => ({ value: c.id, label: c.name })),
+    },
+    {
+      key: 'payment_status',
+      label: 'Payment Status',
+      type: 'select',
+      options: [
+        { value: 'paid', label: 'Paid' },
+        { value: 'due', label: 'Due' },
+        { value: 'pending', label: 'Pending' },
+      ],
+    },
+    { key: 'next_due_date', label: 'Next Due Date', type: 'date' },
+    { key: 'registration_date', label: 'Registration Date', type: 'date' },
+    { key: 'created_at', label: 'Created Date', type: 'date' },
+    { key: 'total_fee', label: 'Total Amount / Fee', type: 'number' },
+    { key: 'amount_paid', label: 'Amount Paid', type: 'number' },
+    { key: 'pending_balance', label: 'Pending Balance', type: 'number' },
+  ]
+
   return (
     <div>
       <PageHeader title="Fee Management" description="Track payments and outstanding balances">
@@ -486,11 +560,18 @@ export default function FeeManagement() {
         <StatsCard title="Outstanding Accounts" value={overdueCount} icon={AlertTriangle} color="bg-danger" loading={isLoading} />
       </div>
 
-      <CustomizableFilterBar
-        tableKey="fees"
-        items={feeFilterItems}
-        defaultOrder={DEFAULT_FEE_FILTERS}
-      />
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <CustomizableFilterBar
+          tableKey="fees"
+          items={feeFilterItems}
+          defaultOrder={DEFAULT_FEE_FILTERS}
+        />
+        <DynamicFilterBuilder
+          fields={feeDynamicFields}
+          rules={dynamicRules}
+          onChange={setDynamicRules}
+        />
+      </div>
 
       <DataTable
         columns={columns}

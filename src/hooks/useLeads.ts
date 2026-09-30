@@ -39,7 +39,11 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.interestLevel) query = query.ilike('interest_level', filters.interestLevel)
       if (filters.disposition) query = query.ilike('disposition', filters.disposition)
-      if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
+      if (filters.counselorId === 'unassigned') {
+        query = query.is('assigned_counselor_id', null)
+      } else if (filters.counselorId) {
+        query = query.eq('assigned_counselor_id', filters.counselorId)
+      }
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)
       if (filters.priority) query = query.eq('priority', filters.priority)
       if (filters.temperature) query = query.eq('temperature', filters.temperature)
@@ -50,6 +54,30 @@ export function useLeads(filters: LeadFilters = {}) {
       }
       if (filters.search) {
         query = query.or(`full_name.ilike.%${filters.search}%,mobile.ilike.%${filters.search}%,city.ilike.%${filters.search}%,display_id.ilike.%${filters.search}%`)
+      }
+      if (filters.dynamicRules && filters.dynamicRules.length > 0) {
+        for (const rule of filters.dynamicRules) {
+          const { fieldKey, operator, value } = rule
+          if (operator === 'is_empty') {
+            query = query.is(fieldKey, null)
+          } else if (operator === 'is_not_empty') {
+            query = query.not(fieldKey, 'is', null)
+          } else if (operator === 'equals') {
+            if (fieldKey.includes('date') || fieldKey === 'created_at') {
+              query = query.gte(fieldKey, value).lte(fieldKey, value + 'T23:59:59')
+            } else {
+              query = query.eq(fieldKey, value)
+            }
+          } else if (operator === 'not_equals') {
+            query = query.neq(fieldKey, value)
+          } else if (operator === 'contains') {
+            query = query.ilike(fieldKey, `%${value}%`)
+          } else if (operator === 'greater_than') {
+            query = query.gte(fieldKey, value)
+          } else if (operator === 'less_than') {
+            query = query.lte(fieldKey, value)
+          }
+        }
       }
 
       const { data, error, count } = await query

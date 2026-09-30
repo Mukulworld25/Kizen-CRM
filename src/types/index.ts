@@ -398,6 +398,7 @@ export interface LeadFilters {
   dateTo?: string
   search?: string
   displayId?: string
+  dynamicRules?: import('@/components/shared/DynamicFilterBuilder').DynamicFilterRule[]
   page?: number
   pageSize?: number
 }

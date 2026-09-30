@@ -1,13 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, UserCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useLeads, useCounselors, useCourses } from '@/hooks/useLeads'
 import { useSoftDelete } from '@/hooks/useSoftDelete'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable, type Column, type BulkAction } from '@/components/shared/DataTable'
+import { DynamicFilterBuilder, type FilterField, type DynamicFilterRule } from '@/components/shared/DynamicFilterBuilder'
 import { LeadStatusBadge, PriorityBadge, TemperatureBadge } from '@/components/shared/LeadStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -33,6 +35,16 @@ export default function LeadList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [flaggedOnly, setFlaggedOnly] = useState(false)
   const updateLead = useUpdateLead()
+  const queryClient = useQueryClient()
+
+  // Dynamic Filter Builder rules
+  const [dynamicRules, setDynamicRules] = useState<DynamicFilterRule[]>([])
+
+  // Bulk Assign State
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
+  const [selectedForAssign, setSelectedForAssign] = useState<Lead[]>([])
+  const [targetCounselorId, setTargetCounselorId] = useState<string>('')
+  const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
     const filterParam = searchParams.get('filter')
@@ -43,7 +55,7 @@ export default function LeadList() {
     }
   }, [searchParams])
 
-  const { data, isLoading } = useLeads(filters)
+  const { data, isLoading } = useLeads({ ...filters, dynamicRules })
   const softDelete = useSoftDelete()
   const { data: counselors = [] } = useCounselors()
   const { data: courses = [] } = useCourses()
@@ -187,7 +199,52 @@ export default function LeadList() {
     },
   ]
 
+  const handleBulkAssign = async () => {
+    if (!targetCounselorId) {
+      toast.error('Please select a counselor')
+      return
+    }
+    setAssigning(true)
+    try {
+      const isUnassign = targetCounselorId === 'unassigned'
+      const counselorObj = counselors.find((c) => c.id === targetCounselorId)
+      const counselorName = isUnassign ? null : (counselorObj?.name || null)
+      const leadIds = selectedForAssign.map((l) => l.id)
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          assigned_counselor_id: isUnassign ? null : targetCounselorId,
+          counselor_name: counselorName,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', leadIds)
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success(
+        isUnassign
+          ? `Unassigned ${leadIds.length} lead(s)`
+          : `Assigned ${leadIds.length} lead(s) to ${counselorName}`
+      )
+      setBulkAssignOpen(false)
+      setSelectedForAssign([])
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign leads')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
   const bulkActions: BulkAction<Lead>[] = [
+    {
+      label: 'Assign to...',
+      icon: <UserCheck className="h-3.5 w-3.5 mr-1" />,
+      onClick: (selected) => {
+        setSelectedForAssign(selected)
+        setTargetCounselorId('')
+        setBulkAssignOpen(true)
+      },
+    },
     {
       label: 'Delete',
       variant: 'destructive',
@@ -306,18 +363,19 @@ export default function LeadList() {
         </Select>
       ),
     },
-    ...(can('assignCounselor') ? [{
+    {
       key: 'counselor',
       component: (
         <Select value={filters.counselorId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, counselorId: v === 'all' ? undefined : v, page: 1 }))}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Counselor" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Counselors</SelectItem>
+            <SelectItem value="unassigned">Unassigned Only</SelectItem>
             {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
       ),
-    }] : []),
+    },
     {
       key: 'course',
       component: (
@@ -332,6 +390,73 @@ export default function LeadList() {
     },
   ]
 
+  const leadDynamicFields: FilterField[] = [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      type: 'select',
+      options: [
+        { value: 'google_ads', label: 'Google Ads' },
+        { value: 'referral', label: 'Referral' },
+        { value: 'whatsapp', label: 'WhatsApp' },
+        { value: 'instagram', label: 'Instagram' },
+        { value: 'website', label: 'Website' },
+        { value: 'college_visit', label: 'College Visit' },
+        { value: 'walk_in', label: 'Walk-in' },
+        { value: 'other', label: 'Other' },
+      ],
+    },
+    { key: 'city', label: 'City', type: 'text' },
+    {
+      key: 'interest_level',
+      label: 'Interest Level',
+      type: 'select',
+      options: [
+        { value: 'Hot', label: 'Hot' },
+        { value: 'Warm', label: 'Warm' },
+        { value: 'Cold', label: 'Cold' },
+        { value: 'Dead', label: 'Dead' },
+      ],
+    },
+    {
+      key: 'disposition',
+      label: 'Disposition',
+      type: 'select',
+      options: [
+        { value: 'interested', label: 'Interested' },
+        { value: 'neutral', label: 'Neutral' },
+        { value: 'Not Interested', label: 'Not Interested' },
+      ],
+    },
+    {
+      key: 'assigned_counselor_id',
+      label: 'Counselor',
+      type: 'select',
+      options: counselors.map((c) => ({ value: c.id, label: c.name })),
+    },
+    {
+      key: 'interested_course_id',
+      label: 'Course',
+      type: 'select',
+      options: courses.map((c) => ({ value: c.id, label: c.name })),
+    },
+    { key: 'created_at', label: 'Registration Date / Lead Date', type: 'date' },
+    { key: 'tap_date', label: 'Tap Date', type: 'date' },
+    { key: 'call_status', label: 'Call Status', type: 'text' },
+    { key: 'class_year', label: 'Current Class / Qualification', type: 'text' },
+    { key: 'school_college', label: 'School / College', type: 'text' },
+    { key: 'priority', label: 'Priority', type: 'select', options: [{ value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }] },
+    { key: 'temperature', label: 'Temperature', type: 'select', options: [{ value: 'hot', label: 'Hot' }, { value: 'warm', label: 'Warm' }, { value: 'cold', label: 'Cold' }] },
+    { key: 'budget', label: 'Budget', type: 'number' },
+    { key: 'lead_score', label: 'Lead Score', type: 'number' },
+  ]
+
   return (
     <div>
       <PageHeader title="Leads" description="Manage your lead pipeline">
@@ -340,11 +465,21 @@ export default function LeadList() {
         )}
       </PageHeader>
 
-      <CustomizableFilterBar
-        tableKey="leads"
-        items={leadFilterItems}
-        defaultOrder={DEFAULT_LEAD_FILTERS}
-      />
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <CustomizableFilterBar
+          tableKey="leads"
+          items={leadFilterItems}
+          defaultOrder={DEFAULT_LEAD_FILTERS}
+        />
+        <DynamicFilterBuilder
+          fields={leadDynamicFields}
+          rules={dynamicRules}
+          onChange={(rules) => {
+            setDynamicRules(rules)
+            setFilters((f) => ({ ...f, page: 1 }))
+          }}
+        />
+      </div>
 
       <DataTable
         columns={columns}
@@ -575,6 +710,47 @@ export default function LeadList() {
         }}
         loading={softDelete.isPending}
       />
+
+      {/* BULK ASSIGN MODAL */}
+      <Dialog open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Selected Leads</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground">
+              Assign <strong className="text-slate-900 dark:text-slate-100">{selectedForAssign.length}</strong> selected lead(s) to a counselor:
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Select Counselor</Label>
+              <Select value={targetCounselorId} onValueChange={setTargetCounselorId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Choose a counselor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned" className="text-xs text-amber-600">Unassign (Remove Counselor)</SelectItem>
+                  {counselors.map((c) => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.name} ({c.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkAssignOpen(false)}>Cancel</Button>
+            <Button
+              size="sm"
+              onClick={handleBulkAssign}
+              disabled={assigning || !targetCounselorId}
+              className="bg-primary text-primary-foreground font-semibold"
+            >
+              {assigning ? 'Assigning...' : 'Confirm Assignment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

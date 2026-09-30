@@ -203,23 +203,21 @@ export default function LeadList() {
   const DEFAULT_LEAD_FILTERS = [
     'display_id',
     'status',
-    'channel',
-    'sheet_source',
-    'temperature',
-    'refresh_scores',
+    'source',
+    'city',
+    'interest_level',
+    'disposition',
     'counselor',
     'course',
-    'priority',
-    'flagged',
   ]
 
   const leadFilterItems: FilterItem[] = [
     {
       key: 'display_id',
       component: (
-        <div className="relative w-44">
+        <div className="relative w-40">
           <Input
-            placeholder="Search by ID (KZ-)..."
+            placeholder="Search ID (KZ-)..."
             value={filters.displayId ?? ''}
             onChange={(e) => {
               const val = e.target.value
@@ -233,8 +231,8 @@ export default function LeadList() {
     {
       key: 'status',
       component: (
-        <Select value={filters.status ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, status: v === 'all' ? undefined : v as LeadStatus }))}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+        <Select value={filters.status ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, status: v === 'all' ? undefined : v as LeadStatus, page: 1 }))}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             {LEAD_STATUSES.map((s) => (
@@ -245,57 +243,73 @@ export default function LeadList() {
       ),
     },
     {
-      key: 'channel',
+      key: 'source',
       component: (
-        <Select value={filters.source ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, source: v === 'all' ? undefined : v as LeadSource }))}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Channel" /></SelectTrigger>
+        <Select value={filters.source ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, source: v === 'all' ? undefined : v as LeadSource, page: 1 }))}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Source" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Channels</SelectItem>
-            {LEAD_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="google_ads">Google Ads</SelectItem>
+            <SelectItem value="referral">Referral</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="instagram">Instagram</SelectItem>
+            <SelectItem value="website">Website</SelectItem>
+            <SelectItem value="college_visit">College Visit</SelectItem>
+            <SelectItem value="walk_in">Walk-in</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>
       ),
     },
     {
-      key: 'sheet_source',
+      key: 'city',
       component: (
-        <Select value={filters.sheetSource ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, sheetSource: v === 'all' ? undefined : v }))}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Source Sheet / Campaign" /></SelectTrigger>
+        <div className="relative w-36">
+          <Input
+            placeholder="Filter City..."
+            value={filters.city ?? ''}
+            onChange={(e) => {
+              const val = e.target.value
+              setFilters((f) => ({ ...f, city: val || undefined, page: 1 }))
+            }}
+            className="h-10 text-xs"
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'interest_level',
+      component: (
+        <Select value={filters.interestLevel ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, interestLevel: v === 'all' ? undefined : v, page: 1 }))}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Interest Level" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sheets / Campaigns</SelectItem>
-            {SHEET_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            <SelectItem value="all">All Interest</SelectItem>
+            <SelectItem value="Hot">Hot</SelectItem>
+            <SelectItem value="Warm">Warm</SelectItem>
+            <SelectItem value="Cold">Cold</SelectItem>
+            <SelectItem value="Dead">Dead</SelectItem>
           </SelectContent>
         </Select>
       ),
     },
     {
-      key: 'temperature',
+      key: 'disposition',
       component: (
-        <Select value={filters.temperature ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, temperature: v === 'all' ? undefined : v as LeadTemperature }))}>
-          <SelectTrigger className="w-32"><SelectValue placeholder="Temperature" /></SelectTrigger>
+        <Select value={filters.disposition ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, disposition: v === 'all' ? undefined : v, page: 1 }))}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Disposition" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Temperatures</SelectItem>
-            <SelectItem value="hot">Hot</SelectItem>
-            <SelectItem value="warm">Warm</SelectItem>
-            <SelectItem value="cold">Cold</SelectItem>
+            <SelectItem value="all">All Dispositions</SelectItem>
+            <SelectItem value="interested">Interested</SelectItem>
+            <SelectItem value="neutral">Neutral</SelectItem>
+            <SelectItem value="Not Interested">Not Interested</SelectItem>
           </SelectContent>
         </Select>
-      ),
-    },
-    {
-      key: 'refresh_scores',
-      component: (
-        <Button size="sm" variant="outline" className="text-xs h-10" onClick={() => {
-          supabase.rpc('compute_lead_scores').then(() => window.location.reload())
-        }}>
-          Refresh Scores
-        </Button>
       ),
     },
     ...(can('assignCounselor') ? [{
       key: 'counselor',
       component: (
-        <Select value={filters.counselorId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, counselorId: v === 'all' ? undefined : v }))}>
+        <Select value={filters.counselorId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, counselorId: v === 'all' ? undefined : v, page: 1 }))}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Counselor" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Counselors</SelectItem>
@@ -307,40 +321,13 @@ export default function LeadList() {
     {
       key: 'course',
       component: (
-        <Select value={filters.courseId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, courseId: v === 'all' ? undefined : v }))}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Course" /></SelectTrigger>
+        <Select value={filters.courseId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, courseId: v === 'all' ? undefined : v, page: 1 }))}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Course" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Courses</SelectItem>
             {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
-      ),
-    },
-    {
-      key: 'priority',
-      component: (
-        <Select value={filters.priority ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, priority: v === 'all' ? undefined : v as Priority }))}>
-          <SelectTrigger className="w-32"><SelectValue placeholder="Priority" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-      ),
-    },
-    {
-      key: 'flagged',
-      component: (
-        <Button
-          variant={flaggedOnly ? 'destructive' : 'outline'}
-          size="sm"
-          className="text-xs h-10"
-          onClick={() => setFlaggedOnly((prev) => !prev)}
-        >
-          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
-        </Button>
       ),
     },
   ]

@@ -318,16 +318,19 @@ export function DataTable<T>({
                     return (
                       <TableHead
                         key={col.key}
-                        className={cn(col.sortable && !isEditing ? 'cursor-pointer select-none' : '', 'relative py-2.5')}
+                        className={cn(
+                          col.sortable && !isEditing ? 'cursor-pointer select-none' : '',
+                          'relative px-4 py-3 h-11 text-xs font-semibold text-slate-700 dark:text-slate-200'
+                        )}
                         onClick={() => {
                           if (!isEditing && col.sortable) {
                             handleSort(col.key)
                           }
                         }}
                       >
-                        {isEditing ? (
+                        {isEditing && (
                           <div
-                            className="flex items-center gap-1.5 bg-background border border-primary shadow-lg rounded-lg p-1.5 min-w-[170px] z-30"
+                            className="absolute left-1 top-1.5 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-primary shadow-xl rounded-lg p-1.5 min-w-[200px] z-40"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Input
@@ -345,7 +348,7 @@ export function DataTable<T>({
                               }}
                               autoFocus
                               placeholder={col.header}
-                              className="h-7 text-xs font-normal px-2 py-1 w-full"
+                              className="h-7 text-xs font-normal px-2 py-1 w-full bg-slate-50 dark:bg-slate-800"
                             />
                             <Button
                               type="button"
@@ -374,31 +377,30 @@ export function DataTable<T>({
                               <X className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 group/th">
-                            <span className="font-semibold text-xs tracking-tight">{displayHeader}</span>
-                            {sortKey === col.key && (
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {sortDir === 'asc' ? '↑' : '↓'}
-                              </span>
-                            )}
-                            {isEditable && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setEditingColKey(col.key)
-                                  setEditingLabel(displayHeader)
-                                }}
-                                className="opacity-40 group-hover/th:opacity-100 hover:opacity-100 hover:text-primary transition-opacity p-0.5 rounded hover:bg-muted/80 text-muted-foreground"
-                                title={`Edit label for ${displayHeader}`}
-                                aria-label={`Edit ${displayHeader} column header`}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
                         )}
+                        <div className={cn("inline-flex items-center gap-1.5 whitespace-nowrap group/th", isEditing && "opacity-20")}>
+                          <span className="font-semibold text-xs tracking-tight">{displayHeader}</span>
+                          {sortKey === col.key && (
+                            <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                              {sortDir === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                          {isEditable && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingColKey(col.key)
+                                setEditingLabel(displayHeader)
+                              }}
+                              className="opacity-0 group-hover/th:opacity-70 hover:!opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-primary shrink-0"
+                              title={`Edit label for ${displayHeader}`}
+                              aria-label={`Edit ${displayHeader} column header`}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </TableHead>
                     )
                   })}

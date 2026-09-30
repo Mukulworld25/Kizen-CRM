@@ -195,6 +195,7 @@ export interface Fee {
   gst_percent: number
   subject?: string | null
   duration?: string | null
+  payment_status?: string | null
   next_due_date?: string | null
   next_due_amount?: number | null
   flag_color?: 'red' | 'yellow' | null
@@ -387,6 +388,8 @@ export interface LeadFilters {
   source?: LeadSource
   sheetSource?: string
   city?: string
+  interestLevel?: string
+  disposition?: string
   counselorId?: string
   courseId?: string
   priority?: Priority

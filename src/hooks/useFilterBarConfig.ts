@@ -19,8 +19,8 @@ export function useFilterBarConfig(tableKey: string, defaultOrder: string[]) {
       }
 
       if (data && Array.isArray(data.filter_order) && data.filter_order.length > 0) {
-        const savedOrder = data.filter_order as string[]
-        // Preserve saved order, then append any items in defaultOrder not in savedOrder
+        const savedOrder = (data.filter_order as string[]).filter((k) => defaultOrder.includes(k))
+        // Preserve saved order of valid filters, then append any items in defaultOrder not in savedOrder
         const combined = [...savedOrder]
         for (const key of defaultOrder) {
           if (!combined.includes(key)) {

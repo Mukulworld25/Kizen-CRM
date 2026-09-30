@@ -17,7 +17,7 @@ import { format } from 'date-fns'
 import { IndianRupee, AlertTriangle, Clock } from 'lucide-react'
 import FlagDot from '@/components/ui/FlagDot'
 import type { Fee, PaymentMethod } from '@/types'
-import { FEE_COURSE_LEVELS } from '@/types'
+import { useCourses } from '@/hooks/useLeads'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { CustomizableFilterBar, type FilterItem } from '@/components/shared/CustomizableFilterBar'
@@ -26,10 +26,10 @@ export default function FeeManagement() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { can, isOwner } = useAuth()
+  const { data: courses = [] } = useCourses()
   const [overdueOnly, setOverdueOnly] = useState(false)
-  const [courseLevel, setCourseLevel] = useState<string>('all')
+  const [courseId, setCourseId] = useState<string>('all')
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
-  const [flaggedOnly, setFlaggedOnly] = useState(false)
   const [dateSort, setDateSort] = useState<string>('created_desc')
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function FeeManagement() {
   }, [searchParams])
   const { data: rawFees = [], isLoading } = useFees({
     overdue: overdueOnly,
-    courseLevel,
+    courseId: courseId === 'all' ? undefined : courseId,
     paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
   })
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -71,9 +71,19 @@ export default function FeeManagement() {
   const [txnId, setTxnId] = useState('')
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
-  const filteredFees = flaggedOnly ? rawFees.filter((f) => f.flag_color != null) : rawFees
+  const filteredFees = rawFees
 
   const fees = [...filteredFees].sort((a, b) => {
+    if (dateSort === 'due_asc') {
+      const da = a.next_due_date ? new Date(a.next_due_date).getTime() : (a.installments?.[0]?.due_date ? new Date(a.installments[0].due_date).getTime() : 9999999999999)
+      const db = b.next_due_date ? new Date(b.next_due_date).getTime() : (b.installments?.[0]?.due_date ? new Date(b.installments[0].due_date).getTime() : 9999999999999)
+      return da - db
+    }
+    if (dateSort === 'due_desc') {
+      const da = a.next_due_date ? new Date(a.next_due_date).getTime() : (a.installments?.[0]?.due_date ? new Date(a.installments[0].due_date).getTime() : 0)
+      const db = b.next_due_date ? new Date(b.next_due_date).getTime() : (b.installments?.[0]?.due_date ? new Date(b.installments[0].due_date).getTime() : 0)
+      return db - da
+    }
     if (dateSort === 'created_desc') {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     }
@@ -398,23 +408,22 @@ export default function FeeManagement() {
   }
 
   const DEFAULT_FEE_FILTERS = [
-    'course_level',
+    'course',
     'payment_status',
-    'date_sort',
+    'due_date',
     'overdue',
-    'flagged',
   ]
 
   const feeFilterItems: FilterItem[] = [
     {
-      key: 'course_level',
+      key: 'course',
       component: (
-        <Select value={courseLevel} onValueChange={setCourseLevel}>
-          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
+        <Select value={courseId} onValueChange={setCourseId}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Course" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Course Levels</SelectItem>
-            {FEE_COURSE_LEVELS.map((lvl) => (
-              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
+            <SelectItem value="all">All Courses</SelectItem>
+            {courses.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -424,26 +433,26 @@ export default function FeeManagement() {
       key: 'payment_status',
       component: (
         <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Health" /></SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="paid">Paid in Full</SelectItem>
-            <SelectItem value="pending">Pending Balance</SelectItem>
-            <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="due">Due</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
           </SelectContent>
         </Select>
       ),
     },
     {
-      key: 'date_sort',
+      key: 'due_date',
       component: (
         <Select value={dateSort} onValueChange={setDateSort}>
-          <SelectTrigger className="w-52"><SelectValue placeholder="Sort by Date" /></SelectTrigger>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Due Date / Sort" /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="due_asc">Due Date (Earliest First)</SelectItem>
+            <SelectItem value="due_desc">Due Date (Latest First)</SelectItem>
             <SelectItem value="created_desc">Created Date (Newest First)</SelectItem>
-            <SelectItem value="created_asc">Created Date (Oldest First)</SelectItem>
             <SelectItem value="reg_desc">Registration Date (Newest)</SelectItem>
-            <SelectItem value="reg_asc">Registration Date (Oldest)</SelectItem>
           </SelectContent>
         </Select>
       ),
@@ -458,19 +467,6 @@ export default function FeeManagement() {
           onClick={() => setOverdueOnly((prev) => !prev)}
         >
           {overdueOnly ? 'Showing Overdue' : 'Overdue Only'}
-        </Button>
-      ),
-    },
-    {
-      key: 'flagged',
-      component: (
-        <Button
-          variant={flaggedOnly ? 'destructive' : 'outline'}
-          size="sm"
-          className="text-xs h-10"
-          onClick={() => setFlaggedOnly((prev) => !prev)}
-        >
-          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
         </Button>
       ),
     },

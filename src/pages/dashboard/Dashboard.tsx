@@ -420,7 +420,7 @@ function OwnerDashboard() {
   const revenue = stats?.revenue ?? 0
   const admissions = stats?.admissionsMonth ?? 0
   const admissionsGoal = 500
-  const convertedLeads = (stats as any)?.convertedLeads ?? admissions
+  const convertedLeads = (stats?.convertedLeads && stats.convertedLeads > 0) ? stats.convertedLeads : admissions
   const rawConversionRate = stats?.totalLeads ? ((convertedLeads / stats.totalLeads) * 100) : 0
   const conversionRateDisplay = rawConversionRate === 0
     ? '0%'
@@ -942,10 +942,10 @@ function OwnerDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="h-8 text-xs bg-white border-amber-300 text-amber-900 hover:bg-amber-50" onClick={() => window.location.href = '/followups'}>
+            <Button size="sm" variant="outline" className="h-8 text-xs bg-white border-amber-300 text-amber-900 hover:bg-amber-50" onClick={() => navigate('/followups?tab=overdue')}>
               View Follow-ups
             </Button>
-            <Button size="sm" className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={() => window.location.href = '/fees'}>
+            <Button size="sm" className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={() => navigate('/fees?filter=overdue')}>
               Fee Ledger
             </Button>
           </div>

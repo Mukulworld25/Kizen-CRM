@@ -302,9 +302,10 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       }
 
       if (filters.paymentStatus) {
-        if (filters.paymentStatus === 'paid') rawFees = rawFees.filter((f) => f.pending_balance <= 0)
-        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.pending_balance > 0)
-        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.pending_balance > 50000)
+        if (filters.paymentStatus === 'paid') rawFees = rawFees.filter((f) => f.payment_status === 'paid' || f.pending_balance <= 0)
+        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.payment_status === 'pending' || f.pending_balance > 0)
+        if (filters.paymentStatus === 'due') rawFees = rawFees.filter((f) => f.payment_status === 'due')
+        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.installments?.some((i) => i.status === 'overdue') || f.pending_balance > 50000)
       }
 
       const fees = rawFees.map((f) => {
@@ -880,7 +881,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         leadsYesterday: leadsYesterday ?? 0,
         leadsWeek: leadsWeek ?? 0,
         admissionsMonth: admissionsMonth ?? 0,
-        convertedLeads: convertedLeads ?? admissionsMonth ?? 0,
+        convertedLeads: (convertedLeads && convertedLeads > 0) ? convertedLeads : (admissionsMonth ?? 0),
         revenue,
         pending,
         followUpsDue: followUpsDue ?? 0,

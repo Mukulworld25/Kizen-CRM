@@ -37,6 +37,8 @@ export function useLeads(filters: LeadFilters = {}) {
         }
       }
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
+      if (filters.interestLevel) query = query.ilike('interest_level', filters.interestLevel)
+      if (filters.disposition) query = query.ilike('disposition', filters.disposition)
       if (filters.counselorId) query = query.eq('assigned_counselor_id', filters.counselorId)
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)
       if (filters.priority) query = query.eq('priority', filters.priority)

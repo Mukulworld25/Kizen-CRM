@@ -11,8 +11,7 @@ import { useOverdueCount } from '@/hooks/useStudents'
 import { roleLabels } from '@/lib/permissions'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import kizenLogo from '@/assets/kizen-logo.jpg'
-import sagedoLogo from '@/assets/sagedo-logo.jpeg'
+import kizenLogo from '@/assets/kizen-lotus.png'
 
 import { useFeaturePermissions } from '@/hooks/useFeaturePermissions'
 
@@ -67,29 +66,47 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
     return can(item.permission)
   })
 
+  const isCollapsed = collapsed && !mobile
+
   return (
     <aside
       className={cn(
-        'flex h-full flex-col transition-all duration-300',
-        collapsed && !mobile ? 'w-16' : 'w-64'
+        'flex h-full flex-col transition-all duration-300 overflow-hidden select-none shrink-0',
+        isCollapsed ? 'w-16' : 'w-64'
       )}
       style={{ backgroundColor: 'var(--sidebar)', color: 'var(--sidebar-foreground)' }}
     >
-      <div className="flex h-16 items-center justify-between border-b px-4" style={{ borderColor: 'var(--sidebar-border)' }}>
-        {(!collapsed || mobile) && (
-          <div className="flex items-center gap-2.5">
-            <img src={kizenLogo} alt="Kizen Education" className="h-9 w-9 rounded-xl object-cover shadow-sm border border-white/20" />
-            <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--sidebar-foreground)' }}>Kizen Education</span>
+      <div 
+        className={cn(
+          "flex h-16 items-center border-b px-3 transition-all duration-300",
+          isCollapsed ? "justify-center" : "justify-between"
+        )} 
+        style={{ borderColor: 'var(--sidebar-border)' }}
+      >
+        {isCollapsed ? (
+          <button 
+            type="button" 
+            onClick={onToggle} 
+            title="Expand Sidebar"
+            className="flex items-center justify-center p-1 rounded-xl hover:bg-white/10 transition-colors"
+          >
+            <img src={kizenLogo} alt="Kizen Logo" className="h-8 w-8 rounded-lg object-contain shadow-sm border border-white/20" />
+            <span className="sr-only">Expand Sidebar</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src={kizenLogo} alt="Kizen Logo" className="h-9 w-9 rounded-xl object-contain shadow-sm border border-white/20 shrink-0" />
+            <span className="font-semibold text-sm tracking-wide truncate" style={{ color: 'var(--sidebar-foreground)' }}>Kizen Education</span>
           </div>
         )}
-        {!mobile && (
-          <button type="button" onClick={onToggle} className="rounded-lg p-1.5 hover:bg-white/10 transition-colors">
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {!isCollapsed && !mobile && (
+          <button type="button" onClick={onToggle} title="Collapse Sidebar" className="rounded-lg p-1.5 hover:bg-white/10 transition-colors shrink-0">
+            <ChevronLeft className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 p-3 overflow-y-auto min-h-0">
+      <nav className={cn("flex-1 space-y-1 overflow-y-auto min-h-0", isCollapsed ? "p-2" : "p-3")}>
         {visibleItems.map((item) => {
           const Icon = item.icon
           const active = location.pathname.startsWith(item.path)
@@ -98,8 +115,10 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               key={item.path}
               to={item.path}
               onClick={onNavigate}
+              title={isCollapsed ? item.label : undefined}
               className={cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                'flex items-center rounded-xl text-sm font-medium transition-all duration-150',
+                isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
                 active
                   ? 'shadow-sm'
                   : 'hover:bg-white/10'
@@ -110,9 +129,9 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               }}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {(!collapsed || mobile) && (
+              {!isCollapsed && (
                 <>
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && overdueCount > 0 && (
                     <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">{overdueCount}</Badge>
                   )}
@@ -124,24 +143,24 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
       </nav>
 
       {profile && (
-        <div className="border-t p-4" style={{ borderColor: 'var(--sidebar-border)' }}>
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9" style={{ boxShadow: '0 0 0 2px var(--sidebar-accent)' }}>
+        <div className={cn("border-t transition-all duration-300", isCollapsed ? "p-2" : "p-4")} style={{ borderColor: 'var(--sidebar-border)' }}>
+          <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+            <Avatar className="h-9 w-9 shrink-0" style={{ boxShadow: '0 0 0 2px var(--sidebar-accent)' }}>
               <AvatarFallback className="text-xs font-semibold" style={{ backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' }}>
                 {profile.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
               </AvatarFallback>
             </Avatar>
-            {(!collapsed || mobile) && (
+            {!isCollapsed && (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>{profile.name}</p>
-                <p className="text-xs" style={{ color: 'var(--sidebar-accent-foreground)', opacity: 0.7 }}>{roleLabels[profile.role]}</p>
+                <p className="text-xs truncate" style={{ color: 'var(--sidebar-accent-foreground)', opacity: 0.7 }}>{roleLabels[profile.role]}</p>
               </div>
             )}
           </div>
-          {(!collapsed || mobile) && (
+          {!isCollapsed && (
             <div className="mt-3 flex items-center justify-center gap-1.5 pt-2 border-t border-white/10 opacity-80">
               <span className="text-[10px] tracking-wide font-medium" style={{ color: 'var(--sidebar-foreground)' }}>Powered by</span>
-              <img src={sagedoLogo} alt="SAGE DO" className="h-4 object-contain rounded" />
+              <span className="text-xs font-black tracking-wider text-amber-400">SAGE DO</span>
             </div>
           )}
         </div>

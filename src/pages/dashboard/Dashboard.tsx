@@ -429,6 +429,7 @@ function OwnerDashboard() {
     : `${rawConversionRate.toFixed(1)}%`
   const overdueFus = stats?.followUpsOverdue ?? 0
   const coldLeads = insights?.coldLeads ?? 0
+  const staleLeads = insights?.staleLeads ?? 0
   const overdueInstallments = insights?.overdueInstallments ?? 0
   const fullBatches = insights?.fullBatches ?? []
 
@@ -498,8 +499,8 @@ function OwnerDashboard() {
               >
                 <div>
                   <p className="text-[11px] text-slate-500 font-semibold">Stale Leads (&gt;48h Uncontacted)</p>
-                  <h4 className="text-xl font-black text-red-600 mt-0.5">342</h4>
-                  <span className="text-[10px] text-red-500 font-medium">Requires Immediate Call</span>
+                  <h4 className="text-xl font-black text-red-600 mt-0.5">{staleLeads}</h4>
+                  <span className="text-[10px] text-red-500 font-medium">{staleLeads > 0 ? 'Requires Immediate Call' : 'All Leads Contacted / Fresh'}</span>
                 </div>
                 <AlertTriangle className="w-6 h-6 text-red-400 opacity-80" />
               </div>
@@ -540,11 +541,13 @@ function OwnerDashboard() {
           </div>
         )
       case 'lead_temperature':
+        const tempStats = insights?.temperatureStats ?? { hot: 0, warm: 0, cold: 0, newOrUnassigned: 0 }
         const tempSummary = [
-          { name: 'Hot Leads (🔥)', value: 1240, color: '#EF4444' },
-          { name: 'Warm Leads (☀️)', value: 4500, color: '#F59E0B' },
-          { name: 'Cold Leads (❄️)', value: 5910, color: '#3B82F6' },
-        ]
+          { name: 'Hot Leads (🔥)', value: tempStats.hot, color: '#EF4444' },
+          { name: 'Warm Leads (☀️)', value: tempStats.warm, color: '#F59E0B' },
+          { name: 'Cold Leads (❄️)', value: tempStats.cold, color: '#3B82F6' },
+          { name: 'New / Fresh (🌱)', value: tempStats.newOrUnassigned, color: '#10B981' },
+        ].filter(t => t.value > 0 || (tempStats.hot === 0 && tempStats.warm === 0 && tempStats.cold === 0 && t.name.includes('New')))
         return (
           <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
             <div className="flex items-center gap-2 mb-3">
@@ -602,11 +605,12 @@ function OwnerDashboard() {
           </div>
         )
       case 'counselor_leaderboard':
-        const counselors = [
-          { name: 'Preeti Verma', leads: 420, converted: 48, revenue: 2240000, rate: '11.4%' },
-          { name: 'Aadya Sharma', leads: 380, converted: 39, revenue: 1850000, rate: '10.2%' },
-          { name: 'Lakshaya Ma\'am', leads: 310, converted: 32, revenue: 1584000, rate: '10.3%' },
-        ]
+        const counselors = (insights?.counselorStats && insights.counselorStats.length > 0)
+          ? insights.counselorStats
+          : [
+              { name: 'Aadya Sharma', leads: 0, converted: 0, revenue: 0, rate: '0.0%' },
+              { name: 'Attender Staff', leads: 0, converted: 0, revenue: 0, rate: '0.0%' },
+            ]
         return (
           <div className="glass-card rounded-2xl p-5 animate-card-in flex flex-col h-full">
             <div className="flex items-center gap-2 mb-3">
@@ -625,7 +629,7 @@ function OwnerDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {counselors.map((c) => (
+                  {counselors.map((c: any) => (
                     <tr key={c.name} className="hover:bg-slate-50/50">
                       <td className="py-2.5 font-bold text-slate-800">{c.name}</td>
                       <td className="py-2.5 text-right tabular-nums text-slate-600">{c.leads}</td>
@@ -1359,6 +1363,7 @@ function ReceptionDashboard({ stats, isLoading }: { stats: any; isLoading: boole
         const { data: leads } = await supabase
           .from('leads')
           .select('id, full_name, mobile, created_at, source')
+          .eq('is_deleted', false)
           .order('created_at', { ascending: false })
           .limit(5)
 

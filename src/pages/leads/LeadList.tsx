@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { useUpdateLead } from '@/hooks/useLeads'
+import { CustomizableFilterBar, type FilterItem } from '@/components/shared/CustomizableFilterBar'
 
 export default function LeadList() {
   const navigate = useNavigate()
@@ -61,50 +62,109 @@ export default function LeadList() {
 
   const columns: Column<Lead>[] = [
     {
-      key: 'flag',
-      header: '',
-      render: (r) => (
-        <div className="flex items-center justify-center w-4">
-          <FlagDot color={r.flag_color} reason={r.flag_reason} />
+      key: 's_no',
+      header: 'Sr No',
+      render: (_r, index) => (
+        <div className="flex items-center gap-1.5">
+          <FlagDot color={_r.flag_color} reason={_r.flag_reason} />
+          <span className="font-mono text-xs text-slate-500 font-bold">
+            {((filters.page ?? 1) - 1) * (filters.pageSize ?? 15) + index + 1}
+          </span>
         </div>
       ),
     },
     {
-      key: 'display_id',
-      header: 'Lead ID',
+      key: 'full_name',
+      header: 'Names',
       sortable: true,
-      render: (r) => (
-        <span className="font-mono text-xs font-semibold text-primary">
-          {r.display_id || '—'}
-        </span>
-      ),
-      exportValue: (r) => r.display_id ?? '',
+      render: (r) => <span className="font-medium text-slate-900">{r.full_name}</span>,
+      exportValue: (r) => r.full_name,
     },
-    { key: 'full_name', header: 'Name', sortable: true, exportValue: (r) => r.full_name },
     { 
       key: 'mobile', 
-      header: 'Mobile', 
-      render: (r) => (r.mobile && r.mobile !== '9999999999') ? r.mobile : <span className="text-slate-400 italic text-xs font-normal">— No Phone —</span>, 
+      header: 'Contact No.', 
+      render: (r) => (r.mobile && r.mobile !== '9999999999') ? <span className="font-mono text-xs">{r.mobile}</span> : <span className="text-slate-400 italic text-xs font-normal">—</span>, 
       exportValue: (r) => (r.mobile && r.mobile !== '9999999999') ? r.mobile : '' 
     },
-    { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—', exportValue: (r) => r.course?.name ?? '' },
-    { key: 'source', header: 'Source', render: (r) => r.source?.replace('_', ' ') ?? '—', exportValue: (r) => r.source ?? '' },
-    { key: 'status', header: 'Status', render: (r) => <LeadStatusBadge status={r.status} /> },
-    { key: 'call_status', header: 'Call Status', render: (r) => r.call_status ?? '—' },
-    { key: 'disposition', header: 'Disposition', render: (r) => r.disposition ?? '—' },
-    { key: 'tap_date', header: 'Tap Date', render: (r) => r.tap_date ? format(new Date(r.tap_date), 'MMM d, yyyy') : '—' },
-    { key: 'followup_1', header: 'Follow-up 1', render: (r) => r.followup_date_1 ? <div className="text-xs"><div>{format(new Date(r.followup_date_1), 'MMM d')}</div><div className="text-slate-400 truncate max-w-[120px]">{r.followup_remarks_1}</div></div> : '—' },
-    { key: 'temperature', header: 'Temp', render: (r) => <TemperatureBadge temperature={r.temperature} /> },
-    { key: 'budget', header: 'Budget', render: (r) => r.budget ? `₹${r.budget.toLocaleString()}` : '—' },
-    { key: 'lead_score', header: 'Score', sortable: true, render: (r) => r.lead_score != null ? (
-      <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${r.lead_score >= 60 ? 'bg-red-100 text-red-800' : r.lead_score >= 30 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
-        {r.lead_score}
-      </span>
-    ) : '—' },
-    { key: 'priority', header: 'Priority', render: (r) => <PriorityBadge priority={r.priority} /> },
-    { key: 'counselor', header: 'Counselor', render: (r) => r.counselor?.name ?? '—', exportValue: (r) => r.counselor?.name ?? '' },
-    { key: 'expected_joining_date', header: 'Exp. Joining', render: (r) => r.expected_joining_date ? new Date(r.expected_joining_date).toLocaleDateString() : '—' },
-    { key: 'created_at', header: 'Created', render: (r) => format(new Date(r.created_at), 'MMM d, yyyy'), sortable: true },
+    {
+      key: 'lead_date',
+      header: 'Lead Date',
+      sortable: true,
+      render: (r) => r.lead_date ? format(new Date(r.lead_date), 'dd/MM/yy') : '—',
+      exportValue: (r) => r.lead_date ? format(new Date(r.lead_date), 'dd/MM/yy') : '',
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      render: (r) => r.source?.replace('_', ' ') ?? '—',
+      exportValue: (r) => r.source ?? '',
+    },
+    {
+      key: 'class_year',
+      header: 'Current Class/ Qualification',
+      render: (r) => (r as any).class_year || '—',
+      exportValue: (r) => (r as any).class_year ?? '',
+    },
+    {
+      key: 'city',
+      header: 'City',
+      render: (r) => r.city || '—',
+      exportValue: (r) => r.city ?? '',
+    },
+    {
+      key: 'tap_date',
+      header: 'Tap Date',
+      render: (r) => r.tap_date ? format(new Date(r.tap_date), 'dd/MM/yy') : '—',
+      exportValue: (r) => r.tap_date ? format(new Date(r.tap_date), 'dd/MM/yy') : '',
+    },
+    {
+      key: 'call_status',
+      header: 'Call Status',
+      render: (r) => r.call_status ?? '—',
+      exportValue: (r) => r.call_status ?? '',
+    },
+    {
+      key: 'interest_level',
+      header: 'Interest level',
+      render: (r) => r.interest_level ?? '—',
+      exportValue: (r) => r.interest_level ?? '',
+    },
+    {
+      key: 'disposition',
+      header: 'Disposition',
+      render: (r) => r.disposition ?? '—',
+      exportValue: (r) => r.disposition ?? '',
+    },
+    {
+      key: 'notes',
+      header: 'Remarks',
+      render: (r) => r.notes ? <span className="truncate max-w-[140px] inline-block text-xs" title={r.notes}>{r.notes}</span> : '—',
+      exportValue: (r) => r.notes ?? '',
+    },
+    {
+      key: 'followup_date_1',
+      header: 'Date',
+      render: (r) => r.followup_date_1 ? format(new Date(r.followup_date_1), 'dd/MM/yy') : '—',
+      exportValue: (r) => r.followup_date_1 ? format(new Date(r.followup_date_1), 'dd/MM/yy') : '',
+    },
+    {
+      key: 'followup_remarks_1',
+      header: 'Follow-up 1',
+      render: (r) => r.followup_remarks_1 ? <span className="truncate max-w-[140px] inline-block text-xs" title={r.followup_remarks_1}>{r.followup_remarks_1}</span> : '—',
+      exportValue: (r) => r.followup_remarks_1 ?? '',
+    },
+    {
+      key: 'followup_date_2',
+      header: 'Date',
+      render: (r) => r.followup_date_2 ? format(new Date(r.followup_date_2), 'dd/MM/yy') : '—',
+      exportValue: (r) => r.followup_date_2 ? format(new Date(r.followup_date_2), 'dd/MM/yy') : '',
+    },
+    {
+      key: 'followup_remarks_2',
+      header: 'Follow-up 2',
+      render: (r) => r.followup_remarks_2 ? <span className="truncate max-w-[140px] inline-block text-xs" title={r.followup_remarks_2}>{r.followup_remarks_2}</span> : '—',
+      exportValue: (r) => r.followup_remarks_2 ?? '',
+    },
     {
       key: 'actions',
       header: 'Actions',
@@ -140,15 +200,23 @@ export default function LeadList() {
     return (all ?? []) as Lead[]
   }
 
-  return (
-    <div>
-      <PageHeader title="Leads" description="Manage your lead pipeline">
-        {can('addLeads') && (
-          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Lead</Button>
-        )}
-      </PageHeader>
+  const DEFAULT_LEAD_FILTERS = [
+    'display_id',
+    'status',
+    'channel',
+    'sheet_source',
+    'temperature',
+    'refresh_scores',
+    'counselor',
+    'course',
+    'priority',
+    'flagged',
+  ]
 
-      <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border p-3 shadow-sm" style={{ background: 'var(--card)' }}>
+  const leadFilterItems: FilterItem[] = [
+    {
+      key: 'display_id',
+      component: (
         <div className="relative w-44">
           <Input
             placeholder="Search by ID (KZ-)..."
@@ -160,6 +228,11 @@ export default function LeadList() {
             className="h-10 text-xs font-mono"
           />
         </div>
+      ),
+    },
+    {
+      key: 'status',
+      component: (
         <Select value={filters.status ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, status: v === 'all' ? undefined : v as LeadStatus }))}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
@@ -169,6 +242,11 @@ export default function LeadList() {
             ))}
           </SelectContent>
         </Select>
+      ),
+    },
+    {
+      key: 'channel',
+      component: (
         <Select value={filters.source ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, source: v === 'all' ? undefined : v as LeadSource }))}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Channel" /></SelectTrigger>
           <SelectContent>
@@ -176,6 +254,11 @@ export default function LeadList() {
             {LEAD_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+      ),
+    },
+    {
+      key: 'sheet_source',
+      component: (
         <Select value={filters.sheetSource ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, sheetSource: v === 'all' ? undefined : v }))}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Source Sheet / Campaign" /></SelectTrigger>
           <SelectContent>
@@ -183,6 +266,11 @@ export default function LeadList() {
             {SHEET_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+      ),
+    },
+    {
+      key: 'temperature',
+      component: (
         <Select value={filters.temperature ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, temperature: v === 'all' ? undefined : v as LeadTemperature }))}>
           <SelectTrigger className="w-32"><SelectValue placeholder="Temperature" /></SelectTrigger>
           <SelectContent>
@@ -192,20 +280,33 @@ export default function LeadList() {
             <SelectItem value="cold">Cold</SelectItem>
           </SelectContent>
         </Select>
-        <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+      ),
+    },
+    {
+      key: 'refresh_scores',
+      component: (
+        <Button size="sm" variant="outline" className="text-xs h-10" onClick={() => {
           supabase.rpc('compute_lead_scores').then(() => window.location.reload())
         }}>
           Refresh Scores
         </Button>
-        {can('assignCounselor') && (
-          <Select value={filters.counselorId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, counselorId: v === 'all' ? undefined : v }))}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Counselor" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Counselors</SelectItem>
-              {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
+      ),
+    },
+    ...(can('assignCounselor') ? [{
+      key: 'counselor',
+      component: (
+        <Select value={filters.counselorId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, counselorId: v === 'all' ? undefined : v }))}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Counselor" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Counselors</SelectItem>
+            {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      ),
+    }] : []),
+    {
+      key: 'course',
+      component: (
         <Select value={filters.courseId ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, courseId: v === 'all' ? undefined : v }))}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Course" /></SelectTrigger>
           <SelectContent>
@@ -213,6 +314,11 @@ export default function LeadList() {
             {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
+      ),
+    },
+    {
+      key: 'priority',
+      component: (
         <Select value={filters.priority ?? 'all'} onValueChange={(v) => setFilters((f) => ({ ...f, priority: v === 'all' ? undefined : v as Priority }))}>
           <SelectTrigger className="w-32"><SelectValue placeholder="Priority" /></SelectTrigger>
           <SelectContent>
@@ -222,16 +328,36 @@ export default function LeadList() {
             <SelectItem value="low">Low</SelectItem>
           </SelectContent>
         </Select>
-
+      ),
+    },
+    {
+      key: 'flagged',
+      component: (
         <Button
           variant={flaggedOnly ? 'destructive' : 'outline'}
           size="sm"
-          className="text-xs"
+          className="text-xs h-10"
           onClick={() => setFlaggedOnly((prev) => !prev)}
         >
           {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
         </Button>
-      </div>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      <PageHeader title="Leads" description="Manage your lead pipeline">
+        {can('addLeads') && (
+          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Lead</Button>
+        )}
+      </PageHeader>
+
+      <CustomizableFilterBar
+        tableKey="leads"
+        items={leadFilterItems}
+        defaultOrder={DEFAULT_LEAD_FILTERS}
+      />
 
       <DataTable
         columns={columns}
@@ -246,7 +372,9 @@ export default function LeadList() {
         exportFilename="kizen-leads"
         totalCount={data?.total}
         page={filters.page ?? 1}
+        pageSize={filters.pageSize ?? 15}
         onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
+        onSearch={(s) => setFilters((f) => ({ ...f, search: s || undefined, page: 1 }))}
         rowKey={(r) => r.id}
         onRowClick={(r) => navigate(`/leads/${r.id}`)}
         emptyTitle="No leads yet"

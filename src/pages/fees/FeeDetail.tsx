@@ -78,7 +78,7 @@ export default function FeeDetail() {
                   {installments.map((inst) => (
                     <TableRow key={inst.id}>
                       <TableCell>{inst.installment_number}</TableCell>
-                      <TableCell>{format(new Date(inst.due_date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{inst.due_date ? format(new Date(inst.due_date), 'MMM d, yyyy') : '—'}</TableCell>
                       <TableCell>{formatCurrency(inst.amount)}</TableCell>
                       <TableCell>
                         <Badge variant={inst.status === 'paid' ? 'success' : inst.status === 'overdue' ? 'destructive' : 'warning'}>

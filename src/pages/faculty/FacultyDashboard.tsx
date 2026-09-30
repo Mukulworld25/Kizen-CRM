@@ -62,6 +62,7 @@ export default function FacultyDashboard() {
       const { data, error } = await supabase
         .from('students')
         .select('*, course:courses(name), batch:batches(id, batch_name, timing, days_of_week), faculty:users(name)')
+        .eq('is_deleted', false)
         .order('full_name')
       if (error) throw error
       return (data ?? []) as Student[]
@@ -76,6 +77,7 @@ export default function FacultyDashboard() {
         .from('students')
         .select('*')
         .eq('batch_id', selectedBatch)
+        .eq('is_deleted', false)
         .order('full_name')
       if (error) throw error
       return (data ?? []) as Student[]

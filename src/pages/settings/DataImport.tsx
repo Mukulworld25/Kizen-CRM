@@ -1,810 +1,349 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, ArrowRight, Settings, Info, Sparkles } from 'lucide-react'
+import { Input, Label } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { 
+  FileSpreadsheet, 
+  Send, 
+  CheckCircle2, 
+  Clock, 
+  ShieldCheck, 
+  Database, 
+  AlertCircle,
+  ExternalLink,
+  History
+} from 'lucide-react'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 
-interface ImportRow {
-  rowNum: number
-  data: Record<string, any>
-  errors: string[]
-  warnings: string[]
+interface IntakeSetting {
+  id: string
+  source: string
+  is_enabled: boolean
+  last_synced_at: string | null
 }
 
-interface FieldMapping {
-  spreadsheetCol: string
-  schemaField: string
-  confidence?: number
-  reason?: string
+interface IntakeRequestRecord {
+  id: string
+  ticket_id: string
+  data_type: string
+  dataset_name: string
+  sheet_url: string
+  priority: string
+  notes: string
+  status: 'pending' | 'in_progress' | 'completed'
+  created_at: string
 }
 
 export default function DataImport() {
-  const { can } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  const [importType, setImportType] = useState<'leads' | 'students'>('leads')
-  const [step, setStep] = useState<'upload' | 'map' | 'preview' | 'done'>('upload')
-  const [rawRows, setRawRows] = useState<Record<string, string>[]>([])
-  const [mapping, setMapping] = useState<FieldMapping[]>([])
-  const [parsedRows, setParsedRows] = useState<ImportRow[]>([])
-  const [importing, setImporting] = useState(false)
-  const [imported, setImported] = useState(0)
-  
-  // Database lookup cache for resolving FKs
-  const [courses, setCourses] = useState<any[]>([])
-  const [batches, setBatches] = useState<any[]>([])
-  const [createdCourses, setCreatedCourses] = useState<string[]>([])
-  const [createdBatches, setCreatedBatches] = useState<string[]>([])
-  const [showPopup, setShowPopup] = useState(false)
+  const { session, profile, isOwner } = useAuth()
+  const [settings, setSettings] = useState<IntakeSetting[]>([])
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Form State
+  const [dataType, setDataType] = useState<string>('leads')
+  const [datasetName, setDatasetName] = useState<string>('')
+  const [sheetUrl, setSheetUrl] = useState<string>('')
+  const [priority, setPriority] = useState<string>('standard')
+  const [notes, setNotes] = useState<string>('')
+
+  // Submission confirmation modal state
+  const [submittedTicket, setSubmittedTicket] = useState<string | null>(null)
+
+  // Recent requests stored locally in session
+  const [recentRequests, setRecentRequests] = useState<IntakeRequestRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('kizen_sagedo_intake_requests')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
 
   useEffect(() => {
-    async function loadCache() {
-      const { data: c } = await supabase.from('courses').select('*')
-      const { data: b } = await supabase.from('batches').select('*')
-      if (c) setCourses(c)
-      if (b) setBatches(b)
+    async function loadSettings() {
+      setLoading(true)
+      const { data } = await supabase.from('data_intake_settings').select('*')
+      if (data) setSettings(data)
+      setLoading(false)
     }
-    loadCache()
+    loadSettings()
   }, [])
 
-  if (!can('importData')) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground font-medium">You do not have permission to import data.</p>
-      </div>
-    )
-  }
-
-  // Target schema fields depending on Leads vs Students
-  const leadFields = [
-    { field: 'full_name', label: 'Full Name', required: true },
-    { field: 'mobile', label: 'Mobile / Phone', required: true },
-    { field: 'email', label: 'Email', required: false },
-    { field: 'parent_name', label: 'Parent Name', required: false },
-    { field: 'parent_contact', label: 'Parent Contact', required: false },
-    { field: 'city', label: 'City', required: false },
-    { field: 'school_college', label: 'School/College', required: false },
-    { field: 'source', label: 'Source (instagram, walk_in, etc)', required: false },
-    { field: 'course_name', label: 'Interested Course', required: false },
-    { field: 'status', label: 'Status (new_lead, etc)', required: false },
-    { field: 'notes', label: 'Notes / Remarks', required: false }
-  ]
-
-  const studentFields = [
-    { field: 'full_name', label: 'Full Name', required: true },
-    { field: 'mobile', label: 'Mobile / Phone', required: true },
-    { field: 'email', label: 'Email', required: false },
-    { field: 'student_id', label: 'Student ID (Optional)', required: false },
-    { field: 'roll_number', label: 'Roll Number (Optional)', required: false },
-    { field: 'dob', label: 'Date of Birth (YYYY-MM-DD)', required: false },
-    { field: 'gender', label: 'Gender (male/female)', required: false },
-    { field: 'parent_name', label: 'Parent Name', required: false },
-    { field: 'parent_contact', label: 'Parent Contact', required: false },
-    { field: 'emergency_contact', label: 'Emergency Contact', required: false },
-    { field: 'address', label: 'Address', required: false },
-    { field: 'city', label: 'City', required: false },
-    { field: 'school_college', label: 'School/College', required: false },
-    { field: 'course_name', label: 'Course Enrolled', required: true },
-    { field: 'batch_name', label: 'Batch Name', required: true },
-    { field: 'admission_date', label: 'Admission Date (YYYY-MM-DD)', required: false },
-    { field: 'total_fee', label: 'Total Fee Amount', required: true },
-    { field: 'paid_amount', label: 'Amount Paid (Optional)', required: false },
-    { field: 'payment_date', label: 'Payment Date (Optional)', required: false },
-    { field: 'payment_method', label: 'Payment Method (cash/upi/card/etc)', required: false }
-  ]
-
-  const activeFields = importType === 'leads' ? leadFields : studentFields
-
-  // Helper to parse Excel dates or standard string dates safely (resolves epoch bug)
-  const parseExcelDate = (val: any): string | null => {
-    if (!val) return null
-    if (typeof val === 'number') {
-      // Excel serial date code
-      const date = new Date(Math.round((val - 25569) * 86400 * 1000))
-      return isNaN(date.getTime()) ? null : format(date, 'yyyy-MM-dd')
-    }
-    const cleanStr = String(val).trim()
-    if (!cleanStr) return null
-    const parsed = new Date(cleanStr)
-    return isNaN(parsed.getTime()) ? null : format(parsed, 'yyyy-MM-dd')
-  }
-
-  // Clean and standardize phone numbers
-  const parsePhoneNumber = (val: any): string => {
-    if (!val) return ''
-    let str = String(val).trim()
-    if (str.endsWith('.0')) str = str.slice(0, -2)
-    return str.replace(/\D/g, '').slice(-10) // standard 10 digit
-  }
-
-  // Dual-Engine Cell Content & Header Analyzer
-  const analyzeColumn = (header: string, sampleRows: Record<string, string>[]): { schemaField: string; confidence: number; reason: string } => {
-    const lowerHeader = header.toLowerCase().trim()
-
-    // Extract sample non-empty values
-    const samples = sampleRows.map(r => String(r[header] ?? '').trim()).filter(Boolean).slice(0, 25)
-
-    if (samples.length === 0) {
-      return { schemaField: '', confidence: 0, reason: 'Empty Column' }
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!datasetName.trim()) {
+      toast.error('Please provide a dataset name or campaign title')
+      return
     }
 
-    // Skip Serial Number columns
-    if (lowerHeader.includes('lead no') || lowerHeader.includes('s.no') || lowerHeader.includes('sr.no') || lowerHeader.includes('sr no')) {
-      return { schemaField: '', confidence: 100, reason: 'Skipped Serial Column' }
-    }
-
-    // Value Pattern Counters
-    let phoneMatches = 0
-    let emailMatches = 0
-    let feeMatches = 0
-
-    for (const val of samples) {
-      const digits = val.replace(/\D/g, '')
-      if (digits.length >= 10 && digits.length <= 12) phoneMatches++
-      if (val.includes('@') && val.includes('.')) emailMatches++
-      if (/\d/.test(val) && (val.includes('₹') || val.includes(',') || val.includes('rs') || /^\d+(\.\d+)?$/.test(val))) feeMatches++
-    }
-
-    const total = samples.length
-    const phoneRatio = phoneMatches / total
-    const emailRatio = emailMatches / total
-    const feeRatio = feeMatches / total
-
-    // 1. PHONE MATCH (Value inspect > 50% OR Header match)
-    const isPhoneHeader = lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('contact')
-    const isParentHeader = lowerHeader.includes('parent') || lowerHeader.includes('father')
-
-    if ((phoneRatio > 0.5 || isPhoneHeader) && !isParentHeader) {
-      return { schemaField: 'mobile', confidence: Math.round(Math.max(phoneRatio * 100, 95)), reason: 'Detected 10-digit mobile numbers in cells' }
-    }
-    if ((phoneRatio > 0.5 || isPhoneHeader) && isParentHeader) {
-      return { schemaField: 'parent_contact', confidence: 95, reason: 'Detected parent contact numbers' }
-    }
-
-    // 2. EMAIL MATCH
-    if (emailRatio > 0.4 || lowerHeader.includes('email') || lowerHeader.includes('mail')) {
-      return { schemaField: 'email', confidence: 99, reason: 'Detected email addresses in cells' }
-    }
-
-    // 3. NAME MATCH
-    if (lowerHeader.includes('name') && !isParentHeader && !lowerHeader.includes('course') && !lowerHeader.includes('batch')) {
-      return { schemaField: 'full_name', confidence: 99, reason: 'Matched Candidate Name header' }
-    }
-    if (isParentHeader && (lowerHeader.includes('name') || lowerHeader.includes('father'))) {
-      return { schemaField: 'parent_name', confidence: 95, reason: 'Matched Parent Name header' }
-    }
-
-    // 4. COURSE & BATCH
-    if (lowerHeader.includes('course') || lowerHeader.includes('program') || lowerHeader.includes('subject')) {
-      return { schemaField: 'course_name', confidence: 95, reason: 'Matched Course/Program header' }
-    }
-    if (lowerHeader.includes('batch')) {
-      return { schemaField: 'batch_name', confidence: 95, reason: 'Matched Batch Name header' }
-    }
-
-    // 5. FEE & AMOUNT MATCH
-    const isFeeHeader = lowerHeader.includes('total') || lowerHeader.includes('fee') || lowerHeader.includes('paid') || lowerHeader.includes('amount')
-    if (isFeeHeader || (feeRatio > 0.7 && !isPhoneHeader)) {
-      if (lowerHeader.includes('paid') || lowerHeader.includes('received')) {
-        return { schemaField: 'paid_amount', confidence: 95, reason: 'Detected paid monetary values' }
-      }
-      return { schemaField: 'total_fee', confidence: 95, reason: 'Detected total fee structure values' }
-    }
-
-    // 6. LOCATION / SCHOOL
-    if (lowerHeader.includes('city') || lowerHeader.includes('location')) {
-      return { schemaField: 'city', confidence: 90, reason: 'Matched City/Location header' }
-    }
-    if (lowerHeader.includes('college') || lowerHeader.includes('school')) {
-      return { schemaField: 'school_college', confidence: 90, reason: 'Matched School/College header' }
-    }
-
-    // 7. DATE MATCH
-    if (lowerHeader.includes('admission') || lowerHeader === 'date' || lowerHeader === 'lead date' || lowerHeader === 'enquiry date') {
-      return { schemaField: importType === 'leads' ? 'notes' : 'admission_date', confidence: 90, reason: 'Matched Date header' }
-    }
-
-    // 8. NOTES
-    if (lowerHeader.includes('followup') || lowerHeader.includes('notes') || lowerHeader.includes('remarks')) {
-      return { schemaField: 'notes', confidence: 85, reason: 'Matched Notes/Remarks header' }
-    }
-
-    return { schemaField: '', confidence: 0, reason: 'Unrecognized column' }
-  }
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' })
-        if (json.length === 0) {
-          toast.error('File is empty')
-          return
-        }
-        
-        const headers = Object.keys(json[0])
-        setRawRows(json)
-
-        // Run Dual-Engine Auto-Mapping
-        const initialMapping: FieldMapping[] = headers.map(h => {
-          const res = analyzeColumn(h, json)
-          return { spreadsheetCol: h, schemaField: res.schemaField, confidence: res.confidence, reason: res.reason }
-        })
-
-        setMapping(initialMapping)
-        setStep('map')
-        toast.success(`Loaded ${json.length} rows. Dual-Engine Content Classifier applied!`)
-      } catch (err) {
-        toast.error('Failed to parse file: ' + (err as Error).message)
-      }
-    }
-    reader.readAsArrayBuffer(file)
-  }
-
-  const updateMapping = (idx: number, schemaField: string) => {
-    const next = [...mapping]
-    next[idx] = { ...next[idx], schemaField }
-    setMapping(next)
-  }
-
-  const validateAndPreview = () => {
-    const activeMapping = mapping.filter(m => m.schemaField)
-    const requiredFields = activeFields.filter(f => f.required).map(f => f.field)
-
-    const rows: ImportRow[] = rawRows.map((row, i) => {
-      const data: Record<string, any> = {}
-      const errors: string[] = []
-      const warnings: string[] = []
-
-      for (const m of activeMapping) {
-        data[m.schemaField] = row[m.spreadsheetCol]
-      }
-
-      // 1. Check Required fields
-      for (const rf of requiredFields) {
-        if (!data[rf] || String(data[rf]).trim() === '') {
-          errors.push(`Missing required field: ${rf.replace('_', ' ')}`)
-        }
-      }
-
-      // 2. Clean Phone numbers & validate
-      if (data.mobile) {
-        data.mobile = parsePhoneNumber(data.mobile)
-        if (data.mobile.length < 10) {
-          errors.push(`Invalid mobile phone format (needs 10 digits): ${row[activeMapping.find(m => m.schemaField === 'mobile')?.spreadsheetCol ?? '']}`)
-        }
-      }
-
-      // 3. Clean Dates to prevent Jan 1, 1970 errors
-      if (data.dob) {
-        const parsed = parseExcelDate(data.dob)
-        if (!parsed) errors.push(`Invalid DOB format: ${data.dob}`)
-        else data.dob = parsed
-      }
-      if (data.admission_date) {
-        const parsed = parseExcelDate(data.admission_date)
-        if (!parsed) errors.push(`Invalid Admission Date format: ${data.admission_date}`)
-        else data.admission_date = parsed
-      }
-      if (data.payment_date) {
-        const parsed = parseExcelDate(data.payment_date)
-        if (!parsed) errors.push(`Invalid Payment Date format: ${data.payment_date}`)
-        else data.payment_date = parsed
-      }
-
-      // 4. Validate Numbers
-      if (importType === 'students') {
-        if (data.total_fee && isNaN(Number(data.total_fee))) {
-          errors.push(`Total fee must be a valid number: ${data.total_fee}`)
-        } else {
-          data.total_fee = Number(data.total_fee)
-        }
-
-        if (data.paid_amount) {
-          if (isNaN(Number(data.paid_amount))) {
-            errors.push(`Paid amount must be a number: ${data.paid_amount}`)
-          } else {
-            data.paid_amount = Number(data.paid_amount)
-          }
-        } else {
-          data.paid_amount = 0
-        }
-      }
-
-      return { rowNum: i + 2, data, errors, warnings }
-    })
-
-    setParsedRows(rows)
-    setStep('preview')
-  }
-
-  const handleImport = async () => {
-    setImporting(true)
-    const validRows = parsedRows.filter(r => r.errors.length === 0)
-    let count = 0
-    
-    const resolvedCourses = [...courses]
-    const resolvedBatches = [...batches]
-    const newCourses: string[] = []
-    const newBatches: string[] = []
+    setSubmitting(true)
+    const ticketId = `REQ-SAGEDO-${Math.floor(1000 + Math.random() * 9000)}`
 
     try {
-      for (const row of validRows) {
-        const rowData = row.data
-        
-        // --- COURSE RESOLUTION ---
-        let courseId = null
-        if (rowData.course_name) {
-          const cleanCourseName = String(rowData.course_name).trim()
-          let existingCourse = resolvedCourses.find(
-            c => c.name.toLowerCase() === cleanCourseName.toLowerCase()
-          )
-          
-          if (!existingCourse) {
-            // Auto-create missing Course (User Instruction 2)
-            const { data: newC, error: cErr } = await supabase
-              .from('courses')
-              .insert({
-                name: cleanCourseName,
-                total_fee: rowData.total_fee || 0,
-                is_active: true
-              })
-              .select()
-              .single()
-              
-            if (cErr) throw cErr
-            existingCourse = newC
-            resolvedCourses.push(newC)
-            newCourses.push(cleanCourseName)
-          }
-          courseId = existingCourse.id
-        }
+      // 1. Create a notification record for SAGEDO/Owner
+      await supabase.from('notifications').insert({
+        user_id: profile?.id,
+        title: `Data Intake Request: ${dataType.toUpperCase()} (${ticketId})`,
+        message: `New dataset intake requested by ${profile?.name || session?.user?.email || 'User'}: "${datasetName}". Priority: ${priority}. Notes: ${notes || 'None'}`,
+        type: 'system',
+        is_read: false
+      })
 
-        // --- BATCH RESOLUTION ---
-        let batchId = null
-        if (rowData.batch_name && courseId) {
-          const cleanBatchName = String(rowData.batch_name).trim()
-          let existingBatch = resolvedBatches.find(
-            b => b.batch_name.toLowerCase() === cleanBatchName.toLowerCase() && b.course_id === courseId
-          )
-
-          if (!existingBatch) {
-            // Auto-create missing Batch (User Instruction 2)
-            const { data: newB, error: bErr } = await supabase
-              .from('batches')
-              .insert({
-                course_id: courseId,
-                batch_name: cleanBatchName,
-                status: 'ongoing',
-                total_seats: 40
-              })
-              .select()
-              .single()
-              
-            if (bErr) throw bErr
-            existingBatch = newB
-            resolvedBatches.push(newB)
-            newBatches.push(cleanBatchName)
-          }
-          batchId = existingBatch.id
-        }
-
-        if (importType === 'leads') {
-          // --- LEADS BULK IMPORT ---
-          // Check if Lead already exists by Mobile (Option A)
-          const { data: existingLead } = await supabase
-            .from('leads')
-            .select('id')
-            .eq('mobile', rowData.mobile)
-            .maybeSingle()
-
-          const leadPayload = {
-            full_name: rowData.full_name,
-            mobile: rowData.mobile,
-            email: rowData.email || null,
-            parent_name: rowData.parent_name || null,
-            parent_contact: rowData.parent_contact || null,
-            city: rowData.city || null,
-            school_college: rowData.school_college || null,
-            interested_course_id: courseId,
-            source: rowData.source || 'walk_in',
-            status: rowData.status || 'new_lead',
-            notes: rowData.notes || null,
-          }
-
-          if (existingLead) {
-            // Option A: Update details
-            await supabase.from('leads').update(leadPayload).eq('id', existingLead.id)
-          } else {
-            // Insert new
-            await supabase.from('leads').insert(leadPayload)
-          }
-        } else {
-          // --- STUDENTS & FEES CASCADE IMPORT ---
-          // 1. Upsert Student (Option A: Update details on Mobile match)
-          const { data: existingStudent } = await supabase
-            .from('students')
-            .select('id')
-            .eq('mobile', rowData.mobile)
-            .maybeSingle()
-
-          const studentPayload = {
-            full_name: rowData.full_name,
-            mobile: rowData.mobile,
-            email: rowData.email || null,
-            student_id: rowData.student_id || null,
-            roll_number: rowData.roll_number || null,
-            dob: rowData.dob || null,
-            gender: rowData.gender || null,
-            parent_name: rowData.parent_name || null,
-            parent_contact: rowData.parent_contact || null,
-            emergency_contact: rowData.emergency_contact || null,
-            address: rowData.address || null,
-            city: rowData.city || null,
-            school_college: rowData.school_college || null,
-            course_id: courseId,
-            batch_id: batchId,
-            admission_date: rowData.admission_date || format(new Date(), 'yyyy-MM-dd'),
-            is_active: true
-          }
-
-          let studentId = null
-          if (existingStudent) {
-            await supabase.from('students').update(studentPayload).eq('id', existingStudent.id)
-            studentId = existingStudent.id
-          } else {
-            const { data: newS, error: sErr } = await supabase.from('students').insert(studentPayload).select().single()
-            if (sErr) throw sErr
-            studentId = newS.id
-          }
-
-          // 2. Setup Fee Record
-          const totalFee = rowData.total_fee
-          const paidAmount = rowData.paid_amount || 0
-          const pendingBalance = totalFee - paidAmount
-
-          // Check if fee record exists
-          const { data: existingFee } = await supabase.from('fees').select('*').eq('student_id', studentId).maybeSingle()
-
-          let feeId = null
-          if (existingFee) {
-            const updatedPaid = existingFee.amount_paid + paidAmount
-            const updatedPending = Math.max(0, existingFee.total_fee - updatedPaid)
-            const { data: nextFee } = await supabase
-              .from('fees')
-              .update({
-                amount_paid: updatedPaid,
-                pending_balance: updatedPending
-              })
-              .eq('id', existingFee.id)
-              .select()
-              .single()
-            feeId = nextFee?.id
-          } else {
-            const { data: newFee, error: fErr } = await supabase
-              .from('fees')
-              .insert({
-                student_id: studentId,
-                course_id: courseId,
-                total_fee: totalFee,
-                discount: 0,
-                scholarship: 0,
-                net_fee: totalFee,
-                amount_paid: paidAmount,
-                pending_balance: pendingBalance,
-                gst_applicable: false,
-                gst_percent: 18
-              })
-              .select()
-              .single()
-            if (fErr) throw fErr
-            feeId = newFee.id
-          }
-
-          // 3. Create Payment & Installments if Paid
-          if (paidAmount > 0 && feeId) {
-            // Record payment
-            await supabase.from('fee_payments').insert({
-              fee_id: feeId,
-              student_id: studentId,
-              amount: paidAmount,
-              payment_date: rowData.payment_date || format(new Date(), 'yyyy-MM-dd'),
-              payment_method: rowData.payment_method || 'cash',
-              receipt_number: `REC-${Date.now().toString(36).toUpperCase()}-${count}`
-            })
-
-            // Generate paid installment record
-            await supabase.from('installments').insert({
-              fee_id: feeId,
-              student_id: studentId,
-              installment_number: 1,
-              amount: paidAmount,
-              due_date: rowData.payment_date || format(new Date(), 'yyyy-MM-dd'),
-              paid_date: rowData.payment_date || format(new Date(), 'yyyy-MM-dd'),
-              status: 'paid'
-            })
-          }
-
-          // Create pending installment for balance if any
-          if (pendingBalance > 0 && feeId) {
-            await supabase.from('installments').insert({
-              fee_id: feeId,
-              student_id: studentId,
-              installment_number: paidAmount > 0 ? 2 : 1,
-              amount: pendingBalance,
-              due_date: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-              status: 'pending'
-            })
-          }
-        }
-        
-        count++
+      const newRecord: IntakeRequestRecord = {
+        id: crypto.randomUUID(),
+        ticket_id: ticketId,
+        data_type: dataType,
+        dataset_name: datasetName,
+        sheet_url: sheetUrl,
+        priority,
+        notes,
+        status: 'pending',
+        created_at: new Date().toISOString()
       }
 
-      setImported(count)
-      setCreatedCourses(newCourses)
-      setCreatedBatches(newBatches)
-      setStep('done')
-      if (newCourses.length > 0 || newBatches.length > 0) {
-        setShowPopup(true)
-      }
-      toast.success(`Successfully processed ${count} records!`)
-    } catch (err) {
-      toast.error('Import process failed: ' + (err as Error).message)
+      const updated = [newRecord, ...recentRequests]
+      setRecentRequests(updated)
+      localStorage.setItem('kizen_sagedo_intake_requests', JSON.stringify(updated))
+
+      setSubmittedTicket(ticketId)
+      setDatasetName('')
+      setSheetUrl('')
+      setNotes('')
+      toast.success(`Request ${ticketId} submitted to SAGEDO successfully`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit intake request')
     } finally {
-      setImporting(false)
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Intelligent CRM Importer" description="Bulk upload spreadsheet data directly into Leads or Admitted Students" />
+    <div className="space-y-6 max-w-6xl">
+      <PageHeader 
+        title="Data Intake Operations" 
+        description="Centralized data ingestion and pipeline integration managed by SAGEDO engineering"
+      />
 
-      {step === 'upload' && (
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="border-b border-border/50 bg-slate-50/50">
-            <CardTitle className="text-base text-slate-800">Select Import Directory</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="flex justify-center">
-              <Tabs value={importType} onValueChange={(v) => setImportType(v as 'leads' | 'students')} className="w-full max-w-md">
-                <TabsList className="grid grid-cols-2">
-                  <TabsTrigger value="leads" className="text-sm">Inquiry Leads</TabsTrigger>
-                  <TabsTrigger value="students" className="text-sm">Admitted Students</TabsTrigger>
-                </TabsList>
-              </Tabs>
+      {/* MANAGED OPERATIONS NOTICE */}
+      <Card className="border-sky-200 bg-sky-50/50 shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-4">
+            <div className="p-2.5 rounded-xl bg-sky-100 text-sky-800">
+              <ShieldCheck className="h-6 w-6" />
             </div>
-
-            <div className="flex flex-col items-center py-12 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              <FileSpreadsheet className="h-16 w-16 text-slate-400 mb-4" />
-              <p className="text-sm text-slate-700 font-semibold mb-1">Drag and drop your spreadsheet here</p>
-              <p className="text-xs text-slate-500 mb-5">Supports Excel (.xlsx, .xls) and CSV files</p>
-              <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-              <Button onClick={() => fileInputRef.current?.click()} className="shadow-sm">
-                <Upload className="h-4 w-4 mr-2" /> Choose Spreadsheet File
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 'map' && (
-        <Card className="border-border/50 shadow-sm animate-in fade-in duration-200">
-          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex justify-between items-center">
-            <h3 className="font-semibold text-slate-800">Map Columns ({importType === 'leads' ? 'Leads' : 'Students & Fees'})</h3>
-            <span className="text-xs text-slate-500 font-medium">Automatic header normalization has been pre-applied</span>
-          </div>
-
-          <div className="m-4 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <p className="font-semibold text-amber-900 text-sm flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-600" /> AI Auto-Header Match Applied!
+            <div className="space-y-1">
+              <h3 className="font-semibold text-slate-900 text-base">
+                Self-Serve CSV Upload Superseded by SAGEDO Precision Ingestion
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                To guarantee zero schema corruption, prevent duplicate collisions across phone/name pairs, and preserve non-Latin scripts (Gurmukhi, Arabic, Devanagari) without character mangling, all bulk datasets are committed directly by the SAGEDO data operations engineering team.
               </p>
-              <p className="text-xs text-amber-800/90 mt-0.5">
-                Key required fields (Full Name & Phone) have been matched automatically. You do NOT need to fill out any dropdowns manually! Click the button to import immediately.
-              </p>
-            </div>
-            <Button onClick={validateAndPreview} className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-sm">
-              Proceed to Import Preview →
-            </Button>
-          </div>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-slate-50/30">
-                <TableRow>
-                  <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Spreadsheet Column</TableHead>
-                  <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Maps to CRM Field</TableHead>
-                  <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Validation</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="divide-y divide-border/50">
-                {mapping.map((m, i) => (
-                  <TableRow key={i} className="hover:bg-slate-50/50">
-                    <TableCell className="px-6 py-4 font-medium text-slate-800 text-sm">{m.spreadsheetCol}</TableCell>
-                    <TableCell className="px-6 py-4">
-                      <select
-                        className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                        value={m.schemaField}
-                        onChange={(e) => updateMapping(i, e.target.value)}
-                      >
-                        <option value="">— Skip Column —</option>
-                        {activeFields.map(sf => (
-                          <option key={sf.field} value={sf.field}>{sf.label} {sf.required ? '(Required)' : ''}</option>
-                        ))}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-6 py-4">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {activeFields.find(f => f.field === m.schemaField)?.required && (
-                          <Badge variant="destructive" className="bg-red-50 text-red-700 border-red-100">Required</Badge>
-                        )}
-                        {m.confidence && m.confidence > 0 ? (
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
-                            {m.confidence}% Confidence ({m.reason})
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <div className="flex gap-2 justify-end p-4 border-t border-border/50">
-              <Button variant="outline" onClick={() => setStep('upload')}>Back</Button>
-              <Button onClick={validateAndPreview}>Validate & Preview Data</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 'preview' && (
-        <Card className="border-border/50 shadow-sm animate-in fade-in duration-200">
-          <div className="p-4 border-b border-border/50 bg-slate-50/50 flex justify-between items-center flex-wrap gap-2">
-            <h3 className="font-semibold text-slate-800 flex items-center gap-2">Data Digestion Preview</h3>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="bg-slate-100 text-slate-700">{parsedRows.length} Rows</Badge>
-              <Badge variant="success" className="bg-green-50 text-green-700">{parsedRows.filter(r => r.errors.length === 0).length} Valid</Badge>
-              {parsedRows.filter(r => r.errors.length > 0).length > 0 && (
-                <Badge variant="destructive" className="bg-red-50 text-red-700">{parsedRows.filter(r => r.errors.length > 0).length} Errors</Badge>
-              )}
+              <div className="pt-2 flex items-center gap-4 text-xs font-medium text-sky-900">
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Complete Audit Logging
+                </span>
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Reversible Archive Protocol
+                </span>
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Verbatim Header Alignment
+                </span>
+              </div>
             </div>
           </div>
-          <CardContent className="p-0">
-            {parsedRows.filter(r => r.errors.length > 0).length > 0 && (
-              <div className="m-4 rounded-lg bg-red-50 border border-red-100 p-3 text-sm text-red-800 flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">Validation Conflicts Detected</p>
-                  <p className="text-xs text-red-700/80 mt-0.5">Rows containing validation errors will be skipped to protect data integrity. Please review the issues in the grid below.</p>
-                </div>
-              </div>
-            )}
-            
-            <div className="max-h-96 overflow-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/30 sticky top-0">
-                  <TableRow>
-                    <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Row</TableHead>
-                    <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Full Name</TableHead>
-                    <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Phone</TableHead>
-                    <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Course / Batch</TableHead>
-                    <TableHead className="px-6 py-3 text-xs uppercase font-semibold text-slate-500">Issues</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="divide-y divide-border/50">
-                  {parsedRows.map((r) => (
-                    <TableRow key={r.rowNum} className={r.errors.length > 0 ? 'bg-red-50/20 hover:bg-red-50/35' : 'hover:bg-slate-50/50'}>
-                      <TableCell className="px-6 py-4 font-medium text-slate-500 text-sm">{r.rowNum}</TableCell>
-                      <TableCell className="px-6 py-4 font-medium text-slate-800 text-sm">{r.data.full_name || '—'}</TableCell>
-                      <TableCell className="px-6 py-4 text-slate-600 text-sm">{r.data.mobile || '—'}</TableCell>
-                      <TableCell className="px-6 py-4 text-slate-600 text-sm">
-                        {r.data.course_name ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-slate-800">{r.data.course_name}</span>
-                            {r.data.batch_name && (
-                              <>
-                                <ArrowRight className="w-3 h-3 text-slate-400" />
-                                <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs">{r.data.batch_name}</span>
-                              </>
-                            )}
-                          </div>
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        {r.errors.map((e, i) => <p key={i} className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {e}</p>)}
-                        {r.warnings.map((w, i) => <p key={i} className="text-xs text-amber-600 flex items-center gap-1"><Info className="w-3 h-3" /> {w}</p>)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            
-            <div className="flex gap-2 justify-end p-4 border-t border-border/50">
-              <Button variant="outline" onClick={() => setStep('map')}>Back</Button>
-              <Button onClick={handleImport} disabled={importing || parsedRows.filter(r => r.errors.length === 0).length === 0}>
-                {importing ? 'Processing Data...' : `Import ${parsedRows.filter(r => r.errors.length === 0).length} Records`}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
 
-      {step === 'done' && (
-        <div className="space-y-6">
-          <Card className="border-border/50 shadow-sm text-center py-12">
-            <CardContent className="flex flex-col items-center">
-              <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-              <h2 className="text-xl font-bold text-slate-800 mb-1">Import Complete!</h2>
-              <p className="text-sm text-slate-500 mb-6">CRM Standardizer has processed and updated all modules.</p>
-              
-              <div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-8">
-                <div className="bg-slate-50 p-4 rounded-xl border border-border/50">
-                  <p className="text-2xl font-bold text-slate-800">{imported}</p>
-                  <p className="text-xs text-slate-500 font-medium">Successfully Imported</p>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-border/50">
-                  <p className="text-2xl font-bold text-slate-800">{parsedRows.length - imported}</p>
-                  <p className="text-xs text-slate-500 font-medium">Skipped (With Errors)</p>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* REQUEST INTAKE FORM */}
+        <div className="md:col-span-2">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileSpreadsheet className="h-5 w-5 text-primary" />
+                Request Data Intake to SAGEDO
+              </CardTitle>
+              <CardDescription>
+                Submit new lead sheets, student batches, or fee trackers for schema verification and live import.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmitRequest} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data Category</Label>
+                    <Select value={dataType} onValueChange={setDataType}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="leads">Leads Pipeline (Google Sheets / XLSX)</SelectItem>
+                        <SelectItem value="students">Student Master Enrollment</SelectItem>
+                        <SelectItem value="fees">Fee Tracker & Installments</SelectItem>
+                        <SelectItem value="campaign">Meta / Google Ads Campaign Export</SelectItem>
+                        <SelectItem value="other">Other Tabular Dataset</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => { setStep('upload'); setImported(0); setCreatedCourses([]); setCreatedBatches([]); }}>
-                  Import Another File
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Priority Level</Label>
+                    <Select value={priority} onValueChange={setPriority}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard (within 24 hours)</SelectItem>
+                        <SelectItem value="urgent">Urgent Live Migration (within 4 hours)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Dataset Name / Campaign Reference *</Label>
+                  <Input 
+                    placeholder="e.g. Q3 Chandigarh Walk-in Leads / Class 11th Fee Tracker" 
+                    value={datasetName}
+                    onChange={(e) => setDatasetName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Google Sheets Link / Shared Drive URL</Label>
+                  <Input 
+                    placeholder="https://docs.google.com/spreadsheets/d/..." 
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Ensure permissions are set to view with link or shared with SAGEDO support.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Special Instructions / Custom Notes</Label>
+                  <textarea
+                    rows={3}
+                    placeholder="Specify any column header nuances, phone number splitting rules, or missing fields..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+
+                <Button type="submit" disabled={submitting} className="w-full h-11 font-semibold gap-2">
+                  <Send className="h-4 w-4" />
+                  {submitting ? 'Submitting Request to SAGEDO...' : 'Submit Request to SAGEDO'}
                 </Button>
-              </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* SIDEBAR: INTAKE CHANNELS & SYSTEM STATUS */}
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Database className="h-4 w-4 text-slate-500" />
+                Intake Sources Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {settings.map((s) => (
+                <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0 border-slate-100 text-xs">
+                  <span className="capitalize font-medium text-slate-700">
+                    {s.source.replace('_', ' ')}
+                  </span>
+                  <Badge variant={s.is_enabled ? 'success' : 'secondary'} className="text-[10px] uppercase">
+                    {s.is_enabled ? 'Active' : 'Standby'}
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
-          {/* User Instruction 2: Auto-Created Entities Warning Popup/Card */}
-          {showPopup && (createdCourses.length > 0 || createdBatches.length > 0) && (
-            <Card className="border-amber-100 bg-amber-50/50 shadow-sm animate-in slide-in-from-bottom duration-300">
-              <CardHeader className="pb-2 flex flex-row items-center gap-2">
-                <Settings className="w-5 h-5 text-amber-600 animate-spin" style={{ animationDuration: '3s' }} />
-                <CardTitle className="text-base text-amber-800">Entity Creation Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm text-amber-800/90">
-                <p>We detected new courses or batches in your sheet. To avoid import failure, the system automatically created them in the background. However, you should configure their pricing and timing structures:</p>
-                
-                {createdCourses.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="font-semibold flex items-center gap-1">📚 New Courses Created ({createdCourses.length}):</p>
-                    <div className="flex gap-1.5 flex-wrap pl-5">
-                      {createdCourses.map((c, i) => <Badge key={i} variant="outline" className="bg-white border-amber-200 text-amber-800">{c}</Badge>)}
-                    </div>
-                  </div>
-                )}
-
-                {createdBatches.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="font-semibold flex items-center gap-1">🏫 New Batches Created ({createdBatches.length}):</p>
-                    <div className="flex gap-1.5 flex-wrap pl-5">
-                      {createdBatches.map((b, i) => <Badge key={i} variant="outline" className="bg-white border-amber-200 text-amber-800">{b}</Badge>)}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t border-amber-100 text-xs text-amber-600 font-medium">
-                  Go to Courses Settings or Batch Settings to configure Faculty, timings, and standard pricing schedules for these new records.
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <History className="h-4 w-4 text-slate-500" />
+                Latest Verified Ingestions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-slate-900">
+                  <span>leads_sheet.xlsx</span>
+                  <Badge variant="success" className="text-[10px]">Active</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <p className="text-slate-500 text-[11px]">406 verified rows • 0 duplicates</p>
+                <p className="text-slate-400 text-[10px]">Unicode preserved verbatim</p>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-slate-900">
+                  <span>fee_tracker_sheet.xlsx</span>
+                  <Badge variant="success" className="text-[10px]">Active</Badge>
+                </div>
+                <p className="text-slate-500 text-[11px]">40 records • 11 split contacts</p>
+                <p className="text-slate-400 text-[10px]">3 Step 6 indicators flagged</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      </div>
+
+      {/* RECENT REQUESTS TABLE */}
+      {recentRequests.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-slate-500" />
+              Your Recent Intake Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
+                  <tr>
+                    <th className="py-2.5 px-3">Ticket ID</th>
+                    <th className="py-2.5 px-3">Dataset Name</th>
+                    <th className="py-2.5 px-3">Type</th>
+                    <th className="py-2.5 px-3">Priority</th>
+                    <th className="py-2.5 px-3">Submitted</th>
+                    <th className="py-2.5 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentRequests.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3 font-mono font-bold text-sky-700">{r.ticket_id}</td>
+                      <td className="py-2.5 px-3 font-medium text-slate-900">{r.dataset_name}</td>
+                      <td className="py-2.5 px-3 capitalize">{r.data_type}</td>
+                      <td className="py-2.5 px-3 capitalize">
+                        <span className={r.priority === 'urgent' ? 'text-rose-600 font-semibold' : 'text-slate-600'}>
+                          {r.priority}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-500">{format(new Date(r.created_at), 'dd MMM, HH:mm')}</td>
+                      <td className="py-2.5 px-3">
+                        <Badge variant="warning" className="text-[10px]">Queued (SAGEDO)</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

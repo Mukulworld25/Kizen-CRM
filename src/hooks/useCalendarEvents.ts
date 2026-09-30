@@ -67,6 +67,7 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           id, full_name, mobile, status, expected_joining_date, assigned_counselor_id,
           course:courses(name), counselor:users!leads_assigned_counselor_id_fkey(name)
         `)
+        .eq('is_deleted', false)
         .not('expected_joining_date', 'is', null)
 
       if (startDateStr) leadQuery = leadQuery.gte('expected_joining_date', startDateStr)

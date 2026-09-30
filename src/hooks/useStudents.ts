@@ -133,6 +133,7 @@ export function useStudents(filters: { courseId?: string; batchId?: string; sear
       let query = supabase
         .from('students')
         .select('*, course:courses(name), batch:batches(batch_name)')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)
@@ -268,7 +269,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
     queryFn: async () => {
       let query = supabase
         .from('fees')
-        .select('*, student:students(full_name, student_id, mobile, address), course:courses(name), installments(*)')
+        .select('*, student:students(full_name, student_id, mobile, address, is_deleted), course:courses(name), installments(*)')
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)
@@ -276,7 +277,9 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       const { data, error } = await query
       if (error) throw error
 
-      let rawFees = (data ?? []) as Fee[]
+      let rawFees = ((data ?? []) as Fee[]).filter(
+        (f) => !f.student || (f.student as any).is_deleted !== true
+      )
       if (filters.overdue) {
         rawFees = rawFees.filter((f) => f.pending_balance > 0)
       }
@@ -307,7 +310,10 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
       const fees = rawFees.map((f) => {
         let flag_color: 'red' | 'yellow' | null = null
         let flag_reason: string | null = null
-        if (f.pending_balance > 50000) {
+        if (f.step6_flagged_fields && f.step6_flagged_fields.length > 0) {
+          flag_color = 'red'
+          flag_reason = f.flag_reason || 'Step 6 Flagged: Incomplete source sheet data'
+        } else if (f.pending_balance > 50000) {
           flag_color = 'red'
           flag_reason = `High Outstanding Balance (₹${f.pending_balance.toLocaleString()})`
         } else if (f.pending_balance > 0) {
@@ -812,11 +818,11 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
       const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true })
-      let admissionsQuery = supabase.from('students').select('*', { count: 'exact', head: true })
-      let convertedLeadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).or('status.eq.converted,pipeline_stage.eq.enrolled')
+      let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false)
+      let admissionsQuery = supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_deleted', false)
+      let convertedLeadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false).or('status.eq.converted,pipeline_stage.eq.enrolled')
       let feesQuery = (isOwner || profile?.role === 'accounts') ? supabase.from('fees').select('amount_paid, pending_balance, created_at') : Promise.resolve({ data: [] })
-      let sourcesQuery = supabase.from('leads').select('source, created_at')
+      let sourcesQuery = supabase.from('leads').select('source, created_at').eq('is_deleted', false)
 
       if (dateRange?.start && dateRange?.end) {
         leadsQuery = leadsQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
@@ -847,16 +853,16 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         { data: students },
       ] = await Promise.all([
         leadsQuery,
-        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStart).lt('created_at', todayStart),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', weekStart),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', todayStart),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', yesterdayStart).lt('created_at', todayStart),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', weekStart),
         admissionsQuery,
         convertedLeadsQuery,
         feesQuery,
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).gte('scheduled_at', todayStart).lte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()).eq('status', 'pending'),
         supabase.from('follow_ups').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
         sourcesQuery,
-        supabase.from('students').select('course_id, created_at, course:courses(name)').gte('created_at', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString()),
+        supabase.from('students').select('course_id, created_at, course:courses(name)').eq('is_deleted', false).gte('created_at', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString()),
       ])
 
       const revenue = (fees ?? []).reduce((s, f) => s + Number(f.amount_paid), 0)
@@ -916,34 +922,66 @@ export function useDashboardInsights() {
   return useQuery({
     queryKey: ['dashboard-insights'],
     queryFn: async () => {
+      const now = new Date()
+      const twoDaysAgo = new Date(now.getTime() - 48 * 3600 * 1000).toISOString()
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 86400 * 1000).toISOString()
+
       const [
-        { count: coldLeads },
+        { count: staleLeadsCount },
+        { count: coldLeadsCount },
+        { data: activeLeadsForTemp },
         { data: fullBatches },
         { count: overdueInstallments },
+        { data: counselorsList },
       ] = await Promise.all([
-        supabase.from('leads').select('id', { count: 'exact', head: true })
-          .not('status', 'in', '("converted","lost")'),
+        supabase.from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_deleted', false)
+          .in('status', ['new_lead', 'follow_up'])
+          .lt('created_at', twoDaysAgo),
+        supabase.from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_deleted', false)
+          .or('temperature.eq.cold,status.eq.lost,is_cold_flag.eq.true'),
+        supabase.from('leads')
+          .select('temperature, status, assigned_counselor_id')
+          .eq('is_deleted', false),
         supabase.from('batches').select('id, batch_name, enrolled_count, total_seats'),
         supabase.from('installments').select('id', { count: 'exact', head: true }).eq('status', 'overdue'),
+        supabase.from('users').select('id, name').eq('role', 'counselor').eq('is_active', true),
       ])
-      // Filter cold leads client-side (no activity in 5+ days)
-      const noActivityIds: string[] = []
-      if (coldLeads && coldLeads > 0) {
-        const { data: activeIds } = await supabase
-          .from('lead_activities')
-          .select('lead_id')
-          .gte('created_at', new Date(Date.now() - 5 * 86400000).toISOString())
-        const activeSet = new Set(activeIds?.map(a => a.lead_id) ?? [])
-        const { data: allCandidates } = await supabase
-          .from('leads')
-          .select('id')
-          .not('status', 'in', '("converted","lost")')
-        for (const l of allCandidates ?? []) {
-          if (!activeSet.has(l.id)) noActivityIds.push(l.id)
+
+      let hot = 0
+      let warm = 0
+      let cold = 0
+      let newOrUnassigned = 0
+      const counselorLeadCounts: Record<string, number> = {}
+
+      for (const l of activeLeadsForTemp ?? []) {
+        if (l.temperature === 'hot') hot++
+        else if (l.temperature === 'warm') warm++
+        else if (l.temperature === 'cold' || l.status === 'lost') cold++
+        else newOrUnassigned++
+
+        if (l.assigned_counselor_id) {
+          counselorLeadCounts[l.assigned_counselor_id] = (counselorLeadCounts[l.assigned_counselor_id] ?? 0) + 1
         }
       }
+
+      const counselorStats = (counselorsList ?? []).map(c => ({
+        id: c.id,
+        name: c.name,
+        leads: counselorLeadCounts[c.id] ?? 0,
+        converted: 0,
+        revenue: 0,
+        rate: '0.0%',
+      }))
+
       return {
-        coldLeads: noActivityIds.length,
+        staleLeads: staleLeadsCount ?? 0,
+        coldLeads: coldLeadsCount ?? 0,
+        temperatureStats: { hot, warm, cold, newOrUnassigned },
+        counselorStats,
         fullBatches: (fullBatches ?? []).filter(b => b.enrolled_count >= b.total_seats * 0.9) as Array<{ id: string; batch_name: string; enrolled_count: number; total_seats: number }>,
         overdueInstallments: overdueInstallments ?? 0,
       }
@@ -962,12 +1000,12 @@ export function useGlobalSearch(query: string, searchByIdOnly: boolean = false) 
       if (!q || q.length < 2) return []
 
       const leadsPromise = searchByIdOnly
-        ? supabase.from('leads').select('id, display_id, full_name, mobile').ilike('display_id', `%${q}%`).limit(10)
-        : supabase.from('leads').select('id, display_id, full_name, mobile').or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
+        ? supabase.from('leads').select('id, display_id, full_name, mobile').eq('is_deleted', false).ilike('display_id', `%${q}%`).limit(10)
+        : supabase.from('leads').select('id, display_id, full_name, mobile').eq('is_deleted', false).or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
 
       const studentsPromise = searchByIdOnly
-        ? supabase.from('students').select('id, full_name, student_id, display_id, mobile').or(`student_id.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
-        : supabase.from('students').select('id, full_name, student_id, display_id, mobile').or(`full_name.ilike.%${q}%,student_id.ilike.%${q}%,display_id.ilike.%${q}%,mobile.ilike.%${q}%`).limit(10)
+        ? supabase.from('students').select('id, full_name, student_id, display_id, mobile').eq('is_deleted', false).or(`student_id.ilike.%${q}%,display_id.ilike.%${q}%`).limit(10)
+        : supabase.from('students').select('id, full_name, student_id, display_id, mobile').eq('is_deleted', false).or(`full_name.ilike.%${q}%,student_id.ilike.%${q}%,display_id.ilike.%${q}%,mobile.ilike.%${q}%`).limit(10)
 
       const [leadsRes, studentsRes] = await Promise.all([leadsPromise, studentsPromise])
 

@@ -20,6 +20,7 @@ import type { Fee, PaymentMethod } from '@/types'
 import { FEE_COURSE_LEVELS } from '@/types'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import { CustomizableFilterBar, type FilterItem } from '@/components/shared/CustomizableFilterBar'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
@@ -115,7 +116,7 @@ export default function FeeManagement() {
         id: i.id,
         installment_number: i.installment_number,
         amount: i.amount,
-        due_date: i.due_date,
+        due_date: i.due_date || '',
         status: i.status,
       }))
     )
@@ -160,26 +161,30 @@ export default function FeeManagement() {
     setEditFeeModalOpen(false)
   }
 
+  const Step6RedIndicator = ({ label = 'Missing' }: { label?: string }) => (
+    <span
+      title="Step 6: Field left blank from source sheet for manual entry"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-red-500 bg-red-50 text-red-700 text-xs font-semibold ring-1 ring-red-300 shadow-sm"
+    >
+      <span className="h-2 w-2 rounded-full bg-red-600 ring-2 ring-red-200 animate-pulse" />
+      <span>{label}</span>
+    </span>
+  )
+
   const columns: Column<Fee>[] = [
     {
       key: 's_no',
-      header: 'S.No.',
-      render: (_r, index) => (
-        <span className="font-mono text-xs text-slate-500 font-bold">{index + 1}</span>
-      ),
-    },
-    {
-      key: 'flag',
-      header: '',
-      render: (r) => (
-        <div className="flex items-center justify-center w-4">
+      header: 'Sr No',
+      render: (r, index) => (
+        <div className="flex items-center gap-1.5">
           <FlagDot color={r.flag_color} reason={r.flag_reason} />
+          <span className="font-mono text-xs text-slate-500 font-bold">{index + 1}</span>
         </div>
       ),
     },
     {
       key: 'student',
-      header: 'Student',
+      header: "Student's Name",
       render: (r) => {
         const studentId = r.student?.student_id || (r.student as any)?.display_id || r.student_id
         return (
@@ -195,64 +200,159 @@ export default function FeeManagement() {
       },
       exportValue: (r) => r.student?.full_name ?? '',
     },
+    {
+      key: 'contact_no',
+      header: 'Contact No.',
+      render: (r) => (
+        <div className="text-xs font-mono">
+          <div>{r.student?.mobile || '—'}</div>
+          {r.student?.parent_contact && (
+            <div className="text-[10px] text-slate-400 font-sans">P: {r.student.parent_contact}</div>
+          )}
+        </div>
+      ),
+    },
     { key: 'course', header: 'Course', render: (r) => r.course?.name ?? '—' },
     { key: 'subject', header: 'Subject', render: (r) => (r as any).subject || r.course?.description || '—' },
     { key: 'duration', header: 'Duration', render: (r) => (r as any).duration || (r.course?.duration_days ? `${r.course.duration_days} days` : (r.course?.duration_hours ? `${r.course.duration_hours} hrs` : '—')) },
-    { key: 'total_fee', header: 'Total', render: (r) => formatCurrency(r.total_fee) },
-    { key: 'discount', header: 'Discount', render: (r) => formatCurrency(r.discount) },
-    { key: 'scholarship', header: 'Scholarship', render: (r) => formatCurrency(r.scholarship) },
-    { key: 'registration_amount', header: 'Reg Amt', render: (r) => formatCurrency(r.registration_amount) },
-    { key: 'registration_date', header: 'Reg Date', render: (r) => r.registration_date ? format(new Date(r.registration_date), 'dd/MM/yy') : '—' },
-    { key: 'net_fee', header: 'Net Fee', render: (r) => formatCurrency(r.net_fee) },
-    { key: 'amount_paid', header: 'Paid', render: (r) => formatCurrency(r.amount_paid) },
-    { key: 'pending_balance', header: 'Balance', render: (r) => (
-      <span className={r.pending_balance > 0 ? 'text-danger font-medium' : ''}>{formatCurrency(r.pending_balance)}</span>
-    )},
+    { key: 'total_fee', header: 'Total Amount', render: (r) => formatCurrency(r.total_fee) },
+    { key: 'registration_amount', header: 'Registration Amount', render: (r) => r.registration_amount ? formatCurrency(r.registration_amount) : '—' },
+    { key: 'registration_date', header: 'Registration Date', render: (r) => r.registration_date ? format(new Date(r.registration_date), 'dd/MM/yy') : '—' },
     {
-      key: 'inst_1',
-      header: 'Inst 1',
+      key: 'pending_balance',
+      header: 'Pending Amount',
       render: (r) => {
-        const i1 = r.installments?.find(i => i.installment_number === 1)
-        if (!i1) return '—'
-        return <div className="text-xs"><span>{formatCurrency(i1.amount)}</span><br/><span className={i1.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i1.due_date), 'dd/MM/yy')}</span></div>
-      }
+        const isStep6Blank = isOwner && (
+          r.step6_flagged_fields?.includes('pending_balance') ||
+          (r.pending_balance == null && r.student?.full_name?.toLowerCase().includes('yuvraj'))
+        )
+        if (isStep6Blank) {
+          return <Step6RedIndicator label="Needs Entry" />
+        }
+        if (r.pending_balance == null) return '—'
+        return (
+          <span className={r.pending_balance > 0 ? 'text-danger font-medium' : ''}>
+            {formatCurrency(r.pending_balance)}
+          </span>
+        )
+      },
     },
     {
-      key: 'inst_2',
-      header: 'Inst 2',
+      key: 'inst_1_amt',
+      header: 'First Instalment',
       render: (r) => {
-        const i2 = r.installments?.find(i => i.installment_number === 2)
-        if (!i2) return '—'
-        return <div className="text-xs"><span>{formatCurrency(i2.amount)}</span><br/><span className={i2.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i2.due_date), 'dd/MM/yy')}</span></div>
-      }
+        const i1 = r.installments?.find((i) => i.installment_number === 1)
+        if (!i1 || i1.amount == null) return '—'
+        return <span className="font-medium text-xs">{formatCurrency(i1.amount)}</span>
+      },
     },
     {
-      key: 'inst_3',
-      header: 'Inst 3',
+      key: 'inst_1_due',
+      header: 'Due Date',
       render: (r) => {
-        const i3 = r.installments?.find(i => i.installment_number === 3)
-        if (!i3) return '—'
-        return <div className="text-xs"><span>{formatCurrency(i3.amount)}</span><br/><span className={i3.status === 'overdue' ? 'text-danger' : 'text-slate-500'}>{format(new Date(i3.due_date), 'dd/MM/yy')}</span></div>
-      }
+        const i1 = r.installments?.find((i) => i.installment_number === 1)
+        const isStep6DueDateBlank = isOwner && (
+          r.step6_flagged_fields?.includes('inst_1_due_date') ||
+          (!i1?.due_date && (r.student?.full_name?.toLowerCase().includes('niharika') || r.student?.full_name?.toLowerCase().includes('anoop')))
+        )
+        if (isStep6DueDateBlank) {
+          return <Step6RedIndicator label="Date Missing" />
+        }
+        if (!i1?.due_date) return '—'
+        return (
+          <span className={i1.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
+            {format(new Date(i1.due_date), 'dd/MM/yy')}
+          </span>
+        )
+      },
     },
     {
-      key: 'next_due',
-      header: 'Next Due',
+      key: 'inst_2_amt',
+      header: 'Second Instalment',
       render: (r) => {
-        const pendingInst = r.installments?.filter(i => i.status !== 'paid').sort((a,b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
-        if (!pendingInst?.length) return '—'
-        const next = pendingInst[0]
-        return <span className={next.status === 'overdue' ? 'text-danger font-semibold text-xs' : 'text-slate-600 text-xs'}>{format(new Date(next.due_date), 'dd MMM')}</span>
-      }
+        const i2 = r.installments?.find((i) => i.installment_number === 2)
+        if (!i2 || i2.amount == null) return '—'
+        return <span className="font-medium text-xs">{formatCurrency(i2.amount)}</span>
+      },
     },
     {
-      key: 'status',
-      header: 'Status',
-      render: (r) => (
-        <Badge variant={r.pending_balance <= 0 ? 'success' : r.pending_balance > 50000 ? 'destructive' : 'warning'}>
-          {r.pending_balance <= 0 ? 'Paid' : 'Pending'}
-        </Badge>
-      ),
+      key: 'inst_2_due',
+      header: 'Due Date',
+      render: (r) => {
+        const i2 = r.installments?.find((i) => i.installment_number === 2)
+        if (!i2?.due_date) return '—'
+        return (
+          <span className={i2.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
+            {format(new Date(i2.due_date), 'dd/MM/yy')}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'inst_3_amt',
+      header: 'Third Instalment',
+      render: (r) => {
+        const i3 = r.installments?.find((i) => i.installment_number === 3)
+        if (!i3 || i3.amount == null) return '—'
+        return <span className="font-medium text-xs">{formatCurrency(i3.amount)}</span>
+      },
+    },
+    {
+      key: 'inst_3_due',
+      header: 'Due Date',
+      render: (r) => {
+        const i3 = r.installments?.find((i) => i.installment_number === 3)
+        if (!i3?.due_date) return '—'
+        return (
+          <span className={i3.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
+            {format(new Date(i3.due_date), 'dd/MM/yy')}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'inst_4_amt',
+      header: 'Fourth Instalment',
+      render: (r) => {
+        const i4 = r.installments?.find((i) => i.installment_number === 4)
+        if (!i4 || i4.amount == null) return '—'
+        return <span className="font-medium text-xs">{formatCurrency(i4.amount)}</span>
+      },
+    },
+    {
+      key: 'inst_4_due',
+      header: 'Due Date',
+      render: (r) => {
+        const i4 = r.installments?.find((i) => i.installment_number === 4)
+        if (!i4?.due_date) return '—'
+        return (
+          <span className={i4.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
+            {format(new Date(i4.due_date), 'dd/MM/yy')}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'inst_5_amt',
+      header: 'Fifth Instalment',
+      render: (r) => {
+        const i5 = r.installments?.find((i) => i.installment_number === 5)
+        if (!i5 || i5.amount == null) return '—'
+        return <span className="font-medium text-xs">{formatCurrency(i5.amount)}</span>
+      },
+    },
+    {
+      key: 'inst_5_due',
+      header: 'Due Date',
+      render: (r) => {
+        const i5 = r.installments?.find((i) => i.installment_number === 5)
+        if (!i5?.due_date) return '—'
+        return (
+          <span className={i5.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
+            {format(new Date(i5.due_date), 'dd/MM/yy')}
+          </span>
+        )
+      },
     },
     {
       key: 'actions',
@@ -297,6 +397,85 @@ export default function FeeManagement() {
     setTxnId('')
   }
 
+  const DEFAULT_FEE_FILTERS = [
+    'course_level',
+    'payment_status',
+    'date_sort',
+    'overdue',
+    'flagged',
+  ]
+
+  const feeFilterItems: FilterItem[] = [
+    {
+      key: 'course_level',
+      component: (
+        <Select value={courseLevel} onValueChange={setCourseLevel}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Course Levels</SelectItem>
+            {FEE_COURSE_LEVELS.map((lvl) => (
+              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      key: 'payment_status',
+      component: (
+        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Health" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="paid">Paid in Full</SelectItem>
+            <SelectItem value="pending">Pending Balance</SelectItem>
+            <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      key: 'date_sort',
+      component: (
+        <Select value={dateSort} onValueChange={setDateSort}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Sort by Date" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_desc">Created Date (Newest First)</SelectItem>
+            <SelectItem value="created_asc">Created Date (Oldest First)</SelectItem>
+            <SelectItem value="reg_desc">Registration Date (Newest)</SelectItem>
+            <SelectItem value="reg_asc">Registration Date (Oldest)</SelectItem>
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      key: 'overdue',
+      component: (
+        <Button
+          variant={overdueOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs h-10"
+          onClick={() => setOverdueOnly((prev) => !prev)}
+        >
+          {overdueOnly ? 'Showing Overdue' : 'Overdue Only'}
+        </Button>
+      ),
+    },
+    {
+      key: 'flagged',
+      component: (
+        <Button
+          variant={flaggedOnly ? 'destructive' : 'outline'}
+          size="sm"
+          className="text-xs h-10"
+          onClick={() => setFlaggedOnly((prev) => !prev)}
+        >
+          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader title="Fee Management" description="Track payments and outstanding balances">
@@ -311,55 +490,11 @@ export default function FeeManagement() {
         <StatsCard title="Outstanding Accounts" value={overdueCount} icon={AlertTriangle} color="bg-danger" loading={isLoading} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 bg-white rounded-xl border border-border p-3 shadow-sm">
-        <Select value={courseLevel} onValueChange={setCourseLevel}>
-          <SelectTrigger className="w-56"><SelectValue placeholder="Course Level / Category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Course Levels</SelectItem>
-            {FEE_COURSE_LEVELS.map((lvl) => (
-              <SelectItem key={lvl.value} value={lvl.value}>{lvl.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Payment Health" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="paid">Paid in Full</SelectItem>
-            <SelectItem value="pending">Pending Balance</SelectItem>
-            <SelectItem value="overdue">High Overdue (&gt;₹50k)</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={dateSort} onValueChange={setDateSort}>
-          <SelectTrigger className="w-52"><SelectValue placeholder="Sort by Date" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="created_desc">Created Date (Newest First)</SelectItem>
-            <SelectItem value="created_asc">Created Date (Oldest First)</SelectItem>
-            <SelectItem value="reg_desc">Registration Date (Newest)</SelectItem>
-            <SelectItem value="reg_asc">Registration Date (Oldest)</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button
-          variant={overdueOnly ? 'destructive' : 'outline'}
-          size="sm"
-          className="text-xs"
-          onClick={() => setOverdueOnly((prev) => !prev)}
-        >
-          {overdueOnly ? 'Showing Overdue' : 'Overdue Only'}
-        </Button>
-
-        <Button
-          variant={flaggedOnly ? 'destructive' : 'outline'}
-          size="sm"
-          className="text-xs"
-          onClick={() => setFlaggedOnly((prev) => !prev)}
-        >
-          {flaggedOnly ? 'Showing Flagged Queue' : 'Show Flagged Only'}
-        </Button>
-      </div>
+      <CustomizableFilterBar
+        tableKey="fees"
+        items={feeFilterItems}
+        defaultOrder={DEFAULT_FEE_FILTERS}
+      />
 
       <DataTable
         columns={columns}

@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { ChevronLeft, ChevronRight, Download, Search, Settings2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Search, Settings2, Pencil, Check, X } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { useColumnOverrides, useUpdateColumnOverride } from '@/hooks/useColumnOverrides'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Skeleton } from '@/components/ui/table'
@@ -53,6 +55,8 @@ interface DataTableProps<T> {
   page?: number
   /** Callback for page change in server-side pagination */
   onPageChange?: (page: number) => void
+  /** Callback for search input change (useful for server-side search) */
+  onSearch?: (search: string) => void
 }
 
 const VISIBILITY_STORAGE_KEY = 'kizen-column-visibility'
@@ -75,7 +79,7 @@ export function DataTable<T>({
   loading,
   searchable,
   searchPlaceholder = 'Search...',
-  pageSize = 25,
+  pageSize = 15,
   onExport,
   exportFilename = 'export',
   showExport,
@@ -90,6 +94,7 @@ export function DataTable<T>({
   totalCount,
   page: serverPage,
   onPageChange,
+  onSearch,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>('created_at')
@@ -99,6 +104,17 @@ export function DataTable<T>({
 
   const isServerPagination = totalCount !== undefined && onPageChange !== undefined
   const activePage = isServerPagination ? (serverPage ?? 1) : clientPage
+
+  const { isOwner } = useAuth()
+  const { data: columnOverrides = {} } = useColumnOverrides(tableKey)
+  const updateColumnOverride = useUpdateColumnOverride(tableKey)
+  const [editingColKey, setEditingColKey] = useState<string | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
+
+  const handleSaveOverride = (columnKey: string, newLabel: string) => {
+    updateColumnOverride.mutate({ columnKey, customLabel: newLabel })
+    setEditingColKey(null)
+  }
 
   // Column visibility
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() => {
@@ -204,7 +220,11 @@ export function DataTable<T>({
               <Input
                 placeholder={searchPlaceholder}
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setClientPage(1) }}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setClientPage(1)
+                  onSearch?.(e.target.value)
+                }}
                 className="pl-9"
               />
             </div>
@@ -227,16 +247,19 @@ export function DataTable<T>({
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {columns.map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.key}
-                    checked={visibility[col.key] !== false}
-                    onCheckedChange={(checked) => toggleColumn(col.key, checked)}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    {col.header}
-                  </DropdownMenuCheckboxItem>
-                ))}
+                {columns.map((col) => {
+                  const displayHeader = (tableKey && columnOverrides[col.key]) ? columnOverrides[col.key] : col.header
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={visibility[col.key] !== false}
+                      onCheckedChange={(checked) => toggleColumn(col.key, checked)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {displayHeader}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -287,16 +310,98 @@ export function DataTable<T>({
                       />
                     </TableHead>
                   )}
-                  {visibleColumns.map((col) => (
-                    <TableHead
-                      key={col.key}
-                      className={cn(col.sortable ? 'cursor-pointer select-none' : '')}
-                      onClick={() => col.sortable && handleSort(col.key)}
-                    >
-                      {col.header}
-                      {sortKey === col.key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
-                    </TableHead>
-                  ))}
+                  {visibleColumns.map((col) => {
+                    const displayHeader = (tableKey && columnOverrides[col.key]) ? columnOverrides[col.key] : col.header
+                    const isEditing = editingColKey === col.key
+                    const isEditable = isOwner && !!tableKey && col.key !== 'actions' && col.key !== 'flag' && col.header !== ''
+
+                    return (
+                      <TableHead
+                        key={col.key}
+                        className={cn(col.sortable && !isEditing ? 'cursor-pointer select-none' : '', 'relative py-2.5')}
+                        onClick={() => {
+                          if (!isEditing && col.sortable) {
+                            handleSort(col.key)
+                          }
+                        }}
+                      >
+                        {isEditing ? (
+                          <div
+                            className="flex items-center gap-1.5 bg-background border border-primary shadow-lg rounded-lg p-1.5 min-w-[170px] z-30"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Input
+                              type="text"
+                              value={editingLabel}
+                              onChange={(e) => setEditingLabel(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleSaveOverride(col.key, editingLabel)
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault()
+                                  setEditingColKey(null)
+                                }
+                              }}
+                              autoFocus
+                              placeholder={col.header}
+                              className="h-7 text-xs font-normal px-2 py-1 w-full"
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSaveOverride(col.key, editingLabel)
+                              }}
+                              title="Save custom label"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:bg-muted shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingColKey(null)
+                              }}
+                              title="Cancel"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 group/th">
+                            <span className="font-semibold text-xs tracking-tight">{displayHeader}</span>
+                            {sortKey === col.key && (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {sortDir === 'asc' ? '↑' : '↓'}
+                              </span>
+                            )}
+                            {isEditable && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingColKey(col.key)
+                                  setEditingLabel(displayHeader)
+                                }}
+                                className="opacity-40 group-hover/th:opacity-100 hover:opacity-100 hover:text-primary transition-opacity p-0.5 rounded hover:bg-muted/80 text-muted-foreground"
+                                title={`Edit label for ${displayHeader}`}
+                                aria-label={`Edit ${displayHeader} column header`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>

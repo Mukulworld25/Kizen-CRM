@@ -18,6 +18,7 @@ export function useLeads(filters: LeadFilters = {}) {
       let query = supabase
         .from('leads')
         .select('*, course:courses(*), counselor:users!leads_assigned_counselor_id_fkey(id, name)', { count: 'exact' })
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
 

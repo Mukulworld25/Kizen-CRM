@@ -91,8 +91,12 @@ export function IntakeSettingsToggles() {
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
         {settings.map((item) => {
-          const config = SOURCE_LABELS[item.source]
-          const Icon = config.icon
+          const config = SOURCE_LABELS[item.source] ?? {
+            label: String(item.source || 'Channel Source'),
+            icon: Sliders,
+            description: `Channel configuration for ${item.source || 'intake'}`,
+          }
+          const Icon = config.icon || Sliders
           return (
             <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-card/50">
               <div className="flex items-start gap-3">

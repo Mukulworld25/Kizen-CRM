@@ -90,8 +90,10 @@ export interface Lead {
   expected_joining_date: string | null
   lead_score: number | null
   notes: string | null
+  lead_date?: string | null
   tap_date?: string | null
   call_status?: string | null
+  interest_level?: string | null
   disposition?: string | null
   followup_date_1?: string | null
   followup_remarks_1?: string | null
@@ -197,6 +199,7 @@ export interface Fee {
   next_due_amount?: number | null
   flag_color?: 'red' | 'yellow' | null
   flag_reason?: string | null
+  step6_flagged_fields?: string[] | null
   created_at: string
   updated_at: string
   student?: Student
@@ -225,7 +228,7 @@ export interface Installment {
   student_id: string
   installment_number: number
   amount: number
-  due_date: string
+  due_date: string | null
   paid_date: string | null
   status: 'pending' | 'paid' | 'overdue'
   created_at: string

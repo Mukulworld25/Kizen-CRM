@@ -7,3 +7,16 @@ dist/
 .netlify
 .vite/
 kizen-crm/
+scratch/
+*.xlsx
+*.wav
+*.py
+*.mjs
+prod_debug.html
+prod_*.png
+test_production_faculty_visibility.mjs
+transcribe_client_audio.py
+transcribe_wav.py
+vercel_page.png
+verify_025.mjs
+verify_expense_cats.mjs

@@ -420,7 +420,7 @@ function OwnerDashboard() {
   const revenue = stats?.revenue ?? 0
   const admissions = stats?.admissionsMonth ?? 0
   const admissionsGoal = 500
-  const convertedLeads = (stats?.convertedLeads && stats.convertedLeads > 0) ? stats.convertedLeads : admissions
+  const convertedLeads = stats?.convertedLeads ?? 0
   const rawConversionRate = stats?.totalLeads ? ((convertedLeads / stats.totalLeads) * 100) : 0
   const conversionRateDisplay = rawConversionRate === 0
     ? '0%'
@@ -683,12 +683,12 @@ function OwnerDashboard() {
       case 'conversion_rate':
         return (
           <DashboardKpiCard
-            title="Conversion Rate"
+            title="Lead Conversion Rate"
             value={conversionRateDisplay}
             icon={TrendingUp}
             accent="var(--kizen-gold)"
-            subtitle={`${convertedLeads} of ${(stats?.totalLeads ?? 0).toLocaleString()} leads converted`}
-            rightSlot={mounted && <ScoreRing score={Math.max(1, Math.round(rawConversionRate))} size={50} />}
+            subtitle={`${convertedLeads} of ${(stats?.totalLeads ?? 0).toLocaleString()} active leads converted`}
+            rightSlot={mounted && <ScoreRing score={Math.round(rawConversionRate)} size={50} />}
           />
         )
       case 'pipeline_chart':

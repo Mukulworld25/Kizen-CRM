@@ -881,7 +881,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         leadsYesterday: leadsYesterday ?? 0,
         leadsWeek: leadsWeek ?? 0,
         admissionsMonth: admissionsMonth ?? 0,
-        convertedLeads: (convertedLeads && convertedLeads > 0) ? convertedLeads : (admissionsMonth ?? 0),
+        convertedLeads: convertedLeads ?? 0,
         revenue,
         pending,
         followUpsDue: followUpsDue ?? 0,

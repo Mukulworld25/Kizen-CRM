@@ -12,6 +12,7 @@ import { roleLabels } from '@/lib/permissions'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import kizenLogo from '@/assets/kizen-lotus.png'
+import sagedoLogo from '@/assets/sagedo_logo_final_circle.png'
 
 import { useFeaturePermissions } from '@/hooks/useFeaturePermissions'
 
@@ -157,10 +158,17 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: SidebarProp
               </div>
             )}
           </div>
-          {!isCollapsed && (
-            <div className="mt-3 flex items-center justify-center gap-1.5 pt-2 border-t border-white/10 opacity-80">
-              <span className="text-[10px] tracking-wide font-medium" style={{ color: 'var(--sidebar-foreground)' }}>Powered by</span>
-              <span className="text-xs font-black tracking-wider text-amber-400">SAGE DO</span>
+          {!isCollapsed ? (
+            <div className="mt-3 flex items-center justify-center gap-1.5 pt-2 border-t border-white/10">
+              <span className="text-[10px] tracking-wide font-medium" style={{ color: 'var(--sidebar-foreground)', opacity: 0.8 }}>Powered by</span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/60 border border-amber-500/30 shadow-sm">
+                <img src={sagedoLogo} alt="SAGE DO" className="h-3.5 w-3.5 rounded-full object-cover" />
+                <span className="text-[10px] font-black tracking-wider text-amber-400">SAGE DO</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 flex justify-center" title="Powered by SAGE DO">
+              <img src={sagedoLogo} alt="SAGE DO" className="h-4 w-4 rounded-full object-cover opacity-80 hover:opacity-100 transition-opacity" />
             </div>
           )}
         </div>

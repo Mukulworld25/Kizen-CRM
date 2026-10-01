@@ -5,16 +5,16 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
   return <div className={cn('animate-pulse rounded-md bg-slate-200', className)} {...props} />
 }
 
-export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
+export function Table({ className, containerClassName, ...props }: React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }) {
   return (
-    <div className="relative w-full overflow-auto">
-      <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
+    <div className={cn('relative w-full overflow-auto max-h-[calc(100vh-270px)] min-h-[380px]', containerClassName)}>
+      <table className={cn('w-full caption-bottom text-sm border-separate border-spacing-0', className)} {...props} />
     </div>
   )
 }
 
 export function TableHeader({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn('[&_tr]:border-b', className)} {...props} />
+  return <thead className={cn('sticky top-0 z-20 bg-slate-50/95 dark:bg-[#162338]/95 backdrop-blur-md [&_tr]:border-b', className)} {...props} />
 }
 
 export function TableBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
@@ -26,9 +26,17 @@ export function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTable
 }
 
 export function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn('h-12 px-4 text-left align-middle font-medium text-muted-foreground', className)} {...props} />
+  return (
+    <th
+      className={cn(
+        'h-11 px-4 text-left align-middle font-semibold text-xs text-slate-700 dark:text-slate-200 sticky top-0 z-20 bg-slate-50 dark:bg-[#162338] border-b border-border shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
 export function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('p-4 align-middle', className)} {...props} />
+  return <td className={cn('p-4 align-middle border-b border-border/40', className)} {...props} />
 }

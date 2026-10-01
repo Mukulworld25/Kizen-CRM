@@ -57,6 +57,10 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void
   /** Callback for search input change (useful for server-side search) */
   onSearch?: (search: string) => void
+  /** Callback for page size change */
+  onPageSizeChange?: (pageSize: number) => void
+  /** Available page size options */
+  pageSizeOptions?: number[]
 }
 
 const VISIBILITY_STORAGE_KEY = 'kizen-column-visibility'
@@ -95,6 +99,8 @@ export function DataTable<T>({
   page: serverPage,
   onPageChange,
   onSearch,
+  onPageSizeChange,
+  pageSizeOptions,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>('created_at')
@@ -296,12 +302,12 @@ export function DataTable<T>({
         <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
       ) : (
         <>
-          <div className="rounded-xl border border-border shadow-sm" style={{ background: 'var(--card)' }}>
-            <Table>
-              <TableHeader>
+          <div className="rounded-xl border border-border shadow-sm overflow-hidden" style={{ background: 'var(--card)' }}>
+            <Table containerClassName="max-h-[calc(100vh-270px)] min-h-[380px] overflow-auto">
+              <TableHeader className="sticky top-0 z-20 bg-slate-50 dark:bg-[#162338]">
                 <TableRow>
                   {selectable && (
-                    <TableHead className="w-10">
+                    <TableHead className="w-10 sticky top-0 z-20 bg-slate-50 dark:bg-[#162338] border-b border-border shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-border accent-[var(--primary)]"
@@ -320,7 +326,7 @@ export function DataTable<T>({
                         key={col.key}
                         className={cn(
                           col.sortable && !isEditing ? 'cursor-pointer select-none' : '',
-                          'relative px-4 py-3 h-11 text-xs font-semibold text-slate-700 dark:text-slate-200'
+                          'relative px-4 py-3 h-11 text-xs font-semibold text-slate-700 dark:text-slate-200 sticky top-0 z-20 bg-slate-50 dark:bg-[#162338] border-b border-border shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
                         )}
                         onClick={() => {
                           if (!isEditing && col.sortable) {
@@ -448,8 +454,28 @@ export function DataTable<T>({
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            <span>{effectiveTotal.toLocaleString()} records · Page {activePage} of {totalPages}</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm px-1" style={{ color: 'var(--muted-foreground)' }}>
+            <div className="flex items-center gap-3">
+              <span>{effectiveTotal.toLocaleString()} records · Page {activePage} of {totalPages}</span>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span>Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const newSize = Number(e.target.value)
+                    onPageSizeChange?.(newSize)
+                    if (!isServerPagination) {
+                      setClientPage(1)
+                    }
+                  }}
+                  className="h-7 rounded-lg border border-border bg-card px-2 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {(pageSizeOptions ?? [15, 25, 50, 100]).map((sz) => (
+                    <option key={sz} value={sz}>{sz}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="flex gap-1">
               <Button
                 variant="outline"

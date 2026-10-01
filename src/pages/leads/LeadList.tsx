@@ -30,7 +30,7 @@ export default function LeadList() {
   const [searchParams] = useSearchParams()
   const { can, isOwner, profile } = useAuth()
   const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
-  const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 15 })
+  const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 50 })
   const [addOpen, setAddOpen] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -495,7 +495,9 @@ export default function LeadList() {
         exportFilename="kizen-leads"
         totalCount={data?.total}
         page={filters.page ?? 1}
-        pageSize={filters.pageSize ?? 15}
+        pageSize={filters.pageSize ?? 50}
+        onPageSizeChange={(sz) => setFilters((f) => ({ ...f, pageSize: sz, page: 1 }))}
+        pageSizeOptions={[15, 25, 50, 100]}
         onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
         onSearch={(s) => setFilters((f) => ({ ...f, search: s || undefined, page: 1 }))}
         rowKey={(r) => r.id}

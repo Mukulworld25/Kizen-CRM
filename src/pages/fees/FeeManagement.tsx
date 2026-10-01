@@ -33,6 +33,7 @@ export default function FeeManagement() {
   const [paymentStatus, setPaymentStatus] = useState<string>('all')
   const [dateSort, setDateSort] = useState<string>('created_desc')
   const [dynamicRules, setDynamicRules] = useState<DynamicFilterRule[]>([])
+  const [pageSize, setPageSize] = useState(50)
 
   useEffect(() => {
     if (searchParams.get('filter') === 'overdue') {
@@ -578,6 +579,9 @@ export default function FeeManagement() {
         data={fees}
         loading={isLoading}
         searchable
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[15, 25, 50, 100]}
         tableKey="fees"
         showExport={isOwner}
         onExport={async () => {

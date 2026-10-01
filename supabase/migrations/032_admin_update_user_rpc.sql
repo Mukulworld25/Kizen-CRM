@@ -70,9 +70,9 @@ BEGIN
     WHERE id = target_user_id;
 
     -- Update auth.identities so auth.users and auth.identities stay in sync!
+    -- Note: email column in auth.identities is a GENERATED ALWAYS column from identity_data->>'email'
     UPDATE auth.identities
     SET 
-      email = clean_email,
       identity_data = jsonb_set(
         jsonb_set(COALESCE(identity_data, '{}'::jsonb), '{email}', to_jsonb(clean_email)),
         '{sub}', to_jsonb(target_user_id::text)

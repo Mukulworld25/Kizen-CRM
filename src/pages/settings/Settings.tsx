@@ -54,6 +54,7 @@ export default function Settings() {
   const [resetModalOpen, setResetModalOpen] = useState(false)
   const [resetTargetUser, setResetTargetUser] = useState<User | null>(null)
   const [editEmail, setEditEmail] = useState('')
+  const [updatingUser, setUpdatingUser] = useState(false)
   const [newCourse, setNewCourse] = useState('')
   const [newBatch, setNewBatch] = useState({ name: '', courseId: '', facultyId: '' })
   const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
@@ -168,17 +169,37 @@ export default function Settings() {
 
   const handleUpdateUser = async () => {
     if (!editUser) return
-    const updates: Record<string, unknown> = { name: editName }
-    if (!editUser.is_owner) {
-      updates.role = editUser.role
-      updates.is_active = editUser.is_active
+    const cleanEmail = editEmail.trim().toLowerCase()
+    const cleanName = editName.trim()
+    if (!cleanName) {
+      toast.error('Name is required')
+      return
     }
-    const { error } = await supabase.from('users').update(updates).eq('id', editUser.id)
-    if (error) toast.error(error.message)
-    else {
-      toast.success('User updated')
+    if (!cleanEmail) {
+      toast.error('Email is required')
+      return
+    }
+
+    setUpdatingUser(true)
+    try {
+      // Use admin_update_user RPC to ensure auth.users, auth.identities, and public.users stay in sync
+      const { error } = await supabase.rpc('admin_update_user', {
+        target_user_id: editUser.auth_id || editUser.id,
+        new_name: cleanName,
+        new_email: cleanEmail,
+        new_role: !editUser.is_owner ? editUser.role : null,
+        new_is_active: !editUser.is_owner ? editUser.is_active : null,
+      })
+
+      if (error) throw error
+
+      toast.success('User updated successfully')
       setEditUser(null)
       refetchUsers()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update user')
+    } finally {
+      setUpdatingUser(false)
     }
   }
 
@@ -789,8 +810,15 @@ export default function Settings() {
             </div>
             <div>
               <Label>Email</Label>
-              <Input value={editEmail} disabled className="cursor-not-allowed opacity-70" />
-              <p className="text-xs mt-1 text-muted-foreground">Email changes require re-invite via the Invite User flow.</p>
+              <Input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="user@kizen.edu"
+              />
+              <p className="text-xs mt-1 text-muted-foreground">
+                Email updates keep login credentials and auth identities in sync.
+              </p>
             </div>
             {editUser && !editUser.is_owner && (
               <>
@@ -817,8 +845,10 @@ export default function Settings() {
               </>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
-              <Button onClick={handleUpdateUser}>Save</Button>
+              <Button variant="outline" onClick={() => setEditUser(null)} disabled={updatingUser}>Cancel</Button>
+              <Button onClick={handleUpdateUser} disabled={updatingUser}>
+                {updatingUser ? 'Saving...' : 'Save'}
+              </Button>
             </DialogFooter>
           </div>
         </DialogContent>

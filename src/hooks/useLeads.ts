@@ -8,7 +8,7 @@ const SUPABASE_URL =
   (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
 
 export function useLeads(filters: LeadFilters = {}) {
-  const { profile } = useAuth()
+  const { profile, isOwner } = useAuth()
   const page = filters.page ?? 1
   const pageSize = filters.pageSize ?? 15
 
@@ -39,10 +39,18 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.interestLevel) query = query.ilike('interest_level', filters.interestLevel)
       if (filters.disposition) query = query.ilike('disposition', filters.disposition)
-      if (filters.counselorId === 'unassigned') {
-        query = query.is('assigned_counselor_id', null)
-      } else if (filters.counselorId) {
-        query = query.eq('assigned_counselor_id', filters.counselorId)
+
+      // Role-based Lead Segregation at the database query level:
+      // If the user has a counselor role (and is not an owner or admin), strictly filter by assigned_counselor_id = profile.id
+      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
+      if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
+        query = query.eq('assigned_counselor_id', profile.id)
+      } else {
+        if (filters.counselorId === 'unassigned') {
+          query = query.is('assigned_counselor_id', null)
+        } else if (filters.counselorId) {
+          query = query.eq('assigned_counselor_id', filters.counselorId)
+        }
       }
       if (filters.courseId) query = query.eq('interested_course_id', filters.courseId)
       if (filters.priority) query = query.eq('priority', filters.priority)
@@ -112,18 +120,25 @@ export function useLeads(filters: LeadFilters = {}) {
 }
 
 export function useLead(id: string | undefined) {
+  const { profile, isOwner } = useAuth()
   return useQuery({
-    queryKey: ['leads', id],
+    queryKey: ['leads', id, profile?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
         .select('*, course:courses(*), counselor:users!leads_assigned_counselor_id_fkey(id, name, email)')
         .eq('id', id!)
-        .single()
+
+      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
+      if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
+        query = query.eq('assigned_counselor_id', profile.id)
+      }
+
+      const { data, error } = await query.single()
       if (error) throw error
       return data as Lead
     },
-    enabled: !!id,
+    enabled: !!id && !!profile,
   })
 }
 

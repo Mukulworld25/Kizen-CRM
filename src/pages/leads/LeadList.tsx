@@ -28,7 +28,8 @@ import { CustomizableFilterBar, type FilterItem } from '@/components/shared/Cust
 export default function LeadList() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { can, isOwner } = useAuth()
+  const { can, isOwner, profile } = useAuth()
+  const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
   const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 15 })
   const [addOpen, setAddOpen] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
@@ -468,8 +469,8 @@ export default function LeadList() {
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <CustomizableFilterBar
           tableKey="leads"
-          items={leadFilterItems}
-          defaultOrder={DEFAULT_LEAD_FILTERS}
+          items={isPrivileged ? leadFilterItems : leadFilterItems.filter((item) => item.key !== 'counselor')}
+          defaultOrder={isPrivileged ? DEFAULT_LEAD_FILTERS : DEFAULT_LEAD_FILTERS.filter((k) => k !== 'counselor')}
         />
         <DynamicFilterBuilder
           fields={leadDynamicFields}

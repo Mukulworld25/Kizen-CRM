@@ -142,6 +142,6 @@ export default async function handler(req: any, res: any) {
   } catch (err: any) {
     console.error('Lead intake handler error:', err)
     res.statusCode = 500
-    res.json({ success: false, error: 'Internal server error' })
+    res.json({ success: false, error: err.message, stack: err.stack })
   }
 }

@@ -49,10 +49,14 @@ export default function LeadList() {
 
   useEffect(() => {
     const filterParam = searchParams.get('filter')
+    const sourceParam = searchParams.get('source')
     if (filterParam === 'stale') {
       setFlaggedOnly(true)
     } else if (filterParam === 'dormant') {
-      setFilters((f) => ({ ...f, temperature: 'cold' as LeadTemperature }))
+      setFilters((f) => ({ ...f, temperature: 'cold' as LeadTemperature, page: 1 }))
+    }
+    if (sourceParam) {
+      setFilters((f) => ({ ...f, source: sourceParam as LeadSource, page: 1 }))
     }
   }, [searchParams])
 
@@ -307,13 +311,15 @@ export default function LeadList() {
           <SelectTrigger className="w-36"><SelectValue placeholder="Source" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="google_ads">Google Ads</SelectItem>
-            <SelectItem value="referral">Referral</SelectItem>
-            <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            <SelectItem value="instagram">Instagram</SelectItem>
             <SelectItem value="website">Website</SelectItem>
-            <SelectItem value="college_visit">College Visit</SelectItem>
+            <SelectItem value="meta_ads">Meta Ads</SelectItem>
+            <SelectItem value="google_ads">Google Ads</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
             <SelectItem value="walk_in">Walk-in</SelectItem>
+            <SelectItem value="referral">Referral</SelectItem>
+            <SelectItem value="instagram">Instagram</SelectItem>
+            <SelectItem value="facebook">Facebook</SelectItem>
+            <SelectItem value="college_visit">College Visit</SelectItem>
             <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>

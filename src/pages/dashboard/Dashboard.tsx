@@ -25,6 +25,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
+import { LeadsBySourceWidget } from './LeadsBySourceWidget'
 
 /* ── Widget Registry ── */
 interface WidgetDef {
@@ -44,7 +45,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { key: 'pipeline_chart', label: 'Pipeline Stages', defaultVisible: true, defaultPosition: 6 },
   { key: 'counselor_leaderboard', label: '🏆 Counselor Leaderboard', defaultVisible: true, defaultPosition: 7 },
   { key: 'cash_expense', label: 'Cash / Expense Snapshot', defaultVisible: true, defaultPosition: 8 },
-  { key: 'lead_sources', label: 'Lead Sources Chart', defaultVisible: true, defaultPosition: 9 },
+  { key: 'lead_sources', label: '📊 Leads by Source', defaultVisible: true, defaultPosition: 9 },
   { key: 'today_followups', label: "Today's Follow-ups", defaultVisible: true, defaultPosition: 10 },
   { key: 'cold_leads', label: 'Cold Leads', defaultVisible: true, defaultPosition: 11 },
   { key: 'overdue_followups', label: 'Overdue Follow-ups', defaultVisible: true, defaultPosition: 12 },
@@ -794,52 +795,7 @@ function OwnerDashboard() {
       case 'cycle_countdown':
         return <CycleCountdown enrolled={admissions} goal={admissionsGoal} />
       case 'lead_sources':
-        return (
-          <div className="glass-card rounded-2xl overflow-hidden animate-card-in h-full flex flex-col" style={{ animationDelay: '320ms' }}>
-            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-2">
-                <Award style={{ width: 13, height: 13, color: 'var(--kizen-gold)' }} />
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Lead Sources</h2>
-              </div>
-            </div>
-            {stats?.sourceBreakdown && stats.sourceBreakdown.length > 0 ? (
-              <ul className="divide-y divide-border">
-                {stats.sourceBreakdown.map((src: { name: string; value: number }, i: number) => {
-                  const total = stats.sourceBreakdown.reduce((s: number, x: { value: number }) => s + x.value, 0)
-                  const pct = total > 0 ? Math.round((src.value / total) * 100) : 0
-                  return (
-                    <li key={src.name} className="px-5 py-3 transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
-                      style={{ animationDelay: `${400 + i * 60}ms` }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-[9px] font-mono w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)', opacity: 0.4 }}>0{i + 1}</span>
-                          <span className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>{src.name}</span>
-                        </div>
-                        <span className="text-[11px] font-bold tabular-nums flex-shrink-0 ml-2" style={{ color: 'var(--foreground)' }}>{src.value}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-                          <div className="h-full rounded-full" style={{
-                            width: mounted ? `${pct}%` : '0%',
-                            background: 'linear-gradient(90deg, #C8871A 0%, #F5A623 60%, #FFC84A 100%)',
-                            transition: `width 1.1s cubic-bezier(0.16,1,0.3,1) ${400 + i * 80}ms`,
-                          }} />
-                        </div>
-                        <span className="text-[10px] tabular-nums w-7 text-right" style={{ color: 'var(--muted-foreground)' }}>{pct}%</span>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center flex-1">
-                <Award style={{ width: 30, height: 30, color: 'var(--muted-foreground)', opacity: 0.3 }} />
-                <p className="text-sm mt-3 font-semibold" style={{ color: 'var(--muted-foreground)' }}>No Source Data</p>
-                <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)', opacity: 0.5 }}>Add source details to your leads.</p>
-              </div>
-            )}
-          </div>
-        )
+        return <LeadsBySourceWidget dateRange={activeDateRange} />
       case 'today_followups':
         return (
           <div className="glass-card rounded-2xl overflow-hidden animate-card-in" style={{ animationDelay: '260ms' }}>
@@ -1223,56 +1179,9 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Lead Sources - styled like original Top Programs */}
-        <div className="xl:col-span-2 glass-card rounded-2xl overflow-hidden animate-card-in" style={{ animationDelay: '320ms' }}>
-          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <Award style={{ width: 13, height: 13, color: 'var(--kizen-gold)' }} />
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Lead Sources</h2>
-            </div>
-          </div>
-          {stats?.sourceBreakdown && stats.sourceBreakdown.length > 0 ? (
-            <ul>
-              {stats.sourceBreakdown.map((src: { name: string; value: number }, i: number) => {
-                const total = stats.sourceBreakdown.reduce((s: number, x: { value: number }) => s + x.value, 0)
-                const pct = total > 0 ? Math.round((src.value / total) * 100) : 0
-                return (
-                  <li key={src.name} className="px-5 py-3 transition-colors hover:bg-[rgba(245,166,35,0.04)] animate-card-in"
-                    style={{ borderBottom: i < stats.sourceBreakdown.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${400 + i * 60}ms` }}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] font-mono w-4 flex-shrink-0" style={{ color: 'var(--muted-foreground)', opacity: 0.4 }}>0{i + 1}</span>
-                        <span className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>{src.name}</span>
-                      </div>
-                      <span className="text-[11px] font-bold tabular-nums flex-shrink-0 ml-2" style={{ color: 'var(--foreground)' }}>{src.value}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-                        <div className="h-full rounded-full" style={{
-                          width: mounted ? `${pct}%` : '0%',
-                          background: 'linear-gradient(90deg, #C8871A 0%, #F5A623 60%, #FFC84A 100%)',
-                          transition: `width 1.1s cubic-bezier(0.16,1,0.3,1) ${400 + i * 80}ms`,
-                        }} />
-                      </div>
-                      <span className="text-[10px] tabular-nums w-7 text-right" style={{ color: 'var(--muted-foreground)' }}>{pct}%</span>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            <div className="p-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stats?.sourceBreakdown ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.1} />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#7A90B0' }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', background: 'var(--popover)', border: '1px solid var(--border)' }} />
-                  <Bar dataKey="value" fill="#F5A623" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+        {/* Leads by Source Widget */}
+        <div className="xl:col-span-2">
+          <LeadsBySourceWidget />
         </div>
       </div>
     </div>

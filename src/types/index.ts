@@ -7,7 +7,7 @@ export type LeadStatus =
 
 export type LeadSource =
   | 'instagram' | 'facebook' | 'walk_in' | 'referral'
-  | 'website' | 'whatsapp' | 'college_visit' | 'other'
+  | 'website' | 'whatsapp' | 'college_visit' | 'meta_ads' | 'google_ads' | 'other'
 
 export type Priority = 'high' | 'medium' | 'low'
 export type LeadTemperature = 'hot' | 'warm' | 'cold'
@@ -426,12 +426,14 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 }
 
 export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'facebook', label: 'Facebook' },
+  { value: 'website', label: 'Website' },
+  { value: 'meta_ads', label: 'Meta Ads' },
+  { value: 'google_ads', label: 'Google Ads' },
+  { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'walk_in', label: 'Walk-in' },
   { value: 'referral', label: 'Referral' },
-  { value: 'website', label: 'Website' },
-  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
   { value: 'college_visit', label: 'College Visit' },
   { value: 'other', label: 'Other' },
 ]

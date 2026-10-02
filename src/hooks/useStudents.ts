@@ -535,7 +535,7 @@ export function useNotifications() {
         const nowStr = new Date().toISOString()
         const { data: dueFus } = await supabase
           .from('follow_ups')
-          .select('id, scheduled_at, notes, lead:leads(full_name)')
+          .select('id, lead_id, scheduled_at, notes, lead:leads(id, full_name)')
           .eq('assigned_to', profile.id)
           .lte('scheduled_at', nowStr)
           .eq('status', 'pending')
@@ -543,21 +543,25 @@ export function useNotifications() {
 
         if (dueFus && dueFus.length > 0) {
           for (const fu of dueFus) {
+            const leadId = fu.lead_id || (fu.lead as any)?.id
             const leadName = (fu.lead as any)?.full_name || 'Lead'
+            const title = `Follow-up Due: ${leadName}`
             const { data: existing } = await supabase
               .from('notifications')
               .select('id')
               .eq('user_id', profile.id)
-              .eq('title', `Follow-up Due: ${leadName}`)
+              .eq('title', title)
               .limit(1)
 
             if (!existing || existing.length === 0) {
               await supabase.from('notifications').insert({
                 user_id: profile.id,
-                title: `Follow-up Due: ${leadName}`,
+                title,
                 message: fu.notes || `Scheduled follow-up is due for ${leadName}`,
                 type: 'followup',
-                link: '/calendar',
+                link: leadId ? `/leads/${leadId}` : '/followups',
+                record_id: leadId ? String(leadId) : String(fu.id),
+                record_type: 'lead',
                 is_read: false
               })
             }
@@ -572,7 +576,7 @@ export function useNotifications() {
         const todayDate = new Date().toISOString().split('T')[0]
         const { data: overdueInsts } = await supabase
           .from('installments')
-          .select('id, amount, due_date, installment_number, student:students(full_name, assigned_counselor_id)')
+          .select('id, fee_id, student_id, amount, due_date, installment_number, student:students(id, full_name, assigned_counselor_id)')
           .lte('due_date', todayDate)
           .neq('status', 'paid')
           .limit(15)
@@ -580,6 +584,7 @@ export function useNotifications() {
         if (overdueInsts && overdueInsts.length > 0) {
           for (const inst of overdueInsts) {
             const student = inst.student as any
+            const studentId = inst.student_id || student?.id
             // Only notify the assigned counselor or the current user if they are an owner
             const targetUserId = student?.assigned_counselor_id || profile.id
             if (targetUserId !== profile.id) continue
@@ -599,7 +604,9 @@ export function useNotifications() {
                 title,
                 message: `Installment #${inst.installment_number} of ₹${inst.amount} was due on ${inst.due_date}`,
                 type: 'fee_overdue',
-                link: '/fees',
+                link: studentId ? `/students/${studentId}?tab=fees` : '/fees',
+                record_id: studentId ? String(studentId) : String(inst.id),
+                record_type: 'student_fee',
                 is_read: false
               })
             }

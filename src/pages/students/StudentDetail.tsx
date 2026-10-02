@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ArrowLeft, FileText, Plus, Download, Printer, CreditCard, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,7 +26,11 @@ import type { FeePayment, Student } from '@/types'
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { can, isOwner, profile } = useAuth()
+
+  const tabParam = searchParams.get('tab')
+  const activeTab = tabParam || 'profile'
 
   const { data: student, isLoading } = useStudent(id)
   const updateStudent = useUpdateStudent()
@@ -205,7 +209,14 @@ export default function StudentDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="profile">
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          const newParams = new URLSearchParams(searchParams)
+          newParams.set('tab', val)
+          setSearchParams(newParams, { replace: true })
+        }}
+      >
         <TabsList className="bg-slate-100 p-1 rounded-xl">
           <TabsTrigger value="profile" className="rounded-lg text-xs font-medium">Central Profile</TabsTrigger>
           <TabsTrigger value="attendance" className="rounded-lg text-xs font-medium">Attendance ({attendancePct}%)</TabsTrigger>

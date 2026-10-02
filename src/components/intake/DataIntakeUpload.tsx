@@ -45,6 +45,9 @@ export function DataIntakeUpload({ onUploadSuccess }: { onUploadSuccess?: () => 
         title: `Data Intake Request: ${section.toUpperCase()} (${ticketId})`,
         message: `Dataset: "${datasetTitle}" (${section}). Priority: ${priority}. Sheets URL: ${sheetUrl || 'N/A'}. Notes: ${notes || 'None'}`,
         type: 'system',
+        link: '/settings?tab=intake',
+        record_id: ticketId,
+        record_type: 'intake_request',
         is_read: false
       })
 

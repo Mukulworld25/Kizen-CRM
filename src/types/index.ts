@@ -240,8 +240,11 @@ export interface Notification {
   user_id: string
   title: string
   message: string
-  type: 'follow_up' | 'fee_due' | 'new_lead' | 'task' | 'system'
-  related_id: string | null
+  type: string
+  link?: string | null
+  record_id?: string | null
+  record_type?: string | null
+  related_id?: string | null
   is_read: boolean
   created_at: string
 }

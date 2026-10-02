@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -33,6 +34,8 @@ export interface DeletionRequestRow {
 export function PendingDeletionsTab() {
   const queryClient = useQueryClient()
   const { profile } = useAuth()
+  const [searchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlight')
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<DeletionRequestRow | null>(null)
   const [rejectNote, setRejectNote] = useState('')
@@ -49,6 +52,15 @@ export function PendingDeletionsTab() {
       return (data || []) as DeletionRequestRow[]
     },
   })
+
+  useEffect(() => {
+    if (highlightId && requests.length > 0) {
+      const el = document.getElementById(`deletion-row-${highlightId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [highlightId, requests])
 
   const approveMutation = useMutation({
     mutationFn: async (requestId: string) => {
@@ -157,8 +169,14 @@ export function PendingDeletionsTab() {
                 </TableCell>
               </TableRow>
             ) : (
-              requests.map((r) => (
-                <TableRow key={r.id}>
+              requests.map((r) => {
+                const isHighlighted = highlightId === r.id
+                return (
+                  <TableRow
+                    key={r.id}
+                    id={`deletion-row-${r.id}`}
+                    className={isHighlighted ? 'bg-amber-100/90 dark:bg-amber-950/60 ring-2 ring-amber-400 font-medium transition-all duration-300' : ''}
+                  >
                   <TableCell>
                     <Badge variant="outline" className="capitalize text-xs font-semibold text-slate-700 bg-slate-100">
                       {r.table_name}
@@ -203,7 +221,8 @@ export function PendingDeletionsTab() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                )
+              })
             )}
           </TableBody>
         </Table>

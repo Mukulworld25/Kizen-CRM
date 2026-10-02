@@ -93,6 +93,9 @@ export default function DataImport() {
         title: `Data Intake Request: ${dataType.toUpperCase()} (${ticketId})`,
         message: `New dataset intake requested by ${profile?.name || session?.user?.email || 'User'}: "${datasetName}". Priority: ${priority}. Notes: ${notes || 'None'}`,
         type: 'system',
+        link: '/settings?tab=intake',
+        record_id: ticketId,
+        record_type: 'intake_request',
         is_read: false
       })
 

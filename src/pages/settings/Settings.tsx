@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -44,6 +45,13 @@ type InviteForm = z.infer<typeof inviteSchema>
 
 export default function Settings() {
   const { profile } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const defaultTab = (profile?.is_owner || profile?.role === 'admin') ? "users" : "courses"
+  const activeTab = (tabParam === 'deletions' || tabParam === 'pending-deletions')
+    ? 'pending-deletions'
+    : (tabParam || defaultTab)
+
   const { data: users = [], refetch: refetchUsers } = useUsers()
   const { data: courses = [], refetch: refetchCourses } = useCourses()
   const { data: batches = [], refetch: refetchBatches } = useBatches()
@@ -306,7 +314,14 @@ export default function Settings() {
     <div>
       <PageHeader title="Settings" description="Manage users, courses, batches, and system configuration" />
 
-      <Tabs defaultValue={(profile?.is_owner || profile?.role === 'admin') ? "users" : "courses"}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          const newParams = new URLSearchParams(searchParams)
+          newParams.set('tab', val)
+          setSearchParams(newParams, { replace: true })
+        }}
+      >
         <TabsList>
           {(profile?.is_owner || profile?.role === 'admin') && (
             <TabsTrigger value="users">Users ({userCount}/15)</TabsTrigger>

@@ -14,24 +14,22 @@ SECURITY DEFINER
 SET search_path = public, auth
 AS $$
 DECLARE
-  caller_id UUID;
-  caller_is_owner BOOLEAN;
+  v_caller_id UUID;
+  v_role TEXT;
+  v_is_owner BOOLEAN;
   target_is_owner BOOLEAN;
   clean_email TEXT;
   existing_user_id UUID;
   old_email TEXT;
 BEGIN
-  -- 1. Check authentication
-  caller_id := auth.uid();
-  IF caller_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
+  -- Look up caller via auth.uid() against users.auth_id, enforcing owner-only guard (same pattern as approve_deletion)
+  SELECT id, role, coalesce(is_owner, false)
+  INTO v_caller_id, v_role, v_is_owner
+  FROM public.users
+  WHERE auth_id = auth.uid();
 
-  SELECT is_owner INTO caller_is_owner FROM public.users WHERE auth_id = caller_id;
-  IF caller_is_owner IS NOT TRUE THEN
-    IF caller_id <> target_user_id THEN
-      RAISE EXCEPTION 'Only owners can edit other users';
-    END IF;
+  IF v_caller_id IS NULL OR (v_role != 'owner' AND NOT v_is_owner) THEN
+    RAISE EXCEPTION 'Unauthorized: Only owners can update users';
   END IF;
 
   -- 2. Fetch target user
@@ -103,7 +101,7 @@ BEGIN
   -- 5. Record audit log
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, new_data)
   VALUES (
-    caller_id,
+    v_caller_id,
     'user_update',
     'user',
     target_user_id,
@@ -111,7 +109,7 @@ BEGIN
       'old_email', old_email,
       'new_email', clean_email,
       'name', new_name,
-      'updated_by', caller_id
+      'updated_by', v_caller_id
     )
   );
 

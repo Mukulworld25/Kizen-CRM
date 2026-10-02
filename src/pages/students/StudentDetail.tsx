@@ -47,7 +47,7 @@ export default function StudentDetail() {
   const { data: attendance = [] } = useAttendance(id, month)
   const markAttendance = useMarkAttendance()
 
-  const { data: fees = [] } = useFees()
+  const { data: fees = [], isLoading: feesLoading } = useFees()
   const studentFee = fees.find((f) => f.student_id === id)
   const { data: payments = [] } = useFeePayments(studentFee?.id)
   const { data: installments = [] } = useInstallments(studentFee?.id)
@@ -364,7 +364,9 @@ export default function StudentDetail() {
         </TabsContent>
 
         <TabsContent value="fees" className="mt-4 space-y-6">
-          {studentFee ? (
+          {feesLoading ? (
+            <Skeleton className="h-64 w-full rounded-xl" />
+          ) : studentFee ? (
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-4">
                 <Card className="bg-slate-900 text-white">

@@ -8,16 +8,21 @@ import { Sliders, FileSpreadsheet, Share2, Megaphone } from 'lucide-react'
 
 export interface IntakeSetting {
   id: string
-  source: 'manual_upload' | 'sheets_sync' | 'meta_ads' | 'google_ads'
+  source: 'manual_upload' | 'sheets_sync' | 'meta_ads' | 'google_ads' | 'whatsapp'
   is_enabled: boolean
   last_synced_at: string | null
 }
 
+// Mirrors the seed in 027_add_whatsapp_google_ads_sources.sql. The ad and
+// WhatsApp channels start DISABLED - previously these defaults claimed they
+// were enabled, so a failed read of data_intake_settings made the UI report
+// inactive channels as "Active".
 const DEFAULT_SETTINGS: IntakeSetting[] = [
-  { id: '1', source: 'manual_upload', is_enabled: true, last_synced_at: new Date().toISOString() },
-  { id: '2', source: 'sheets_sync', is_enabled: true, last_synced_at: new Date().toISOString() },
-  { id: '3', source: 'meta_ads', is_enabled: true, last_synced_at: null },
-  { id: '4', source: 'google_ads', is_enabled: true, last_synced_at: null },
+  { id: '1', source: 'manual_upload', is_enabled: true, last_synced_at: null },
+  { id: '2', source: 'sheets_sync', is_enabled: true, last_synced_at: null },
+  { id: '3', source: 'meta_ads', is_enabled: false, last_synced_at: null },
+  { id: '4', source: 'google_ads', is_enabled: false, last_synced_at: null },
+  { id: '5', source: 'whatsapp', is_enabled: false, last_synced_at: null },
 ]
 
 const SOURCE_LABELS: Record<IntakeSetting['source'], { label: string; icon: any; description: string }> = {
@@ -40,6 +45,11 @@ const SOURCE_LABELS: Record<IntakeSetting['source'], { label: string; icon: any;
     label: 'Google Ads Campaign Sync',
     icon: Megaphone,
     description: 'Automated intake from Google Search & Display ad forms.',
+  },
+  whatsapp: {
+    label: 'WhatsApp Inbound Lead Sync',
+    icon: Megaphone,
+    description: 'Automated intake from inbound WhatsApp messages via AiSensy.',
   },
 }
 
@@ -67,12 +77,20 @@ export function IntakeSettingsToggles() {
 
   const handleToggle = async (source: IntakeSetting['source'], currentVal: boolean) => {
     const newVal = !currentVal
+    // Optimistic update
     setSettings((prev) => prev.map((s) => (s.source === source ? { ...s, is_enabled: newVal } : s)))
 
-    try {
-      await supabase.from('data_intake_settings').update({ is_enabled: newVal }).eq('source', source)
-    } catch {
-      // Local state is updated
+    const { error } = await supabase
+      .from('data_intake_settings')
+      .update({ is_enabled: newVal })
+      .eq('source', source)
+
+    if (error) {
+      // Previously the error was swallowed and a success toast was shown, so
+      // the switch reflected a value that was never persisted.
+      setSettings((prev) => prev.map((s) => (s.source === source ? { ...s, is_enabled: currentVal } : s)))
+      toast.error(`Could not update ${SOURCE_LABELS[source].label}: ${error.message}`)
+      return
     }
     toast.success(`${SOURCE_LABELS[source].label} ${newVal ? 'enabled' : 'disabled'}`)
   }

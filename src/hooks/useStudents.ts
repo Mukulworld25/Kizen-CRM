@@ -405,6 +405,9 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['fees'] })
       queryClient.invalidateQueries({ queryKey: ['fee-payments', vars.fee_id] })
       queryClient.invalidateQueries({ queryKey: ['installments', vars.fee_id] })
+      // The student pages render a fee summary from the same rows.
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Payment recorded')
     },
     onError: (err) => toast.error(err.message),
@@ -450,16 +453,15 @@ export function useUpdateFee() {
 
       if (fetchErr) throw fetchErr
 
-      const net_fee = Math.max(0, total_fee - discount - scholarship)
-      const pending_balance = Math.max(0, net_fee - (existing?.amount_paid || 0))
-
+      // net_fee and pending_balance are GENERATED ALWAYS columns derived from
+      // total_fee / discount / scholarship / amount_paid. Writing them here
+      // raised "column ... can only be updated to DEFAULT" and failed the save.
+      // The database owns these values.
       const updatePayload: any = {
         total_fee,
         discount,
         scholarship,
         registration_amount,
-        net_fee,
-        pending_balance,
         updated_at: new Date().toISOString(),
       }
 
@@ -516,6 +518,9 @@ export function useUpdateFee() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fees'] })
       queryClient.invalidateQueries({ queryKey: ['fees', vars.id] })
+      // Installments are deleted and re-inserted by this mutation.
+      queryClient.invalidateQueries({ queryKey: ['installments', vars.id] })
+      queryClient.invalidateQueries({ queryKey: ['fee-payments', vars.id] })
       toast.success('Fee structure updated successfully')
     },
     onError: (err) => toast.error(err.message),
@@ -950,7 +955,7 @@ export function useDashboardInsights() {
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('is_deleted', false)
-          .or('temperature.eq.cold,status.eq.lost,is_cold_flag.eq.true'),
+          .or('temperature.eq.cold,status.eq.lost'),
         supabase.from('leads')
           .select('temperature, status, assigned_counselor_id')
           .eq('is_deleted', false),

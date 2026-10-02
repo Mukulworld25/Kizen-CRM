@@ -69,8 +69,15 @@ export default function DataImport() {
   useEffect(() => {
     async function loadSettings() {
       setLoading(true)
-      const { data } = await supabase.from('data_intake_settings').select('*')
-      if (data) setSettings(data)
+      const { data, error } = await supabase.from('data_intake_settings').select('*')
+      if (error) {
+        // Previously the error was discarded and the panel silently rendered
+        // as "no intake sources configured".
+        console.error('Failed to load intake settings:', error.message)
+        toast.error(`Could not load intake sources: ${error.message}`)
+      } else if (data) {
+        setSettings(data)
+      }
       setLoading(false)
     }
     loadSettings()
@@ -88,7 +95,7 @@ export default function DataImport() {
 
     try {
       // 1. Create a notification record for SAGEDO/Owner
-      await supabase.from('notifications').insert({
+      const { error: notifyError } = await supabase.from('notifications').insert({
         user_id: profile?.id,
         title: `Data Intake Request: ${dataType.toUpperCase()} (${ticketId})`,
         message: `New dataset intake requested by ${profile?.name || session?.user?.email || 'User'}: "${datasetName}". Priority: ${priority}. Notes: ${notes || 'None'}`,
@@ -98,6 +105,9 @@ export default function DataImport() {
         record_type: 'intake_request',
         is_read: false
       })
+      // Previously the insert result was never checked, so a failure was
+      // swallowed while the user still saw "submitted successfully".
+      if (notifyError) throw notifyError
 
       const newRecord: IntakeRequestRecord = {
         id: crypto.randomUUID(),
@@ -283,20 +293,22 @@ export default function DataImport() {
             <CardContent className="space-y-3 text-xs">
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <div className="flex items-center justify-between font-semibold text-slate-900">
-                  <span>leads_sheet.xlsx</span>
+                  <span>Google Sheets live sync</span>
                   <Badge variant="success" className="text-[10px]">Active</Badge>
                 </div>
-                <p className="text-slate-500 text-[11px]">406 verified rows • 0 duplicates</p>
-                <p className="text-slate-400 text-[10px]">Unicode preserved verbatim</p>
+                <p className="text-slate-500 text-[11px]">
+                  Row counts are recorded per run in the Intake Audit Log.
+                </p>
               </div>
 
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <div className="flex items-center justify-between font-semibold text-slate-900">
-                  <span>fee_tracker_sheet.xlsx</span>
-                  <Badge variant="success" className="text-[10px]">Active</Badge>
+                  <span>Ad / WhatsApp webhooks</span>
+                  <Badge variant="secondary" className="text-[10px]">Standby</Badge>
                 </div>
-                <p className="text-slate-500 text-[11px]">40 records • 11 split contacts</p>
-                <p className="text-slate-400 text-[10px]">3 Step 6 indicators flagged</p>
+                <p className="text-slate-500 text-[11px]">
+                  Inactive until platform API credentials are configured.
+                </p>
               </div>
             </CardContent>
           </Card>

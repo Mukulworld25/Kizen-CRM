@@ -146,6 +146,13 @@ export function useFeaturePermissions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feature_permissions'] })
+      // useAuth keeps its own copy of the permission matrix in component state
+      // (refreshed only on this window event). Without dispatching it, the
+      // sidebar and ProtectedRoute kept evaluating the previous permissions
+      // until a full page reload.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('kizen_permissions_updated'))
+      }
     },
   })
 

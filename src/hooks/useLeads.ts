@@ -220,6 +220,10 @@ export function useCreateLead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] })
+      // Lead totals and the temperature/stale/cold widgets are separate queries
+      // with no realtime listener, so they must be invalidated explicitly.
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
       toast.success('Lead added successfully')
     },
     onError: (err) => toast.error(err.message),
@@ -253,6 +257,7 @@ export function useUpdateLead() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['leads', vars.id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
       toast.success('Lead updated')
     },
     onError: (err) => toast.error(err.message),
@@ -297,21 +302,9 @@ export function useAddActivity() {
   })
 }
 
-export function useUpdateLeadScore() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('compute_lead_scores')
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
-      toast.success('Lead scores updated')
-    },
-    onError: (err) => toast.error(err.message),
-  })
-}
+// NOTE: removed useUpdateLeadScore(). It called the RPC compute_lead_scores(),
+// which was never defined in any migration, and the hook was not imported by any
+// component. The RPC is now created by migration 037 if it is ever needed.
 
 export function useCounselors() {
   return useQuery({

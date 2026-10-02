@@ -52,16 +52,27 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   })
 
   const onSubmit = async (data: FormData) => {
-    await createLead.mutateAsync({
-      ...data,
-      email: data.email || null,
-      referred_by_lead_id: data.referred_by_lead_id || null,
-      assigned_counselor_id: data.assigned_counselor_id || profile?.id || null,
-      budget: data.budget ? parseFloat(data.budget) : null,
-      expected_joining_date: data.expected_joining_date || null,
-    } as never)
-    reset()
-    onOpenChange(false)
+    try {
+      await createLead.mutateAsync({
+        ...data,
+        email: data.email || null,
+        referred_by_lead_id: data.referred_by_lead_id || null,
+        // Only fall back to the creator when they are actually a counselor /
+        // owner / admin; otherwise reception-created leads ended up assigned to
+        // a receptionist.
+        assigned_counselor_id: data.assigned_counselor_id ||
+          (['counselor', 'owner', 'admin'].includes(profile?.role ?? '') ? profile?.id : null) ||
+          null,
+        budget: data.budget ? parseFloat(data.budget) : null,
+        expected_joining_date: data.expected_joining_date || null,
+      } as never)
+      reset()
+      onOpenChange(false)
+    } catch (err) {
+      // The mutation already toasts the underlying message; this keeps the
+      // dialog open and surfaces the failure instead of an unhandled rejection.
+      console.error('Failed to create lead:', err)
+    }
   }
 
   return (

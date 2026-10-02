@@ -77,8 +77,12 @@ export function ConvertToStudentModal({ open, onOpenChange, lead }: ConvertToStu
 
       await queryClient.invalidateQueries({ queryKey: ['leads'] })
       await queryClient.invalidateQueries({ queryKey: ['students'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      await queryClient.invalidateQueries({ queryKey: ['lead', lead.id] })
+      // The real keys are ['dashboard', ...] (useDashboardStats) and
+      // ['leads', id, profileId] (useLead). Invalidating 'dashboard-stats' /
+      // 'lead' matched nothing, so the KPI cards and lead detail went stale.
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
+      await queryClient.invalidateQueries({ queryKey: ['leads', lead.id] })
 
       toast.success(`Converted ${lead.full_name} to student ${student.student_id || student.display_id || ''}!`)
       onOpenChange(false)

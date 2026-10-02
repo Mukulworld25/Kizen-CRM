@@ -169,7 +169,7 @@ export function DataIntakeUpload({ onUploadSuccess }: { onUploadSuccess?: () => 
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-slate-400" />
-            Current Live Ingestions: 406 Leads, 40 Fee Records
+            Counts per run are recorded in the Intake Audit Log.
           </span>
           <span className="font-mono text-emerald-600 font-medium">Verified Active</span>
         </div>

@@ -34,7 +34,17 @@ export function useSoftDelete() {
       }) } catch (_) {}
     },
     onSuccess: () => {
+      // Every list view is filtered on is_deleted, so a soft delete must invalidate
+      // all of them. Only `leads` is in the realtime publication, so without this
+      // the deleted row stayed visible until a manual reload.
       queryClient.invalidateQueries({ queryKey: ['trash'] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['institutions'] })
+      queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
       toast.success('Record moved to trash')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed'),
@@ -59,6 +69,12 @@ export function usePermanentDelete() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trash'] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['institutions'] })
+      queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Permanently deleted')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Permanent delete failed'),

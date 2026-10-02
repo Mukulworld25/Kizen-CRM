@@ -157,7 +157,10 @@ export function canAccessRoute(
   }
 
   const permission = routePermissions[base]
-  if (!permission) return true
+  // Deny by default. Previously an unmapped route fell through to `return true`,
+  // which meant any newly added route was reachable by every role unless
+  // someone remembered to register it here.
+  if (!permission) return isOwner
   return hasPermission(role, permission, isOwner, user)
 }
 
@@ -186,7 +189,9 @@ export function isUserHod(user: { email?: string | null; role?: string | null; i
   if (user.is_owner || user.role === 'owner' || user.role === 'admin') return true
   if (user.role === 'hod') return true
   if (user.is_hod) return true
-  if (user.email === 'faculty.hod@kizen.edu') return true
-  if (user.name?.toLowerCase().includes('hod')) return true
+  // Exact match only. The previous `name.toLowerCase().includes('hod')` granted
+  // HOD-level manage permissions to any user whose name happened to contain
+  // those three letters (e.g. "Rhodri").
+  if (user.email?.toLowerCase() === 'faculty.hod@kizen.edu') return true
   return false
 }

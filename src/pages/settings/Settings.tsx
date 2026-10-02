@@ -148,15 +148,17 @@ export default function Settings() {
 
   const handleInvite = async (data: InviteForm) => {
     try {
-      const { error } = await supabase.from('users').insert({
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        is_active: true,
-      }).select().single()
+      // Must go through the invite-user Edge Function. Inserting straight into
+      // public.users creates a profile with no auth.users row, so the person
+      // could never sign in, while still consuming one of the 15 user slots.
+      const { data: result, error } = await supabase.functions.invoke('invite-user', {
+        body: { name: data.name, email: data.email, role: data.role },
+      })
       if (error) throw error
+      const apiError = (result as { error?: string } | null)?.error
+      if (apiError) throw new Error(apiError)
 
-      toast.success(`User ${data.name} added successfully!`)
+      toast.success(`Invitation sent to ${data.email}`)
       reset()
       setInviteOpen(false)
       refetchUsers()
@@ -273,7 +275,8 @@ export default function Settings() {
       batch_name: newBatch.name,
       course_id: newBatch.courseId || null,
       faculty_id: newBatch.facultyId || null,
-      total_seats: 40,
+      // total_seats omitted so the schema default (30) applies; the previous
+      // hardcoded 40 silently overrode it.
     })
     if (error) toast.error(error.message)
     else {
@@ -289,7 +292,8 @@ export default function Settings() {
       batch_name: editBatchName.trim(),
       course_id: editBatchCourseId || null,
       faculty_id: editBatchFacultyId || null,
-      total_seats: editBatchSeats || 40,
+      // Omit when blank so the existing seat count is preserved.
+      ...(editBatchSeats ? { total_seats: editBatchSeats } : {}),
     }).eq('id', editBatchModal.id)
 
     if (error) toast.error(error.message)

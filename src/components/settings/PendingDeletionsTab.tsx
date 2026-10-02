@@ -76,6 +76,15 @@ export function PendingDeletionsTab() {
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['fees'] })
       queryClient.invalidateQueries({ queryKey: ['batches'] })
+      // approve_deletion soft-deletes on any of these four tables, so their
+      // list views must be refetched too.
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['institutions'] })
+      queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['trash'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to approve deletion')

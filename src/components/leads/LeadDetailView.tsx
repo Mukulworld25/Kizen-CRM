@@ -33,7 +33,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         // 1. Fetch Lead
         const { data: lead } = await supabase
           .from('leads')
-          .select('*, course:courses(name), counselor:users!assigned_counselor_id(name)')
+          .select('*, course:courses(name), counselor:users!leads_assigned_counselor_id_fkey(name)')
           .eq('id', leadId)
           .single()
 

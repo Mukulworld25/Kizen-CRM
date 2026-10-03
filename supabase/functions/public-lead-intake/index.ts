@@ -147,6 +147,7 @@ serve(async (req: Request) => {
       mobile: cleanPhone,
       email: typeof email === 'string' && email.trim() ? email.trim() : null,
       source: 'website',
+      lead_date: new Date().toISOString().split('T')[0],
       status: 'new_lead',
       assigned_counselor_id: null,
       notes: notes,

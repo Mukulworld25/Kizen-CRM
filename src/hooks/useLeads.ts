@@ -42,7 +42,7 @@ export function useLeads(filters: LeadFilters = {}) {
 
       // Role-based Lead Segregation at the database query level:
       // If the user has a counselor role (and is not an owner or admin), strictly filter by assigned_counselor_id = profile.id
-      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
+      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
       if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
         query = query.eq('assigned_counselor_id', profile.id)
       } else {
@@ -129,7 +129,7 @@ export function useLead(id: string | undefined) {
         .select('*, course:courses(*), counselor:users!leads_assigned_counselor_id_fkey(id, name, email)')
         .eq('id', id!)
 
-      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
+      const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
       if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
         query = query.eq('assigned_counselor_id', profile.id)
       }

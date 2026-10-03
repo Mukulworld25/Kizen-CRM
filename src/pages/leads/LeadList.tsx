@@ -29,7 +29,7 @@ export default function LeadList() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { can, isOwner, profile } = useAuth()
-  const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin'
+  const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
   const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 50 })
   const [addOpen, setAddOpen] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
@@ -377,7 +377,7 @@ export default function LeadList() {
           <SelectTrigger className="w-40"><SelectValue placeholder="Counselor" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Counselors</SelectItem>
-            <SelectItem value="unassigned">Unassigned Only</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
             {counselors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -445,7 +445,7 @@ export default function LeadList() {
       key: 'assigned_counselor_id',
       label: 'Counselor',
       type: 'select',
-      options: counselors.map((c) => ({ value: c.id, label: c.name })),
+      options: [{ value: 'unassigned', label: 'Unassigned' }, ...counselors.map((c) => ({ value: c.id, label: c.name }))],
     },
     {
       key: 'interested_course_id',

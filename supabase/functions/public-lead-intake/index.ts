@@ -121,7 +121,12 @@ serve(async (req: Request) => {
     // 4. Construct lead notes & data
     let notes = '[Website Inquiry]'
     if (course_interest && typeof course_interest === 'string' && course_interest.trim()) {
-      notes += ` | Course Interest: ${course_interest.trim()}`
+      const trimmedInterest = course_interest.trim()
+      if (trimmedInterest.toLowerCase().startsWith('interested in ')) {
+        notes += ` | ${trimmedInterest}`
+      } else {
+        notes += ` | Course Interest: ${trimmedInterest}`
+      }
     }
     if (message && typeof message === 'string' && message.trim()) {
       notes += ` | Message: ${message.trim()}`
@@ -141,7 +146,73 @@ serve(async (req: Request) => {
     // Use service role internally - never exposes key to browser
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 5. Insert into leads table (RLS bypassed server-side via service role)
+    // 5. Check for recent submission from the same number within the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const { data: recentLeads, error: queryError } = await supabase
+      .from('leads')
+      .select('id, notes, email')
+      .eq('mobile', cleanPhone)
+      .eq('source', 'website')
+      .eq('is_deleted', false)
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (queryError) {
+      console.warn('Recent leads lookup warning:', queryError)
+    }
+
+    if (recentLeads && recentLeads.length > 0) {
+      const existingLead = recentLeads[0]
+      const existingNotes = existingLead.notes || '[Website Inquiry]'
+      const newInterest = course_interest && typeof course_interest === 'string' && course_interest.trim() ? course_interest.trim() : null
+      const newMsg = message && typeof message === 'string' && message.trim() ? message.trim() : null
+
+      let appendedNotes = existingNotes
+      if (newInterest) {
+        const cleanSub = newInterest.replace(/^Interested in\s+/i, '').trim()
+        if (!existingNotes.includes(cleanSub) && !existingNotes.includes(newInterest)) {
+          if (existingNotes.includes('Interested in ')) {
+            appendedNotes += ` & ${cleanSub}`
+          } else if (existingNotes.includes('Course Interest:')) {
+            appendedNotes += ` & ${cleanSub}`
+          } else {
+            appendedNotes += ` | ${newInterest.toLowerCase().startsWith('interested in ') ? newInterest : 'Course Interest: ' + newInterest}`
+          }
+        }
+      }
+      if (newMsg && !existingNotes.includes(newMsg)) {
+        appendedNotes += ` | Message: ${newMsg}`
+      }
+
+      const updatePayload: any = {
+        notes: appendedNotes,
+        updated_at: new Date().toISOString(),
+      }
+      if (!existingLead.email && typeof email === 'string' && email.trim()) {
+        updatePayload.email = email.trim()
+      }
+
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update(updatePayload)
+        .eq('id', existingLead.id)
+
+      if (updateError) {
+        console.error('Lead update error on deduplication:', updateError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to update lead' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, deduplicated: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 6. Otherwise, insert new lead into leads table (RLS bypassed server-side via service role)
     const { error: insertError } = await supabase.from('leads').insert({
       full_name: name.trim(),
       mobile: cleanPhone,

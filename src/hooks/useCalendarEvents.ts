@@ -8,6 +8,7 @@ export interface CalendarEvent {
   title: string
   date: string // YYYY-MM-DD
   time?: string // e.g. "10:30 AM"
+  endTime?: string
   type: 'followup' | 'installment' | 'demo' | 'reminder' | 'task' | 'meeting' | 'batch_schedule' | 'institution_fu'
   status: 'pending' | 'completed' | 'overdue' | 'paid' | 'partial' | 'upcoming' | 'ongoing'
   description?: string
@@ -19,11 +20,14 @@ export interface CalendarEvent {
   mobile?: string
   courseName?: string
   amount?: number
+  priority?: 'low' | 'medium' | 'high'
+  isPrivate?: boolean
+  sourceTable: 'follow_ups' | 'tasks' | 'installments' | 'leads'
   raw: any
 }
 
 export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
-  const { profile } = useAuth()
+  const { profile, isOwner } = useAuth()
 
   // Calculate full grid range (start of first week to end of last week)
   const gridStart = startOfWeek(startOfMonth(currentMonth))
@@ -34,13 +38,13 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
   return useQuery({
     queryKey: ['calendar-events', startDateStr, endDateStr, counselorId, profile?.id],
     queryFn: async () => {
-      // 1. Fetch Follow-ups / Tasks / Reminders / Meetings
+      // 1. Fetch Follow-ups / Tasks / Reminders / Meetings from follow_ups
       let fuQuery = supabase
         .from('follow_ups')
         .select(`
-          id, type, scheduled_at, status, notes, assigned_to,
+          id, type, scheduled_at, status, notes, assigned_to, created_by,
           lead:leads!follow_ups_lead_id_fkey!left(id, full_name, mobile, course:courses(name)),
-          assignee:users!follow_ups_assigned_to_fkey(name)
+          assignee:users!follow_ups_assigned_to_fkey(name, email, role)
         `)
         .order('scheduled_at', { ascending: true })
 
@@ -74,15 +78,31 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
       if (endDateStr) leadQuery = leadQuery.lte('expected_joining_date', endDateStr)
       if (counselorId) leadQuery = leadQuery.eq('assigned_counselor_id', counselorId)
 
-      const [fuRes, instRes, leadRes] = await Promise.all([fuQuery, instQuery, leadQuery])
+      // 4. Fetch Operational Tasks from tasks table
+      let taskQuery = supabase
+        .from('tasks')
+        .select(`
+          id, title, description, due_date, status, priority, is_private, assigned_to, created_by,
+          assignee:users!tasks_assigned_to_fkey(name),
+          creator:users!tasks_created_by_fkey(name)
+        `)
+        .not('due_date', 'is', null)
+        .order('due_date', { ascending: true })
+
+      if (startDateStr) taskQuery = taskQuery.gte('due_date', startDateStr)
+      if (endDateStr) taskQuery = taskQuery.lte('due_date', endDateStr)
+      if (counselorId) taskQuery = taskQuery.eq('assigned_to', counselorId)
+
+      const [fuRes, instRes, leadRes, taskRes] = await Promise.all([fuQuery, instQuery, leadQuery, taskQuery])
 
       if (fuRes.error) throw fuRes.error
       if (instRes.error) throw instRes.error
       if (leadRes.error) throw leadRes.error
+      if (taskRes.error) throw taskRes.error
 
       const events: CalendarEvent[] = []
 
-      // Normalize Follow-ups / Tasks / Reminders / Meetings
+      // Normalize Follow-ups / Tasks / Reminders / Meetings from follow_ups
       ;(fuRes.data || []).forEach((fu: any) => {
         if (!fu.scheduled_at) return
         const d = new Date(fu.scheduled_at)
@@ -93,19 +113,30 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
         const rawType = (fu.type || 'task').toLowerCase()
 
         let eventType: CalendarEvent['type'] = 'task'
-        let prefix = '📝 Task'
         if (rawType.includes('meeting')) {
           eventType = 'meeting'
-          prefix = '🤝 Meeting'
         } else if (rawType.includes('reminder')) {
           eventType = 'reminder'
-          prefix = '📌 Reminder'
-        } else if (rawType.includes('followup') || rawType.includes('call')) {
+        } else if (rawType.includes('followup') || rawType.includes('call') || rawType.includes('whatsapp')) {
           eventType = 'followup'
-          prefix = '📞 Follow-up'
         }
 
-        const titleText = leadName ? `${prefix}: ${leadName}` : `${prefix}: ${fu.notes || 'General'}`
+        let titleText = ''
+        let personName = ''
+
+        if (eventType === 'meeting') {
+          titleText = fu.notes ? `🤝 ${fu.notes}` : (leadName ? `🤝 Meeting: ${leadName}` : (fu.assignee?.name ? `🤝 Meeting with ${fu.assignee.name}` : '🤝 Meeting'))
+          personName = fu.assignee?.name ? `With: ${fu.assignee.name}` : (leadName || fu.notes || 'Team Meeting')
+        } else if (eventType === 'reminder') {
+          titleText = `📌 ${fu.notes || 'Reminder'}`
+          personName = fu.notes || 'Reminder'
+        } else if (eventType === 'followup') {
+          titleText = `📞 Call: ${leadName || 'Lead'}`
+          personName = leadName || 'Lead'
+        } else {
+          titleText = `📝 ${fu.notes || (leadName ? `Task: ${leadName}` : 'Task')}`
+          personName = leadName || fu.notes || 'Team Task'
+        }
 
         events.push({
           id: `fu-${fu.id}`,
@@ -114,14 +145,42 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           time: timeStr,
           type: eventType,
           status: fu.status === 'completed' ? 'completed' : fu.status === 'overdue' ? 'overdue' : 'pending',
-          description: fu.notes || `${prefix} scheduled`,
+          description: fu.notes || titleText,
           counselorId: fu.assigned_to,
           counselorName: fu.assignee?.name,
           leadId: lead?.id,
-          personName: leadName || fu.notes || 'Personal Item',
+          personName: personName,
           mobile: lead?.mobile,
           courseName: lead?.course?.name,
+          sourceTable: 'follow_ups',
           raw: fu,
+        })
+      })
+
+      // Normalize Tasks from tasks table
+      ;(taskRes.data || []).forEach((t: any) => {
+        if (!t.due_date) return
+        if (t.is_private && !isOwner && t.created_by !== profile?.id) return
+
+        const d = new Date(t.due_date)
+        const dateStr = format(d, 'yyyy-MM-dd')
+        const timeStr = t.due_date.includes('T') ? format(d, 'hh:mm a') : undefined
+
+        events.push({
+          id: `task-${t.id}`,
+          title: `📝 ${t.title}`,
+          date: dateStr,
+          time: timeStr,
+          type: 'task',
+          status: t.status === 'completed' ? 'completed' : 'pending',
+          description: t.description || t.title,
+          counselorId: t.assigned_to,
+          counselorName: t.assignee?.name,
+          personName: t.assignee?.name ? `Assignee: ${t.assignee.name}` : (t.creator?.name ? `By ${t.creator.name}` : 'Team Task'),
+          priority: t.priority,
+          isPrivate: t.is_private,
+          sourceTable: 'tasks',
+          raw: t,
         })
       })
 
@@ -144,6 +203,7 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           mobile: student?.mobile,
           courseName: student?.course?.name,
           amount: inst.amount,
+          sourceTable: 'installments',
           raw: inst,
         })
       })
@@ -164,6 +224,7 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           personName: l.full_name,
           mobile: l.mobile,
           courseName: l.course?.name,
+          sourceTable: 'leads',
           raw: l,
         })
       })

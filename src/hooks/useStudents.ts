@@ -124,6 +124,40 @@ export function useRescheduleFollowUp() {
   })
 }
 
+export function useUpdateFollowUp() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
+      const { error } = await supabase.from('follow_ups').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      toast.success('Schedule updated successfully')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
+export function useDeleteFollowUp() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('follow_ups').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      toast.success('Schedule removed successfully')
+    },
+    onError: (err) => toast.error(err.message),
+  })
+}
+
 export function useStudents(filters: { courseId?: string; batchId?: string; search?: string } = {}) {
   const { profile } = useAuth()
 

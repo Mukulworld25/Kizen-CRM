@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Eye, Pencil, Trash2, CreditCard } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, CreditCard, Search, UserCheck, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFees, useRecordPayment, useUpdateFee, useDeleteFee } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -45,8 +45,11 @@ export default function FeeManagement() {
     courseId: courseId === 'all' ? undefined : courseId,
     paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
   })
+  const { data: allUnfilteredFees = [] } = useFees({})
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
+  const [studentSearchQuery, setStudentSearchQuery] = useState('')
+  const [isChangingStudent, setIsChangingStudent] = useState(false)
   const recordPayment = useRecordPayment()
   const updateFee = useUpdateFee()
   const deleteFee = useDeleteFee()
@@ -230,6 +233,18 @@ export default function FeeManagement() {
       <span>{label}</span>
     </span>
   )
+
+  const matchingFees = allUnfilteredFees.filter((f) => {
+    if (!studentSearchQuery.trim()) return true
+    const q = studentSearchQuery.toLowerCase().trim()
+    const nameMatch = (f.student?.full_name || '').toLowerCase().includes(q)
+    const idMatch = (f.student?.display_id || (f.student as any)?.student_id || '')
+      .toLowerCase()
+      .includes(q)
+    const mobileMatch = (f.student?.mobile || '').toLowerCase().includes(q)
+    const courseMatch = (f.course?.name || '').toLowerCase().includes(q)
+    return nameMatch || idMatch || mobileMatch || courseMatch
+  })
 
   const columns: Column<Fee>[] = [
     {
@@ -428,7 +443,17 @@ export default function FeeManagement() {
             </Button>
           )}
           {can('recordPayments') && (
-            <Button variant="outline" size="sm" onClick={() => { setSelectedFee(r); setPaymentOpen(true) }} className="h-8 px-2 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedFee(r)
+                setIsChangingStudent(false)
+                setStudentSearchQuery('')
+                setPaymentOpen(true)
+              }}
+              className="h-8 px-2 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200"
+            >
               <CreditCard className="h-3.5 w-3.5 mr-1" /> Record
             </Button>
           )}
@@ -443,7 +468,11 @@ export default function FeeManagement() {
   ]
 
   const handlePayment = async () => {
-    if (!selectedFee || !amount) return
+    if (!selectedFee || !amount) {
+      if (!selectedFee) toast.error('Please select a student first')
+      if (!amount) toast.error('Please enter payment amount')
+      return
+    }
     await recordPayment.mutateAsync({
       fee_id: selectedFee.id,
       student_id: selectedFee.student_id,
@@ -455,6 +484,9 @@ export default function FeeManagement() {
     setPaymentOpen(false)
     setAmount('')
     setTxnId('')
+    setSelectedFee(null)
+    setIsChangingStudent(false)
+    setStudentSearchQuery('')
   }
 
   const DEFAULT_FEE_FILTERS = [
@@ -551,7 +583,18 @@ export default function FeeManagement() {
     <div>
       <PageHeader title="Fee Management" description="Track payments and outstanding balances">
         {can('recordPayments') && (
-          <Button onClick={() => setPaymentOpen(true)}><Plus className="h-4 w-4" /> Record Payment</Button>
+          <Button
+            onClick={() => {
+              setSelectedFee(null)
+              setIsChangingStudent(false)
+              setStudentSearchQuery('')
+              setAmount('')
+              setTxnId('')
+              setPaymentOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4" /> Record Payment
+          </Button>
         )}
       </PageHeader>
 
@@ -595,31 +638,173 @@ export default function FeeManagement() {
       />
 
       {/* RECORD PAYMENT MODAL */}
-      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
-          <div className="bg-sky-50/80 border border-sky-200/80 rounded-lg px-3.5 py-2.5 text-sky-950">
-            <p className="text-sm font-semibold tracking-tight text-sky-900" id="record-payment-student-context">
-              Recording payment for {selectedFee?.student?.full_name || 'Student'}
-              {(selectedFee?.student?.display_id || selectedFee?.student?.student_id) ? (
-                <>
-                  {' '}
-                  <span className="ml-1 font-mono text-xs font-bold text-sky-700 bg-sky-100/70 px-1.5 py-0.5 rounded border border-sky-200/60">
-                    ({selectedFee?.student?.display_id || selectedFee?.student?.student_id})
+      <Dialog
+        open={paymentOpen}
+        onOpenChange={(open) => {
+          setPaymentOpen(open)
+          if (!open) {
+            setIsChangingStudent(false)
+            setStudentSearchQuery('')
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+
+          {/* STUDENT SELECTION / ACTIVE STUDENT CONTEXT */}
+          {!selectedFee || isChangingStudent ? (
+            <div className="space-y-2 border border-amber-200/90 bg-amber-50/40 rounded-xl p-3.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <UserCheck className="h-4 w-4 text-amber-600" />
+                  Select Student Account <span className="text-rose-500">*</span>
+                </Label>
+                {selectedFee && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsChangingStudent(false)
+                      setStudentSearchQuery('')
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-800 underline flex items-center gap-1"
+                  >
+                    <X className="h-3 w-3" /> Cancel
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  id="record-payment-student-search"
+                  placeholder="Search by student name, ID (e.g. STU-97353), or mobile..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="pl-9 bg-white text-sm border-slate-300 focus:border-amber-500"
+                  autoFocus
+                />
+              </div>
+
+              {/* Matching Students List */}
+              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white shadow-inner mt-2">
+                {matchingFees.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-500">
+                    {studentSearchQuery ? `No students found matching "${studentSearchQuery}"` : 'No active student fee accounts found'}
+                  </div>
+                ) : (
+                  matchingFees.map((f) => {
+                    const sId = f.student?.display_id || (f.student as any)?.student_id
+                    const isOverdue = f.installments?.some((i) => i.status === 'overdue')
+                    return (
+                      <button
+                        type="button"
+                        key={f.id}
+                        onClick={() => {
+                          setSelectedFee(f)
+                          setIsChangingStudent(false)
+                          setStudentSearchQuery('')
+                        }}
+                        className="w-full text-left p-2.5 hover:bg-amber-100/70 focus:bg-amber-100/80 transition-colors flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-900 text-xs truncate">
+                              {f.student?.full_name || 'Unnamed Student'}
+                            </span>
+                            {sId && (
+                              <span className="font-mono text-[10px] font-bold text-sky-800 bg-sky-100/80 px-1.5 py-0.5 rounded border border-sky-200">
+                                {sId}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 truncate">
+                            {f.student?.mobile && <span>{f.student.mobile}</span>}
+                            {f.course?.name && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate">{f.course.name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className={`font-bold text-xs ${f.pending_balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(f.pending_balance)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {f.pending_balance > 0 ? (isOverdue ? 'overdue' : 'pending') : 'cleared'}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-sky-50/80 border border-sky-200/80 rounded-xl p-3.5 text-sky-950 flex items-start justify-between gap-2 shadow-xs">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-sky-700 uppercase tracking-wider">
+                    Selected Student Account
                   </span>
-                </>
-              ) : null}
-            </p>
-            {selectedFee?.pending_balance !== undefined && (
-              <p className="text-xs text-slate-500 mt-1">
-                Outstanding Balance: <span className="font-semibold text-rose-600">{formatCurrency(selectedFee.pending_balance)}</span>
-              </p>
-            )}
-          </div>
-          <div className="space-y-4">
+                  {(selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id) && (
+                    <span className="font-mono text-xs font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-200">
+                      {selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id}
+                    </span>
+                  )}
+                </div>
+                <p className="text-base font-bold text-slate-900 tracking-tight" id="record-payment-student-context">
+                  Recording payment for {selectedFee?.student?.full_name || 'Student'}
+                  {(selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id) ? (
+                    <span className="ml-1.5 font-mono text-xs font-bold text-sky-700 bg-sky-100/70 px-1.5 py-0.5 rounded border border-sky-200/60 whitespace-nowrap">
+                      ({selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id})
+                    </span>
+                  ) : null}
+                </p>
+                <div className="flex items-center gap-3 pt-1 text-xs">
+                  <span className="text-slate-600">
+                    Outstanding: <strong className="text-rose-600">{formatCurrency(selectedFee.pending_balance)}</strong>
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600">
+                    Net Fee: <strong>{formatCurrency(selectedFee.net_fee ?? selectedFee.total_fee)}</strong>
+                  </span>
+                  {selectedFee.course?.name && (
+                    <>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 truncate max-w-[130px]">{selectedFee.course.name}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsChangingStudent(true)
+                  setStudentSearchQuery('')
+                }}
+                className="text-xs text-sky-800 border-sky-300 hover:bg-sky-100 h-7 px-2 flex-shrink-0"
+              >
+                Change
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-4 pt-1">
             <div>
-              <Label>Amount (₹)</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Label>Amount (₹) <span className="text-rose-500">*</span></Label>
+              <Input
+                type="number"
+                placeholder={selectedFee ? `Outstanding: ₹${selectedFee.pending_balance}` : 'Enter amount'}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </div>
             <div>
               <Label>Payment Method</Label>
@@ -634,7 +819,7 @@ export default function FeeManagement() {
             </div>
             <div>
               <Label>Transaction ID</Label>
-              <Input value={txnId} onChange={(e) => setTxnId(e.target.value)} />
+              <Input placeholder="Optional reference (e.g. UPI-123456)" value={txnId} onChange={(e) => setTxnId(e.target.value)} />
             </div>
             <div>
               <Label>Payment Date</Label>
@@ -643,7 +828,9 @@ export default function FeeManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentOpen(false)}>Cancel</Button>
-            <Button onClick={handlePayment} disabled={recordPayment.isPending}>Save Payment</Button>
+            <Button onClick={handlePayment} disabled={recordPayment.isPending || !selectedFee || !amount}>
+              Save Payment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

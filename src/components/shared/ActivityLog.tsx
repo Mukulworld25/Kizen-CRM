@@ -125,6 +125,19 @@ export default function ActivityLog() {
         }
       }
 
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        const matchedUsers = staffUsers.filter(
+          (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+        )
+        const userIds = matchedUsers.map((u) => u.id)
+        if (userIds.length > 0) {
+          query = query.or(`user_id.in.(${userIds.join(',')}),action.ilike.%${q}%,entity_type.ilike.%${q}%`)
+        } else {
+          query = query.or(`action.ilike.%${q}%,entity_type.ilike.%${q}%`)
+        }
+      }
+
       const from = (page - 1) * PAGE_SIZE
       const to = page * PAGE_SIZE - 1
       query = query.range(from, to)
@@ -156,6 +169,19 @@ export default function ActivityLog() {
         query = query.eq('created_by', userFilter)
       }
 
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        const matchedUsers = staffUsers.filter(
+          (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+        )
+        const userIds = matchedUsers.map((u) => u.id)
+        if (userIds.length > 0) {
+          query = query.or(`created_by.in.(${userIds.join(',')}),description.ilike.%${q}%,activity_type.ilike.%${q}%`)
+        } else {
+          query = query.or(`description.ilike.%${q}%,activity_type.ilike.%${q}%`)
+        }
+      }
+
       const from = (page - 1) * PAGE_SIZE
       const to = page * PAGE_SIZE - 1
       query = query.range(from, to)
@@ -167,7 +193,7 @@ export default function ActivityLog() {
 
     setLoading(false)
     setRefreshing(false)
-  }, [sourceMode, page, userFilter, categoryFilter])
+  }, [sourceMode, page, userFilter, categoryFilter, searchQuery, staffUsers])
 
   useEffect(() => {
     fetchLogs()
@@ -178,30 +204,9 @@ export default function ActivityLog() {
     fetchLogs()
   }
 
-  // Filter in-memory for search query
-  const displayedLogs = useMemo(() => {
-    if (!searchQuery.trim()) return logs
-    const q = searchQuery.toLowerCase().trim()
-    return logs.filter((l) => {
-      const uName = (l.user?.name || '').toLowerCase()
-      const uEmail = (l.user?.email || '').toLowerCase()
-      const action = (l.action || '').toLowerCase()
-      const entity = (l.entity_type || '').toLowerCase()
-      const details = JSON.stringify(l.new_data || {}).toLowerCase()
-      return uName.includes(q) || uEmail.includes(q) || action.includes(q) || entity.includes(q) || details.includes(q)
-    })
-  }, [logs, searchQuery])
-
-  const displayedLeadLogs = useMemo(() => {
-    if (!searchQuery.trim()) return leadLogs
-    const q = searchQuery.toLowerCase().trim()
-    return leadLogs.filter((l) => {
-      const uName = (l.user?.name || '').toLowerCase()
-      const leadName = (l.lead?.full_name || '').toLowerCase()
-      const desc = (l.description || l.title || '').toLowerCase()
-      return uName.includes(q) || leadName.includes(q) || desc.includes(q)
-    })
-  }, [leadLogs, searchQuery])
+  // Display logs directly (already filtered & paginated by backend)
+  const displayedLogs = logs
+  const displayedLeadLogs = leadLogs
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
@@ -359,7 +364,10 @@ export default function ActivityLog() {
               <Input
                 placeholder="Search by user, action, entity, details..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setPage(1)
+                }}
                 className="pl-8 h-8 text-xs bg-slate-50 border-slate-200"
               />
             </div>

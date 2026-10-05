@@ -598,11 +598,24 @@ export default function FeeManagement() {
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
-          {selectedFee && (
-            <p className="text-sm text-muted-foreground">
-              {selectedFee.student?.full_name} · Balance: {formatCurrency(selectedFee.pending_balance)}
+          <div className="bg-sky-50/80 border border-sky-200/80 rounded-lg px-3.5 py-2.5 text-sky-950">
+            <p className="text-sm font-semibold tracking-tight text-sky-900" id="record-payment-student-context">
+              Recording payment for {selectedFee?.student?.full_name || 'Student'}
+              {(selectedFee?.student?.display_id || selectedFee?.student?.student_id) ? (
+                <>
+                  {' '}
+                  <span className="ml-1 font-mono text-xs font-bold text-sky-700 bg-sky-100/70 px-1.5 py-0.5 rounded border border-sky-200/60">
+                    ({selectedFee?.student?.display_id || selectedFee?.student?.student_id})
+                  </span>
+                </>
+              ) : null}
             </p>
-          )}
+            {selectedFee?.pending_balance !== undefined && (
+              <p className="text-xs text-slate-500 mt-1">
+                Outstanding Balance: <span className="font-semibold text-rose-600">{formatCurrency(selectedFee.pending_balance)}</span>
+              </p>
+            )}
+          </div>
           <div className="space-y-4">
             <div>
               <Label>Amount (₹)</Label>

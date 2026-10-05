@@ -269,7 +269,7 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
     queryFn: async () => {
       let query = supabase
         .from('fees')
-        .select('*, student:students(full_name, student_id, mobile, address, is_deleted), course:courses(name), installments(*)')
+        .select('*, student:students(full_name, student_id, display_id, mobile, address, is_deleted), course:courses(name), installments(*)')
         .order('created_at', { ascending: false })
 
       if (filters.courseId) query = query.eq('course_id', filters.courseId)

@@ -121,21 +121,32 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           eventType = 'followup'
         }
 
+        let rawNotes = fu.notes || ''
         let titleText = ''
+        let descriptionText = ''
         let personName = ''
 
+        if (rawNotes.includes(' · ')) {
+          const parts = rawNotes.split(' · ')
+          titleText = parts[0].trim()
+          descriptionText = parts.slice(1).join(' · ').trim()
+        } else {
+          titleText = rawNotes.trim()
+          descriptionText = ''
+        }
+
         if (eventType === 'meeting') {
-          titleText = fu.notes ? `🤝 ${fu.notes}` : (leadName ? `🤝 Meeting: ${leadName}` : (fu.assignee?.name ? `🤝 Meeting with ${fu.assignee.name}` : '🤝 Meeting'))
-          personName = fu.assignee?.name ? `With: ${fu.assignee.name}` : (leadName || fu.notes || 'Team Meeting')
+          titleText = titleText ? `🤝 ${titleText}` : (leadName ? `🤝 Meeting: ${leadName}` : (fu.assignee?.name ? `🤝 Meeting with ${fu.assignee.name}` : '🤝 Meeting'))
+          personName = fu.assignee?.name ? `With: ${fu.assignee.name}` : (leadName || 'Team Meeting')
         } else if (eventType === 'reminder') {
-          titleText = `📌 ${fu.notes || 'Reminder'}`
-          personName = fu.notes || 'Reminder'
+          titleText = `📌 ${titleText || 'Reminder'}`
+          personName = 'Reminder'
         } else if (eventType === 'followup') {
-          titleText = `📞 Call: ${leadName || 'Lead'}`
+          titleText = `📞 Call: ${leadName || titleText || 'Lead'}`
           personName = leadName || 'Lead'
         } else {
-          titleText = `📝 ${fu.notes || (leadName ? `Task: ${leadName}` : 'Task')}`
-          personName = leadName || fu.notes || 'Team Task'
+          titleText = `📝 ${titleText || (leadName ? `Task: ${leadName}` : 'Task')}`
+          personName = leadName || 'Team Task'
         }
 
         events.push({
@@ -145,7 +156,7 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
           time: timeStr,
           type: eventType,
           status: fu.status === 'completed' ? 'completed' : fu.status === 'overdue' ? 'overdue' : 'pending',
-          description: fu.notes || titleText,
+          description: descriptionText,
           counselorId: fu.assigned_to,
           counselorName: fu.assignee?.name,
           leadId: lead?.id,

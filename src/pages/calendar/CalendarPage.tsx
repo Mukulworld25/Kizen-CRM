@@ -583,8 +583,8 @@ export default function CalendarPage() {
                         )}
                         title={`${event.title} (${event.time || 'All day'}) - ${event.status}`}
                       >
-                        <span className="truncate font-semibold">{event.title}</span>
-                        {event.time && <span className="text-[9px] opacity-80 ml-1 shrink-0 font-mono">{event.time}</span>}
+                        <span className="truncate font-semibold flex-1 min-w-0 mr-1">{event.title}</span>
+                        {event.time && <span className="text-[9px] opacity-80 shrink-0 font-mono">{event.time}</span>}
                       </div>
                     ))}
                     {dayEvents.length > 3 && (

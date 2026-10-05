@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
+import { logAuditEvent } from '@/lib/auditLogger'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -166,7 +167,7 @@ export default function HodTaskSheet() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['hod-tasks'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Team task created')
@@ -177,6 +178,14 @@ export default function HodTaskSheet() {
       setTaskDueDate('')
       setTaskPriority('medium')
       setIsPrivate(false)
+      logAuditEvent({
+        action: 'task_create',
+        entityType: 'task',
+        entityId: data?.id,
+        entityName: data?.title,
+        details: `Created team task: ${data?.title}`,
+        newData: data,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -187,11 +196,18 @@ export default function HodTaskSheet() {
       const { error } = await supabase.from('tasks').update(updates).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['hod-tasks'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Task updated')
       setEditingTask(null)
+      logAuditEvent({
+        action: 'task_update',
+        entityType: 'task',
+        entityId: vars.id,
+        details: `Updated task`,
+        newData: vars,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -202,10 +218,16 @@ export default function HodTaskSheet() {
       const { error } = await supabase.from('tasks').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['hod-tasks'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Task deleted')
+      logAuditEvent({
+        action: 'task_delete',
+        entityType: 'task',
+        entityId: id,
+        details: 'Deleted task',
+      })
     },
     onError: (err) => toast.error(err.message),
   })

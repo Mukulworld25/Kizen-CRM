@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { logAuditEvent } from '@/lib/auditLogger'
 import type { Institution, InstitutionMeeting, InstitutionFollowUp, InstituteExpense } from '@/types'
 
 export function useInstitutions() {
@@ -294,9 +295,17 @@ export function useCreateInstituteExpense() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
       toast.success('Expense recorded')
+      logAuditEvent({
+        action: 'expense_create',
+        entityType: 'expense',
+        entityId: data?.id,
+        entityName: data?.category || 'General Expense',
+        details: `Recorded expense of ₹${data?.amount} under ${data?.category || 'General'}${data?.notes ? ` · ${data.notes}` : ''}`,
+        newData: data,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -308,10 +317,17 @@ export function useDeleteInstituteExpense() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('institute_expenses').delete().eq('id', id)
       if (error) throw error
+      return id
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ['institute-expenses'] })
       toast.success('Expense deleted')
+      logAuditEvent({
+        action: 'expense_delete',
+        entityType: 'expense',
+        entityId: id,
+        details: `Deleted expense record #${id.slice(0, 8)}`,
+      })
     },
     onError: (err) => toast.error(err.message),
   })

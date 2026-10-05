@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { logAuditEvent } from '@/lib/auditLogger'
 import type { FollowUp, Student, Fee, FeePayment, Installment, InstituteExpense, Document, Batch, User } from '@/types'
 
 export function useFollowUps(tab: string, counselorId?: string, targetDate?: string) {
@@ -70,10 +71,16 @@ export function useCompleteFollowUp() {
         .eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up marked complete')
+      logAuditEvent({
+        action: 'meeting_complete',
+        entityType: 'meeting',
+        entityId: id,
+        details: 'Marked schedule / meeting complete',
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -93,10 +100,17 @@ export function useCreateFollowUp() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up scheduled')
+      logAuditEvent({
+        action: 'meeting_schedule',
+        entityType: 'meeting',
+        entityId: data?.id,
+        details: `Scheduled ${vars.type || 'follow-up'}: ${vars.notes || 'No description'}`,
+        newData: data,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -115,10 +129,17 @@ export function useRescheduleFollowUp() {
         .eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Follow-up rescheduled successfully')
+      logAuditEvent({
+        action: 'meeting_reschedule',
+        entityType: 'meeting',
+        entityId: vars.id,
+        details: `Rescheduled follow-up to ${vars.scheduledAt}${vars.notes ? ` - ${vars.notes}` : ''}`,
+        newData: vars,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -132,10 +153,17 @@ export function useUpdateFollowUp() {
       const { error } = await supabase.from('follow_ups').update(updates).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Schedule updated successfully')
+      logAuditEvent({
+        action: 'meeting_update',
+        entityType: 'meeting',
+        entityId: vars.id,
+        details: 'Updated schedule / meeting details',
+        newData: vars,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -149,10 +177,16 @@ export function useDeleteFollowUp() {
       const { error } = await supabase.from('follow_ups').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
       toast.success('Schedule removed successfully')
+      logAuditEvent({
+        action: 'meeting_delete',
+        entityType: 'meeting',
+        entityId: id,
+        details: 'Deleted scheduled event / meeting',
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -221,9 +255,17 @@ export function useCreateStudent() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student created')
+      logAuditEvent({
+        action: 'student_create',
+        entityType: 'student',
+        entityId: data?.id,
+        entityName: data?.full_name,
+        details: `Registered new student: ${data?.full_name || 'Student'}${data?.display_id ? ` (${data.display_id})` : ''}`,
+        newData: data,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -243,10 +285,18 @@ export function useUpdateStudent() {
       if (error) throw error
       return data
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
       queryClient.invalidateQueries({ queryKey: ['students', vars.id] })
       toast.success('Student profile updated')
+      logAuditEvent({
+        action: 'student_update',
+        entityType: 'student',
+        entityId: vars.id,
+        entityName: data?.full_name,
+        details: `Updated student profile: ${data?.full_name || vars.id}`,
+        newData: data,
+      })
     },
     onError: (err) => toast.error(err.message),
   })
@@ -435,7 +485,7 @@ export function useRecordPayment() {
       if (error) throw error
       return data
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fees'] })
       queryClient.invalidateQueries({ queryKey: ['fee-payments', vars.fee_id] })
       queryClient.invalidateQueries({ queryKey: ['installments', vars.fee_id] })
@@ -443,6 +493,13 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['students'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Payment recorded')
+      logAuditEvent({
+        action: 'payment_record',
+        entityType: 'fee',
+        entityId: vars.fee_id,
+        details: `Recorded fee payment of ₹${vars.amount} via ${vars.payment_method || 'cash'}${vars.transaction_reference ? ` (Txn: ${vars.transaction_reference})` : ''}`,
+        newData: { amount: vars.amount, payment_method: vars.payment_method, fee_id: vars.fee_id, payment_id: data?.id },
+      })
     },
     onError: (err) => toast.error(err.message),
   })

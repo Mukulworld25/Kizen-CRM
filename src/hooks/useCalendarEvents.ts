@@ -44,7 +44,8 @@ export function useCalendarEvents(currentMonth: Date, counselorId?: string) {
         .select(`
           id, type, scheduled_at, status, notes, assigned_to, created_by,
           lead:leads!follow_ups_lead_id_fkey!left(id, full_name, mobile, course:courses(name)),
-          assignee:users!follow_ups_assigned_to_fkey(name, email, role)
+          assignee:users!follow_ups_assigned_to_fkey(name, email, role),
+          creator:users!follow_ups_created_by_fkey(name)
         `)
         .order('scheduled_at', { ascending: true })
 

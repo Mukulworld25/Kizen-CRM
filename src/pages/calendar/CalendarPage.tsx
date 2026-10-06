@@ -113,6 +113,28 @@ export default function CalendarPage() {
   const allLeads = leadsData?.leads ?? []
   const allStudents = studentsData ?? []
 
+  /**
+   * Ownership check: determines whether the current user can edit/delete/
+   * reschedule/complete a calendar event.
+   *
+   * Rules:
+   *  - Owner / Admin → always allowed
+   *  - Creator of the event → allowed (created_by matches profile.id)
+   *  - Assignee of the event → allowed (assigned_to matches profile.id)
+   *  - Everyone else → view-only
+   */
+  const canModifyEvent = (event: CalendarEvent | null): boolean => {
+    if (!event || !profile) return false
+    if (isOwner || profile.role === 'admin') return true
+    const raw = event.raw
+    if (!raw) return false
+    // Check creator
+    if (raw.created_by && raw.created_by === profile.id) return true
+    // Check assignee
+    if (raw.assigned_to && raw.assigned_to === profile.id) return true
+    return false
+  }
+
   // Active Users for Staff Meetings
   const { data: allUsers = [] } = useQuery({
     queryKey: ['active-staff-users'],
@@ -684,7 +706,7 @@ export default function CalendarPage() {
                   />
                   <span className="truncate">{isEditingEvent ? 'Edit Schedule Event' : selectedEvent.title}</span>
                 </div>
-                {!isEditingEvent && (selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
+                {!isEditingEvent && canModifyEvent(selectedEvent) && (selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
                   <Button variant="outline" size="sm" onClick={handleOpenEdit} className="h-7 text-xs gap-1">
                     <Edit2 className="h-3 w-3" /> Edit
                   </Button>
@@ -781,8 +803,24 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                {/* Quick Reschedule Presets */}
+                {/* Creator attribution & read-only notice */}
                 {(selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-1 pt-1">
+                    {selectedEvent.raw?.creator?.name && (
+                      <span className="text-slate-500 font-medium flex items-center gap-1">
+                        <UserIcon className="h-3 w-3" /> Created by: <strong className="text-slate-700">{selectedEvent.raw.creator.name}</strong>
+                      </span>
+                    )}
+                    {!canModifyEvent(selectedEvent) && (
+                      <Badge variant="outline" className="text-[10px] border-rose-200 text-rose-600 bg-rose-50 font-semibold">
+                        <Lock className="h-2.5 w-2.5 mr-0.5" /> View Only
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Reschedule Presets — only for creator/owner */}
+                {canModifyEvent(selectedEvent) && (selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
                   <div className="pt-2 border-t">
                     <span className="text-[11px] font-semibold text-slate-600 block mb-1.5">Quick Reschedule:</span>
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -807,7 +845,7 @@ export default function CalendarPage() {
             {!isEditingEvent && (
               <DialogFooter className="flex-col sm:flex-row gap-2 justify-between border-t pt-3">
                 <div>
-                  {(selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
+                  {canModifyEvent(selectedEvent) && (selectedEvent.sourceTable === 'follow_ups' || selectedEvent.sourceTable === 'tasks') && (
                     <Button variant="destructive" size="sm" onClick={handleDeleteEvent} className="h-8 text-xs gap-1">
                       <Trash2 className="h-3.5 w-3.5" /> Remove
                     </Button>
@@ -815,7 +853,7 @@ export default function CalendarPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => setSelectedEvent(null)}>Close</Button>
-                  {selectedEvent.sourceTable === 'follow_ups' && selectedEvent.status !== 'completed' && (
+                  {canModifyEvent(selectedEvent) && selectedEvent.sourceTable === 'follow_ups' && selectedEvent.status !== 'completed' && (
                     <Button
                       size="sm"
                       onClick={() => {
@@ -827,7 +865,7 @@ export default function CalendarPage() {
                       <Check className="h-3.5 w-3.5 mr-1" /> Mark Completed
                     </Button>
                   )}
-                  {selectedEvent.sourceTable === 'tasks' && selectedEvent.status !== 'completed' && (
+                  {canModifyEvent(selectedEvent) && selectedEvent.sourceTable === 'tasks' && selectedEvent.status !== 'completed' && (
                     <Button
                       size="sm"
                       onClick={() => updateTask(selectedEvent.raw?.id, { status: 'completed' })}

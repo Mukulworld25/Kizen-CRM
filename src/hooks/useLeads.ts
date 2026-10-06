@@ -4,6 +4,39 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { Lead, LeadFilters, LeadActivity } from '@/types'
 
+/**
+ * Check whether the current user has been explicitly granted elevated lead
+ * access via the feature_permissions table — either a user-specific override
+ * or a role-level grant.  When the owner toggles "Leads → can_view" ON for a
+ * counselor in Settings → Role Permissions, this returns true so the counselor
+ * sees ALL leads instead of only their assigned ones.
+ */
+async function hasElevatedLeadAccess(userId: string, userRole: string): Promise<boolean> {
+  try {
+    // 1. User-specific override (highest priority)
+    const { data: userPerm } = await supabase
+      .from('feature_permissions')
+      .select('can_view')
+      .eq('feature_key', 'leads')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (userPerm) return userPerm.can_view === true
+
+    // 2. Role-level grant
+    const { data: rolePerm } = await supabase
+      .from('feature_permissions')
+      .select('can_view')
+      .eq('feature_key', 'leads')
+      .eq('role', userRole)
+      .is('user_id', null)
+      .maybeSingle()
+    if (rolePerm) return rolePerm.can_view === true
+  } catch {
+    // On error fall through to default behaviour
+  }
+  return false
+}
+
 const SUPABASE_URL =
   (import.meta.env.VITE_SUPABASE_URL as string) || 'https://bumjiykhgkgmqyynwtuh.supabase.co'
 
@@ -41,10 +74,24 @@ export function useLeads(filters: LeadFilters = {}) {
       if (filters.disposition) query = query.ilike('disposition', filters.disposition)
 
       // Role-based Lead Segregation at the database query level:
-      // If the user has a counselor role (and is not an owner or admin), strictly filter by assigned_counselor_id = profile.id
+      // Owner / Admin / Reception → full access (see all leads)
+      // Counselor with explicitly-granted elevated access → full access
+      // Counselor without elevated access → only leads assigned to them
       const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
       if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
-        query = query.eq('assigned_counselor_id', profile.id)
+        // Check if the owner has explicitly granted this counselor "leads" access
+        // via the feature_permissions panel. If yes → show all leads (like admin).
+        const elevated = await hasElevatedLeadAccess(profile.id, profile.role)
+        if (!elevated) {
+          query = query.eq('assigned_counselor_id', profile.id)
+        } else {
+          // Elevated counselor — apply optional counselor filter if set
+          if (filters.counselorId === 'unassigned') {
+            query = query.is('assigned_counselor_id', null)
+          } else if (filters.counselorId) {
+            query = query.eq('assigned_counselor_id', filters.counselorId)
+          }
+        }
       } else {
         if (filters.counselorId === 'unassigned') {
           query = query.is('assigned_counselor_id', null)
@@ -131,7 +178,10 @@ export function useLead(id: string | undefined) {
 
       const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
       if (!isPrivileged && profile?.role === 'counselor' && profile?.id) {
-        query = query.eq('assigned_counselor_id', profile.id)
+        const elevated = await hasElevatedLeadAccess(profile.id, profile.role)
+        if (!elevated) {
+          query = query.eq('assigned_counselor_id', profile.id)
+        }
       }
 
       const { data, error } = await query.single()

@@ -95,12 +95,15 @@ export default function StudentList() {
       render: (r) => {
         const f = studentFeeMap.get(r.id)
         if (!f) return <span className="text-xs text-slate-400">No Fee</span>
-        const isOverdue = f.pending_balance === f.total_fee && f.total_fee > 0
+        if (f.total_fee === 0) return <span className="text-xs text-slate-400">No Fee</span>
+        const isPaid = f.payment_status === 'paid' || f.pending_balance <= 0
+        if (isPaid) return <Badge variant="success" className="text-[10px] flex items-center gap-1"><CheckCircle className="w-3 h-3" /> PAID</Badge>
+        const isPartial = f.payment_status === 'partial' || (f.amount_paid > 0 && f.pending_balance > 0)
+        if (isPartial) return <Badge variant="warning" className="text-[10px] flex items-center gap-1"><Clock className="w-3 h-3" /> PARTIAL</Badge>
+        const isOverdue = f.payment_status === 'overdue' || f.installments?.some((i) => i.status === 'overdue')
         if (isOverdue) return <Badge variant="destructive" className="text-[10px] flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> OVERDUE</Badge>
-        if (f.pending_balance === 0 && f.amount_paid > 0) return <Badge variant="success" className="text-[10px] flex items-center gap-1"><CheckCircle className="w-3 h-3" /> PAID</Badge>
-        if (f.amount_paid > 0 && f.pending_balance > 0) return <Badge variant="warning" className="text-[10px] flex items-center gap-1"><Clock className="w-3 h-3" /> PARTIAL</Badge>
-        if (f.amount_paid === 0 && f.total_fee > 0) return <Badge variant="destructive" className="text-[10px] flex items-center gap-1"><CreditCard className="w-3 h-3" /> DUE</Badge>
-        return <span className="text-xs text-slate-400">—</span>
+        if (f.payment_status === 'due') return <Badge variant="destructive" className="text-[10px] flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 border-red-200"><CreditCard className="w-3 h-3" /> DUE</Badge>
+        return <Badge variant="secondary" className="text-[10px] flex items-center gap-1 text-slate-600"><Clock className="w-3 h-3" /> PENDING</Badge>
       },
     },
     {

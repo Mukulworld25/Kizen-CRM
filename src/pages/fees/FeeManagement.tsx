@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Eye, Pencil, Trash2, CreditCard, Search, UserCheck, X } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, CreditCard, Search, UserCheck, X, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFees, useRecordPayment, useUpdateFee, useDeleteFee } from '@/hooks/useStudents'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -14,7 +14,7 @@ import { Input, Label } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
-import { IndianRupee, AlertTriangle, Clock } from 'lucide-react'
+import { IndianRupee, Clock } from 'lucide-react'
 import FlagDot from '@/components/ui/FlagDot'
 import type { Fee, PaymentMethod } from '@/types'
 import { useCourses } from '@/hooks/useLeads'
@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { CustomizableFilterBar, type FilterItem } from '@/components/shared/CustomizableFilterBar'
 import { DynamicFilterBuilder, type FilterField, type DynamicFilterRule } from '@/components/shared/DynamicFilterBuilder'
+import { RecordPaymentModal } from '@/components/shared/RecordPaymentModal'
 
 export default function FeeManagement() {
   const navigate = useNavigate()
@@ -48,8 +49,6 @@ export default function FeeManagement() {
   const { data: allUnfilteredFees = [] } = useFees({})
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null)
-  const [studentSearchQuery, setStudentSearchQuery] = useState('')
-  const [isChangingStudent, setIsChangingStudent] = useState(false)
   const recordPayment = useRecordPayment()
   const updateFee = useUpdateFee()
   const deleteFee = useDeleteFee()
@@ -65,17 +64,12 @@ export default function FeeManagement() {
   const [editSubject, setEditSubject] = useState('')
   const [editRegDate, setEditRegDate] = useState('')
   const [editInstallments, setEditInstallments] = useState<
-    Array<{ id?: string; installment_number: number; amount: number; due_date: string; status?: 'pending' | 'paid' | 'overdue' }>
+    Array<{ id?: string; installment_number: number; amount: number; due_date: string; status?: 'pending' | 'paid' | 'overdue' | 'partial' }>
   >([])
 
   // Delete Fee Modal State
   const [deleteFeeOpen, setDeleteFeeOpen] = useState(false)
   const [deleteFeeId, setDeleteFeeId] = useState<string | null>(null)
-
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState<PaymentMethod>('upi')
-  const [txnId, setTxnId] = useState('')
-  const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const dynamicFilteredFees = rawFees.filter((fee) => {
     if (!dynamicRules || dynamicRules.length === 0) return true
@@ -234,17 +228,45 @@ export default function FeeManagement() {
     </span>
   )
 
-  const matchingFees = allUnfilteredFees.filter((f) => {
-    if (!studentSearchQuery.trim()) return true
-    const q = studentSearchQuery.toLowerCase().trim()
-    const nameMatch = (f.student?.full_name || '').toLowerCase().includes(q)
-    const idMatch = (f.student?.display_id || (f.student as any)?.student_id || '')
-      .toLowerCase()
-      .includes(q)
-    const mobileMatch = (f.student?.mobile || '').toLowerCase().includes(q)
-    const courseMatch = (f.course?.name || '').toLowerCase().includes(q)
-    return nameMatch || idMatch || mobileMatch || courseMatch
-  })
+  const renderInstallmentDue = (inst?: any, isMissingDate?: boolean) => {
+    if (isMissingDate) {
+      return <Step6RedIndicator label="Date Missing" />
+    }
+    if (!inst) return '—'
+    if (inst.status === 'paid') {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+          title={inst.paid_date ? `Paid on ${format(new Date(inst.paid_date), 'dd/MM/yy')}` : 'Paid'}
+        >
+          <CheckCircle className="w-3 h-3 text-emerald-600" /> Paid
+        </span>
+      )
+    }
+    if (inst.status === 'partial') {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+          title={`Paid: ₹${inst.amount_paid}`}
+        >
+          <Clock className="w-3 h-3 text-amber-600" /> ₹{(inst.amount_paid || 0).toLocaleString()}
+        </span>
+      )
+    }
+    if (inst.status === 'overdue') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+          <AlertCircle className="w-3 h-3 text-rose-600" /> {inst.due_date ? format(new Date(inst.due_date), 'dd/MM/yy') : 'Due'}
+        </span>
+      )
+    }
+    if (!inst.due_date) return '—'
+    return (
+      <span className="text-slate-600 text-xs">
+        {format(new Date(inst.due_date), 'dd/MM/yy')}
+      </span>
+    )
+  }
 
   const columns: Column<Fee>[] = [
     {
@@ -313,6 +335,47 @@ export default function FeeManagement() {
       },
     },
     {
+      key: 'payment_status',
+      header: 'Status',
+      render: (r) => {
+        const netFee = (r.total_fee || 0) - (r.discount || 0) - (r.scholarship || 0)
+        const isPaid = (r.amount_paid >= netFee && netFee > 0) || r.payment_status === 'paid' || r.pending_balance <= 0
+        const isPartial = r.amount_paid > 0 && !isPaid
+        const isOverdue = r.installments?.some((i) => i.status === 'overdue') || r.payment_status === 'due'
+
+        if (netFee <= 0) {
+          return <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-50 border-slate-200">No Fee</Badge>
+        }
+        if (isPaid) {
+          return (
+            <Badge className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3 text-emerald-600" /> PAID
+            </Badge>
+          )
+        }
+        if (isPartial) {
+          return (
+            <Badge className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-amber-600" /> PARTIAL
+            </Badge>
+          )
+        }
+        if (isOverdue) {
+          return (
+            <Badge className="text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-rose-600" /> OVERDUE
+            </Badge>
+          )
+        }
+        return (
+          <Badge className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+            <Clock className="w-3 h-3 text-blue-600" /> PENDING
+          </Badge>
+        )
+      },
+      exportValue: (r) => r.payment_status || (r.pending_balance <= 0 ? 'paid' : 'pending'),
+    },
+    {
       key: 'inst_1_amt',
       header: 'First Instalment',
       render: (r) => {
@@ -330,15 +393,7 @@ export default function FeeManagement() {
           r.step6_flagged_fields?.includes('inst_1_due_date') ||
           (!i1?.due_date && (r.student?.full_name?.toLowerCase().includes('niharika') || r.student?.full_name?.toLowerCase().includes('anoop')))
         )
-        if (isStep6DueDateBlank) {
-          return <Step6RedIndicator label="Date Missing" />
-        }
-        if (!i1?.due_date) return '—'
-        return (
-          <span className={i1.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
-            {format(new Date(i1.due_date), 'dd/MM/yy')}
-          </span>
-        )
+        return renderInstallmentDue(i1, isStep6DueDateBlank)
       },
     },
     {
@@ -355,12 +410,7 @@ export default function FeeManagement() {
       header: 'Due Date',
       render: (r) => {
         const i2 = r.installments?.find((i) => i.installment_number === 2)
-        if (!i2?.due_date) return '—'
-        return (
-          <span className={i2.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
-            {format(new Date(i2.due_date), 'dd/MM/yy')}
-          </span>
-        )
+        return renderInstallmentDue(i2)
       },
     },
     {
@@ -377,12 +427,7 @@ export default function FeeManagement() {
       header: 'Due Date',
       render: (r) => {
         const i3 = r.installments?.find((i) => i.installment_number === 3)
-        if (!i3?.due_date) return '—'
-        return (
-          <span className={i3.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
-            {format(new Date(i3.due_date), 'dd/MM/yy')}
-          </span>
-        )
+        return renderInstallmentDue(i3)
       },
     },
     {
@@ -399,12 +444,7 @@ export default function FeeManagement() {
       header: 'Due Date',
       render: (r) => {
         const i4 = r.installments?.find((i) => i.installment_number === 4)
-        if (!i4?.due_date) return '—'
-        return (
-          <span className={i4.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
-            {format(new Date(i4.due_date), 'dd/MM/yy')}
-          </span>
-        )
+        return renderInstallmentDue(i4)
       },
     },
     {
@@ -421,12 +461,7 @@ export default function FeeManagement() {
       header: 'Due Date',
       render: (r) => {
         const i5 = r.installments?.find((i) => i.installment_number === 5)
-        if (!i5?.due_date) return '—'
-        return (
-          <span className={i5.status === 'overdue' ? 'text-danger font-medium text-xs' : 'text-slate-600 text-xs'}>
-            {format(new Date(i5.due_date), 'dd/MM/yy')}
-          </span>
-        )
+        return renderInstallmentDue(i5)
       },
     },
     {
@@ -448,8 +483,6 @@ export default function FeeManagement() {
               size="sm"
               onClick={() => {
                 setSelectedFee(r)
-                setIsChangingStudent(false)
-                setStudentSearchQuery('')
                 setPaymentOpen(true)
               }}
               className="h-8 px-2 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200"
@@ -466,28 +499,6 @@ export default function FeeManagement() {
       ),
     },
   ]
-
-  const handlePayment = async () => {
-    if (!selectedFee || !amount) {
-      if (!selectedFee) toast.error('Please select a student first')
-      if (!amount) toast.error('Please enter payment amount')
-      return
-    }
-    await recordPayment.mutateAsync({
-      fee_id: selectedFee.id,
-      student_id: selectedFee.student_id,
-      amount: parseFloat(amount),
-      payment_method: method,
-      transaction_reference: txnId || null,
-      payment_date: payDate,
-    })
-    setPaymentOpen(false)
-    setAmount('')
-    setTxnId('')
-    setSelectedFee(null)
-    setIsChangingStudent(false)
-    setStudentSearchQuery('')
-  }
 
   const DEFAULT_FEE_FILTERS = [
     'course',
@@ -518,9 +529,11 @@ export default function FeeManagement() {
           <SelectTrigger className="w-44"><SelectValue placeholder="Payment Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="due">Due</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="partial">Partial</SelectItem>
+            <SelectItem value="due">Due</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
           </SelectContent>
         </Select>
       ),
@@ -586,10 +599,6 @@ export default function FeeManagement() {
           <Button
             onClick={() => {
               setSelectedFee(null)
-              setIsChangingStudent(false)
-              setStudentSearchQuery('')
-              setAmount('')
-              setTxnId('')
               setPaymentOpen(true)
             }}
           >
@@ -638,202 +647,14 @@ export default function FeeManagement() {
       />
 
       {/* RECORD PAYMENT MODAL */}
-      <Dialog
+      <RecordPaymentModal
         open={paymentOpen}
-        onOpenChange={(open) => {
-          setPaymentOpen(open)
-          if (!open) {
-            setIsChangingStudent(false)
-            setStudentSearchQuery('')
-          }
+        onOpenChange={setPaymentOpen}
+        initialFee={selectedFee}
+        onSuccess={() => {
+          setSelectedFee(null)
         }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-          </DialogHeader>
-
-          {/* STUDENT SELECTION / ACTIVE STUDENT CONTEXT */}
-          {!selectedFee || isChangingStudent ? (
-            <div className="space-y-2 border border-amber-200/90 bg-amber-50/40 rounded-xl p-3.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <UserCheck className="h-4 w-4 text-amber-600" />
-                  Select Student Account <span className="text-rose-500">*</span>
-                </Label>
-                {selectedFee && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsChangingStudent(false)
-                      setStudentSearchQuery('')
-                    }}
-                    className="text-xs text-slate-500 hover:text-slate-800 underline flex items-center gap-1"
-                  >
-                    <X className="h-3 w-3" /> Cancel
-                  </button>
-                )}
-              </div>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  id="record-payment-student-search"
-                  placeholder="Search by student name, ID (e.g. STU-97353), or mobile..."
-                  value={studentSearchQuery}
-                  onChange={(e) => setStudentSearchQuery(e.target.value)}
-                  className="pl-9 bg-white text-sm border-slate-300 focus:border-amber-500"
-                  autoFocus
-                />
-              </div>
-
-              {/* Matching Students List */}
-              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white shadow-inner mt-2">
-                {matchingFees.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-500">
-                    {studentSearchQuery ? `No students found matching "${studentSearchQuery}"` : 'No active student fee accounts found'}
-                  </div>
-                ) : (
-                  matchingFees.map((f) => {
-                    const sId = f.student?.display_id || (f.student as any)?.student_id
-                    const isOverdue = f.installments?.some((i) => i.status === 'overdue')
-                    return (
-                      <button
-                        type="button"
-                        key={f.id}
-                        onClick={() => {
-                          setSelectedFee(f)
-                          setIsChangingStudent(false)
-                          setStudentSearchQuery('')
-                        }}
-                        className="w-full text-left p-2.5 hover:bg-amber-100/70 focus:bg-amber-100/80 transition-colors flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-slate-900 text-xs truncate">
-                              {f.student?.full_name || 'Unnamed Student'}
-                            </span>
-                            {sId && (
-                              <span className="font-mono text-[10px] font-bold text-sky-800 bg-sky-100/80 px-1.5 py-0.5 rounded border border-sky-200">
-                                {sId}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 truncate">
-                            {f.student?.mobile && <span>{f.student.mobile}</span>}
-                            {f.course?.name && (
-                              <>
-                                <span>•</span>
-                                <span className="truncate">{f.course.name}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className={`font-bold text-xs ${f.pending_balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {formatCurrency(f.pending_balance)}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {f.pending_balance > 0 ? (isOverdue ? 'overdue' : 'pending') : 'cleared'}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-sky-50/80 border border-sky-200/80 rounded-xl p-3.5 text-sky-950 flex items-start justify-between gap-2 shadow-xs">
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-sky-700 uppercase tracking-wider">
-                    Selected Student Account
-                  </span>
-                  {(selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id) && (
-                    <span className="font-mono text-xs font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-200">
-                      {selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id}
-                    </span>
-                  )}
-                </div>
-                <p className="text-base font-bold text-slate-900 tracking-tight" id="record-payment-student-context">
-                  Recording payment for {selectedFee?.student?.full_name || 'Student'}
-                  {(selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id) ? (
-                    <span className="ml-1.5 font-mono text-xs font-bold text-sky-700 bg-sky-100/70 px-1.5 py-0.5 rounded border border-sky-200/60 whitespace-nowrap">
-                      ({selectedFee?.student?.display_id || (selectedFee?.student as any)?.student_id})
-                    </span>
-                  ) : null}
-                </p>
-                <div className="flex items-center gap-3 pt-1 text-xs">
-                  <span className="text-slate-600">
-                    Outstanding: <strong className="text-rose-600">{formatCurrency(selectedFee.pending_balance)}</strong>
-                  </span>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-slate-600">
-                    Net Fee: <strong>{formatCurrency(selectedFee.net_fee ?? selectedFee.total_fee)}</strong>
-                  </span>
-                  {selectedFee.course?.name && (
-                    <>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-slate-500 truncate max-w-[130px]">{selectedFee.course.name}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsChangingStudent(true)
-                  setStudentSearchQuery('')
-                }}
-                className="text-xs text-sky-800 border-sky-300 hover:bg-sky-100 h-7 px-2 flex-shrink-0"
-              >
-                Change
-              </Button>
-            </div>
-          )}
-
-          <div className="space-y-4 pt-1">
-            <div>
-              <Label>Amount (₹) <span className="text-rose-500">*</span></Label>
-              <Input
-                type="number"
-                placeholder={selectedFee ? `Outstanding: ₹${selectedFee.pending_balance}` : 'Enter amount'}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Payment Method</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['cash', 'upi', 'bank_transfer'].map((m) => (
-                    <SelectItem key={m} value={m} className="capitalize">{m.replace('_', ' ')}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Transaction ID</Label>
-              <Input placeholder="Optional reference (e.g. UPI-123456)" value={txnId} onChange={(e) => setTxnId(e.target.value)} />
-            </div>
-            <div>
-              <Label>Payment Date</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentOpen(false)}>Cancel</Button>
-            <Button onClick={handlePayment} disabled={recordPayment.isPending || !selectedFee || !amount}>
-              Save Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* EDIT FEE STRUCTURE MODAL */}
       <Dialog open={editFeeModalOpen} onOpenChange={setEditFeeModalOpen}>

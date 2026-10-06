@@ -387,9 +387,10 @@ export function useFees(filters: { overdue?: boolean; courseId?: string; courseL
 
       if (filters.paymentStatus) {
         if (filters.paymentStatus === 'paid') rawFees = rawFees.filter((f) => f.payment_status === 'paid' || f.pending_balance <= 0)
-        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.payment_status === 'pending' || f.pending_balance > 0)
+        if (filters.paymentStatus === 'partial') rawFees = rawFees.filter((f) => f.payment_status === 'partial' || (f.amount_paid > 0 && f.pending_balance > 0))
+        if (filters.paymentStatus === 'pending') rawFees = rawFees.filter((f) => f.payment_status === 'pending')
         if (filters.paymentStatus === 'due') rawFees = rawFees.filter((f) => f.payment_status === 'due')
-        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.installments?.some((i) => i.status === 'overdue') || f.pending_balance > 50000)
+        if (filters.paymentStatus === 'overdue') rawFees = rawFees.filter((f) => f.installments?.some((i) => i.status === 'overdue') || f.payment_status === 'due' || f.payment_status === 'overdue')
       }
 
       const fees = rawFees.map((f) => {
@@ -487,11 +488,15 @@ export function useRecordPayment() {
     },
     onSuccess: (data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fees'] })
+      queryClient.invalidateQueries({ queryKey: ['fees', vars.fee_id] })
+      queryClient.invalidateQueries({ queryKey: ['fee-payments'] })
       queryClient.invalidateQueries({ queryKey: ['fee-payments', vars.fee_id] })
+      queryClient.invalidateQueries({ queryKey: ['installments'] })
       queryClient.invalidateQueries({ queryKey: ['installments', vars.fee_id] })
-      // The student pages render a fee summary from the same rows.
       queryClient.invalidateQueries({ queryKey: ['students'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
       toast.success('Payment recorded')
       logAuditEvent({
         action: 'payment_record',
@@ -533,7 +538,7 @@ export function useUpdateFee() {
         installment_number: number
         amount: number
         due_date: string
-        status?: 'pending' | 'paid' | 'overdue'
+        status?: 'pending' | 'paid' | 'overdue' | 'partial'
       }>
     }) => {
       const { data: existing, error: fetchErr } = await supabase
@@ -583,12 +588,14 @@ export function useUpdateFee() {
           .eq('fee_id', id)
           .neq('status', 'paid')
 
-        // Insert new/updated unpaid installments
-        if (installments.length > 0) {
-          const installmentPayload = installments.map((inst, index) => ({
+        // Filter only unpaid installments for insertion so we don't duplicate existing paid installments
+        const unpaidInstallments = installments.filter(inst => inst.status !== 'paid')
+
+        if (unpaidInstallments.length > 0) {
+          const installmentPayload = unpaidInstallments.map((inst, index) => ({
             fee_id: id,
             student_id: existing.student_id,
-            installment_number: inst.installment_number || index + 1,
+            installment_number: inst.installment_number || (index + 1),
             amount: inst.amount,
             due_date: inst.due_date,
             status: inst.status || 'pending',
@@ -609,9 +616,12 @@ export function useUpdateFee() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fees'] })
       queryClient.invalidateQueries({ queryKey: ['fees', vars.id] })
-      // Installments are deleted and re-inserted by this mutation.
       queryClient.invalidateQueries({ queryKey: ['installments', vars.id] })
       queryClient.invalidateQueries({ queryKey: ['fee-payments', vars.id] })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-insights'] })
       toast.success('Fee structure updated successfully')
     },
     onError: (err) => toast.error(err.message),

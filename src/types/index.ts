@@ -229,9 +229,11 @@ export interface Installment {
   student_id: string
   installment_number: number
   amount: number
+  amount_paid?: number | null
+  pending_balance?: number | null
   due_date: string | null
   paid_date: string | null
-  status: 'pending' | 'paid' | 'overdue'
+  status: 'pending' | 'paid' | 'overdue' | 'partial'
   created_at: string
 }
 

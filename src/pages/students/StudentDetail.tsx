@@ -21,6 +21,7 @@ import { InlineEdit } from '@/components/shared/InlineEdit'
 import { ReceiptModal } from '@/components/shared/ReceiptModal'
 import { InvoiceModal } from '@/components/shared/InvoiceModal'
 import { AddFeeStructureModal } from '@/components/students/AddFeeStructureModal'
+import { RecordPaymentModal } from '@/components/shared/RecordPaymentModal'
 import type { FeePayment, Student } from '@/types'
 
 export default function StudentDetail() {
@@ -60,6 +61,7 @@ export default function StudentDetail() {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [invoiceOpen, setInvoiceOpen] = useState(false)
   const [addFeeModalOpen, setAddFeeModalOpen] = useState(false)
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false)
 
   // Document Upload state
   const [docModalOpen, setDocModalOpen] = useState(false)
@@ -118,40 +120,47 @@ export default function StudentDetail() {
   // Payment Status Badge Logic
   let paymentBadge = null
   if (studentFee) {
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const hasOverdue = installments.some(i => i.status === 'overdue' || (i.status === 'pending' && new Date(`${i.due_date}T00:00:00`) < todayStart))
-    if (hasOverdue) {
-      paymentBadge = (
-        <Badge variant="destructive" className="ml-2 animate-pulse flex items-center gap-1">
-          <AlertTriangle className="w-3 h-3" /> OVERDUE
-        </Badge>
-      )
-    } else if (studentFee.pending_balance === 0 && studentFee.amount_paid > 0) {
-      paymentBadge = (
-        <Badge variant="success" className="ml-2 flex items-center gap-1">
-          <CheckCircle className="w-3 h-3" /> PAID
-        </Badge>
-      )
-    } else if (studentFee.amount_paid > 0 && studentFee.pending_balance > 0) {
-      paymentBadge = (
-        <Badge variant="warning" className="ml-2 flex items-center gap-1">
-          <Clock className="w-3 h-3" /> PARTIAL
-        </Badge>
-      )
-    } else if (studentFee.amount_paid === 0 && studentFee.total_fee > 0) {
-      paymentBadge = (
-        <Badge variant="destructive" className="ml-2 flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
-          <CreditCard className="w-3 h-3" /> DUE
-        </Badge>
-      )
-    } else if (studentFee.total_fee === 0) {
+    const isPaid = studentFee.payment_status === 'paid' || studentFee.pending_balance <= 0
+    const isPartial = studentFee.payment_status === 'partial' || (studentFee.amount_paid > 0 && studentFee.pending_balance > 0)
+    const isOverdue = studentFee.payment_status === 'overdue' || (!isPaid && installments.some((i) => i.status === 'overdue'))
+
+    if (studentFee.total_fee === 0) {
       paymentBadge = (
         <Badge variant="secondary" className="ml-2 flex items-center gap-1">
           <CheckCircle className="w-3 h-3" /> NO FEE
         </Badge>
       )
-  }
+    } else if (isPaid) {
+      paymentBadge = (
+        <Badge variant="success" className="ml-2 flex items-center gap-1 font-bold">
+          <CheckCircle className="w-3 h-3" /> PAID
+        </Badge>
+      )
+    } else if (isPartial) {
+      paymentBadge = (
+        <Badge variant="warning" className="ml-2 flex items-center gap-1 font-bold">
+          <Clock className="w-3 h-3" /> PARTIAL
+        </Badge>
+      )
+    } else if (isOverdue) {
+      paymentBadge = (
+        <Badge variant="destructive" className="ml-2 animate-pulse flex items-center gap-1 font-bold">
+          <AlertTriangle className="w-3 h-3" /> OVERDUE
+        </Badge>
+      )
+    } else if (studentFee.payment_status === 'due') {
+      paymentBadge = (
+        <Badge variant="destructive" className="ml-2 flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 border-red-200 font-bold">
+          <CreditCard className="w-3 h-3" /> DUE
+        </Badge>
+      )
+    } else {
+      paymentBadge = (
+        <Badge variant="outline" className="ml-2 flex items-center gap-1 text-slate-700 border-slate-300 font-bold">
+          <Clock className="w-3 h-3" /> PENDING
+        </Badge>
+      )
+    }
   }
 
   return (
@@ -399,35 +408,97 @@ export default function StudentDetail() {
                 <Card className="border border-slate-200"><CardContent className="p-4"><p className="text-xs text-slate-500 uppercase font-semibold">Duration</p><p className="text-lg font-bold text-slate-900 mt-1">{studentFee.duration ?? (student.course?.duration_days ? `${student.course.duration_days} days` : student.course?.duration_hours ? `${student.course.duration_hours} hrs` : '—')}</p></CardContent></Card>
                 <Card className="border border-slate-200"><CardContent className="p-4"><p className="text-xs text-slate-500 uppercase font-semibold">Next Due Date</p><p className="text-lg font-bold text-slate-900 mt-1">{studentFee.next_due_date ? format(new Date(studentFee.next_due_date), 'dd MMM yyyy') : '—'}{studentFee.next_due_amount ? <span className="text-sm text-amber-600 ml-2">(₹{studentFee.next_due_amount})</span> : ''}</p></CardContent></Card>
               </div>
-              <Card className="border border-slate-200">
-                <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
-                  <CardTitle className="text-base font-bold">Payment Receipts History</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => setInvoiceOpen(true)}><Printer className="h-4 w-4 mr-2" /> GST Invoice</Button>
-                </CardHeader>
-                <CardContent className="p-4">
-                  {payments.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-4 text-center">No payment transactions recorded yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {payments.map((p) => (
-                        <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-slate-900 text-sm">{p.receipt_number ?? 'REC-' + p.id.slice(0, 6)}</span>
-                              <Badge variant="outline" className="capitalize text-xs">{p.payment_method?.replace('_', ' ')}</Badge>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="border border-slate-200">
+                  <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-primary" />
+                      Installment Schedule
+                    </CardTitle>
+                    {installments.length > 0 && (
+                      <span className="text-xs text-slate-400 font-medium">{installments.length} installment{installments.length > 1 ? 's' : ''}</span>
+                    )}
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {installments.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-4 text-center">No installments configured for this fee.</p>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {installments.map((inst) => (
+                          <div key={inst.id} className="py-2.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
+                            <div>
+                              <span className="font-bold text-slate-800">
+                                Inst #{inst.installment_number}: {formatCurrency(inst.amount)}
+                              </span>
+                              <span className="text-[11px] text-slate-400 block mt-0.5">
+                                Due: {inst.due_date ? format(new Date(inst.due_date), 'dd MMM yyyy') : '—'}
+                              </span>
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">Date: {format(new Date(p.payment_date), 'dd MMM yyyy')}{p.transaction_id && ` · Txn: ${p.transaction_id}`}</p>
+                            <div className="text-right flex items-center gap-2">
+                              {inst.amount_paid != null && inst.amount_paid > 0 && (
+                                <span className="text-[11px] text-emerald-700 font-medium">
+                                  Paid: {formatCurrency(inst.amount_paid)}
+                                </span>
+                              )}
+                              <Badge variant={inst.status === 'paid' ? 'success' : inst.status === 'overdue' ? 'destructive' : inst.status === 'partial' ? 'warning' : 'outline'} className="text-[10px]">
+                                {inst.status}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-4">
-                            <span className="font-extrabold text-emerald-700 text-base">{formatCurrency(p.amount)}</span>
-                            <Button size="sm" variant="outline" className="gap-1.5 text-xs text-sky-700 border-sky-200 hover:bg-sky-50" onClick={() => { setSelectedPayment(p); setReceiptOpen(true); }}><Printer className="h-3.5 w-3.5" /> Receipt PDF</Button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-slate-200">
+                  <CardHeader className="flex flex-row items-center justify-between border-b pb-3 flex-wrap gap-2">
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-emerald-600" />
+                      Payment Receipts History
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      {can('recordPayments') && (
+                        <Button
+                          size="sm"
+                          onClick={() => setRecordPaymentOpen(true)}
+                          className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8"
+                        >
+                          <CreditCard className="h-3.5 w-3.5" /> Record Payment
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => setInvoiceOpen(true)}>
+                        <Printer className="h-3.5 w-3.5 mr-1.5" /> GST Invoice
+                      </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {payments.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-4 text-center">No payment transactions recorded yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {payments.map((p) => (
+                          <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-slate-900 text-xs">{p.receipt_number ?? 'REC-' + p.id.slice(0, 6)}</span>
+                                <Badge variant="outline" className="capitalize text-[10px]">{p.payment_method?.replace('_', ' ')}</Badge>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">Date: {format(new Date(p.payment_date), 'dd MMM yyyy')}{p.transaction_id && ` · Txn: ${p.transaction_id}`}</p>
+                            </div>
+                            <div className="flex items-center justify-between sm:justify-end gap-3">
+                              <span className="font-extrabold text-emerald-700 text-sm">{formatCurrency(p.amount)}</span>
+                              <Button size="sm" variant="outline" className="gap-1 text-xs text-sky-700 border-sky-200 hover:bg-sky-50 h-7 px-2" onClick={() => { setSelectedPayment(p); setReceiptOpen(true); }}>
+                                <Printer className="h-3 w-3" /> Receipt PDF
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           ) : (
             <Card className="p-8 text-center border-dashed">
@@ -553,6 +624,13 @@ export default function StudentDetail() {
           student={student}
         />
       )}
+
+      {/* RECORD PAYMENT MODAL */}
+      <RecordPaymentModal
+        open={recordPaymentOpen}
+        onOpenChange={setRecordPaymentOpen}
+        initialFee={studentFee}
+      />
     </div>
   )
 }

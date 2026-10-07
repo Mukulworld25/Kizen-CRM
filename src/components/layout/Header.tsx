@@ -73,44 +73,49 @@ export function Header({ onMenuClick }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-80 rounded-xl border-border shadow-lg">
             <DropdownMenuLabel className="text-primary">Notifications</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {notifications.length === 0 ? (
-              <p className="p-3 text-sm text-muted-foreground">No notifications</p>
-            ) : (
-              notifications.slice(0, 10).map((n) => (
-                <DropdownMenuItem
-                  key={n.id}
-                  id={`notification-item-${n.id}`}
-                  className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  onClick={() => {
-                    if (!n.is_read) markRead.mutate(n.id)
-                    if (n.link) {
-                      navigate(n.link)
-                    } else if (n.record_type === 'student_fee' || n.record_type === 'student') {
-                      navigate(`/students/${n.record_id}?tab=fees`)
-                    } else if (n.record_type === 'lead') {
-                      navigate(`/leads/${n.record_id}`)
-                    } else if (n.record_type === 'deletion_request') {
-                      navigate(`/settings?tab=deletions&highlight=${n.record_id}`)
-                    } else if (n.type === 'fee_overdue' && n.record_id) {
-                      navigate(`/students/${n.record_id}?tab=fees`)
-                    } else if (n.type === 'followup' && n.record_id) {
-                      navigate(`/leads/${n.record_id}`)
-                    } else if (n.type === 'deletion_request' && n.record_id) {
-                      navigate(`/settings?tab=deletions&highlight=${n.record_id}`)
-                    }
-                  }}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-medium text-sm">{n.title}</span>
-                    {!n.is_read && <Badge variant="default" className="text-[10px]">New</Badge>}
-                  </div>
-                  <span className="text-xs text-muted-foreground">{n.message}</span>
-                  <span className="text-[10px] text-muted-foreground/60">
-                    {n.created_at ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true }) : '—'}
-                  </span>
-                </DropdownMenuItem>
-              ))
-            )}
+            {/* Scrollable list: the dropdown content is clipped by overflow-hidden,
+                so long notification lists must live in their own scroll container
+                or the oldest entries become unreachable. */}
+            <div className="max-h-[60vh] overflow-y-auto pr-1">
+              {notifications.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">No notifications</p>
+              ) : (
+                notifications.slice(0, 10).map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    id={`notification-item-${n.id}`}
+                    className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => {
+                      if (!n.is_read) markRead.mutate(n.id)
+                      if (n.link) {
+                        navigate(n.link)
+                      } else if (n.record_type === 'student_fee' || n.record_type === 'student') {
+                        navigate(`/students/${n.record_id}?tab=fees`)
+                      } else if (n.record_type === 'lead') {
+                        navigate(`/leads/${n.record_id}`)
+                      } else if (n.record_type === 'deletion_request') {
+                        navigate(`/settings?tab=deletions&highlight=${n.record_id}`)
+                      } else if (n.type === 'fee_overdue' && n.record_id) {
+                        navigate(`/students/${n.record_id}?tab=fees`)
+                      } else if (n.type === 'followup' && n.record_id) {
+                        navigate(`/leads/${n.record_id}`)
+                      } else if (n.type === 'deletion_request' && n.record_id) {
+                        navigate(`/settings?tab=deletions&highlight=${n.record_id}`)
+                      }
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="font-medium text-sm">{n.title}</span>
+                      {!n.is_read && <Badge variant="default" className="text-[10px]">New</Badge>}
+                    </div>
+                    <span className="text-xs text-muted-foreground">{n.message}</span>
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {n.created_at ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true }) : '—'}
+                    </span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

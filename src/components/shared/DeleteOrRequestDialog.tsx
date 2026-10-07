@@ -16,6 +16,13 @@ interface DeleteOrRequestDialogProps {
   onDirectDelete?: () => Promise<void> | void
   loading?: boolean
   entityType?: string
+  /**
+   * When true the dialog performs a direct delete instead of queueing an
+   * owner-approval request. Defaults to `isOwner` so existing callers are
+   * unchanged — set this to grant direct deletion to other roles (Admin/Accounts)
+   * that hold fee CRUD rights per the role spec.
+   */
+  canDirectDelete?: boolean
 }
 
 export function DeleteOrRequestDialog({
@@ -27,8 +34,12 @@ export function DeleteOrRequestDialog({
   onDirectDelete,
   loading = false,
   entityType = 'record',
+  canDirectDelete,
 }: DeleteOrRequestDialogProps) {
-  const { profile, isOwner } = useAuth()
+  const { profile, isOwner: currentIsOwner } = useAuth()
+  // Owner (default) plus anyone the caller explicitly authorises (Admin/Accounts)
+  // deletes directly; everyone else submits an approval request to the owner.
+  const isOwner = canDirectDelete ?? currentIsOwner
   const [typed, setTyped] = useState('')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)

@@ -27,7 +27,7 @@ import { RecordPaymentModal } from '@/components/shared/RecordPaymentModal'
 export default function FeeManagement() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { can, isOwner } = useAuth()
+  const { can, isOwner, profile } = useAuth()
   const { data: courses = [] } = useCourses()
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [courseId, setCourseId] = useState<string>('all')
@@ -793,6 +793,7 @@ export default function FeeManagement() {
         recordId={deleteFeeId}
         recordLabel={selectedFee ? `Fee for ${selectedFee.student?.full_name || 'Student'} (Total: ₹${selectedFee.total_fee})` : (deleteFeeId || '')}
         entityType="Fee Record"
+        canDirectDelete={isOwner || profile?.role === 'admin' || profile?.role === 'accounts'}
         onDirectDelete={async () => {
           if (deleteFeeId) {
             await deleteFee.mutateAsync({ feeId: deleteFeeId })

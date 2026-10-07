@@ -130,9 +130,6 @@ export function canAccessRoute(
   if (isOwner) return true
 
   const base = '/' + path.split('/').filter(Boolean)[0]
-  if (role === 'reception' && base === '/fees') {
-    return false
-  }
 
   if (base === '/settings') {
     if (isOwner) return true

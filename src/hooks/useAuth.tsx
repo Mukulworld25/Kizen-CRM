@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { hasPermission, isUserHod, type Permission } from '@/lib/permissions'
@@ -15,6 +15,7 @@ interface AuthContextValue {
   can: (permission: Permission) => boolean
   canViewFeature: (featureKey: string) => boolean
   canEditFeature: (featureKey: string) => boolean
+  canElevatedLeads: boolean
   isOwner: boolean
 }
 
@@ -217,6 +218,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return canViewFeature(featureKey)
   }, [isOwner, profile, featurePermissions, canViewFeature])
 
+  const canElevatedLeads = useMemo((): boolean => {
+    if (isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception') {
+      return true
+    }
+    if (!profile?.id) return false
+    // 1. User-specific override
+    const userPerm = featurePermissions.find((p) => p.feature_key === 'leads' && p.user_id === profile.id)
+    if (userPerm !== undefined) return userPerm.can_view === true
+    // 2. Role-level grant
+    const rolePerm = featurePermissions.find((p) => p.feature_key === 'leads' && p.role === profile.role && !p.user_id)
+    if (rolePerm !== undefined) return rolePerm.can_view === true
+    return false
+  }, [isOwner, profile, featurePermissions])
+
   const can = useCallback((permission: Permission): boolean => {
     if (isOwner) return true
 
@@ -260,14 +275,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const mapping = permissionFeatureMap[permission]
     if (mapping) {
       if (!canViewFeature(mapping.feature)) return false
-      if (mapping.edit && !canEditFeature(mapping.feature)) return false
+      if (mapping.edit) {
+        return canEditFeature(mapping.feature)
+      }
+      return true
     }
 
     return hasPermission(profile?.role, permission, isOwner, profile)
   }, [isOwner, profile, canViewFeature, canEditFeature])
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, canViewFeature, canEditFeature, isOwner }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile, can, canViewFeature, canEditFeature, canElevatedLeads, isOwner }}>
       {children}
     </AuthContext.Provider>
   )

@@ -43,6 +43,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (!canViewFeature(featureKey)) {
       return <Navigate to={getDefaultRoute(profile.role)} replace />
     }
+    return <>{children}</>
   }
 
   if (!canAccessRoute(profile.role, location.pathname, profile.is_owner, profile)) {

@@ -921,10 +921,10 @@ export function useMarkAttendance() {
 }
 
 export function useDashboardStats(dateRange?: { start?: string; end?: string }) {
-  const { profile, isOwner } = useAuth()
+  const { profile, isOwner, canElevatedLeads, canViewFeature } = useAuth()
 
   return useQuery({
-    queryKey: ['dashboard', profile?.id, isOwner, dateRange?.start, dateRange?.end],
+    queryKey: ['dashboard', profile?.id, isOwner, canElevatedLeads, dateRange?.start, dateRange?.end],
     queryFn: async () => {
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -935,7 +935,7 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
       let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false)
       let admissionsQuery = supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_deleted', false)
       let convertedLeadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true }).eq('is_deleted', false).or('status.eq.converted,pipeline_stage.eq.enrolled')
-      let feesQuery = (isOwner || profile?.role === 'accounts') ? supabase.from('fees').select('amount_paid, pending_balance, created_at') : Promise.resolve({ data: [] })
+      let feesQuery = (isOwner || profile?.role === 'accounts' || canViewFeature('fees')) ? supabase.from('fees').select('amount_paid, pending_balance, created_at') : Promise.resolve({ data: [] })
       let sourcesQuery = supabase.from('leads').select('source, created_at').eq('is_deleted', false)
 
       if (dateRange?.start && dateRange?.end) {
@@ -948,7 +948,8 @@ export function useDashboardStats(dateRange?: { start?: string; end?: string }) 
         sourcesQuery = sourcesQuery.gte('created_at', dateRange.start).lte('created_at', dateRange.end)
       }
 
-      if (!isOwner && profile?.role === 'counselor') {
+      const hasFullLeads = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception' || canElevatedLeads
+      if (!hasFullLeads && profile?.role === 'counselor') {
         leadsQuery = leadsQuery.eq('assigned_counselor_id', profile.id)
         convertedLeadsQuery = convertedLeadsQuery.eq('assigned_counselor_id', profile.id)
       }

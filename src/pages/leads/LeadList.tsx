@@ -28,8 +28,8 @@ import { CustomizableFilterBar, type FilterItem } from '@/components/shared/Cust
 export default function LeadList() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { can, isOwner, profile } = useAuth()
-  const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception'
+  const { can, isOwner, profile, canElevatedLeads } = useAuth()
+  const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception' || canElevatedLeads
   const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 50 })
   const [addOpen, setAddOpen] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
@@ -496,7 +496,7 @@ export default function LeadList() {
         selectable
         bulkActions={bulkActions}
         tableKey="leads"
-        showExport={isOwner}
+        showExport={isOwner || can('exportData') || canElevatedLeads}
         onExport={handleExport}
         exportFilename="kizen-leads"
         totalCount={data?.total}

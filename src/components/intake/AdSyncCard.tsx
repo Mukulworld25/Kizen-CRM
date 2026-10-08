@@ -211,9 +211,10 @@ export function AdSyncCard() {
       const forms = formsData.data || []
 
       let imported = 0
+      let updatedCount = 0
       for (const f of forms) {
         const leadsRes = await fetch(
-          `https://graph.facebook.com/v19.0/${f.id}/leads?access_token=${metaConn.access_token}&limit=100`
+          `https://graph.facebook.com/v19.0/${f.id}/leads?fields=id,created_time,field_data,platform,campaign_name&access_token=${metaConn.access_token}&limit=100`
         )
         const leadsData = await leadsRes.json()
         const leads = leadsData.data || []
@@ -223,20 +224,46 @@ export function AdSyncCard() {
           let fullName = ''
           let phone = ''
           let email = ''
+          let city = ''
+          let qual = ''
+          let isStudent = false
+          let isParent = false
+          let commerce = ''
 
           for (const fld of fields) {
             const name = (fld.name || '').toLowerCase()
-            const val = Array.isArray(fld.values) ? fld.values[0] : fld.values
+            const val = (Array.isArray(fld.values) ? fld.values[0] : fld.values) || ''
             if (name.includes('full_name') || name.includes('name')) fullName = val
             else if (name.includes('phone') || name.includes('mobile')) phone = val
             else if (name.includes('email')) email = val
+            else if (name.includes('city')) city = val
+            else if (name.includes('qualification')) {
+              const s = val.toLowerCase()
+              if (s.includes('class_12') || s.includes('12th')) qual = 'Class 12 (Commerce + Arts)'
+              else if (s.includes('class_11') || s.includes('11th')) qual = 'Class 11 (Commerce)'
+              else if (s.includes('b.com') || s.includes('bcom')) qual = 'B.Com'
+              else if (s.includes('bba')) qual = 'BBA'
+              else qual = val.replace(/_/g, ' ')
+            } else if (name.includes('student') || name.includes('parent')) {
+              if (val.toLowerCase().includes('student')) isStudent = true
+              if (val.toLowerCase().includes('parent')) isParent = true
+            } else if (name.includes('commerce')) {
+              if (val.toLowerCase().includes('yes')) commerce = 'Commerce'
+              else if (val.toLowerCase().includes('no')) commerce = 'Non-Commerce'
+            }
           }
+
+          const roleSuffix = isStudent ? ' (Student)' : isParent ? ' (Parent)' : ''
+          const finalQual = qual || (commerce ? `${commerce}${roleSuffix}` : null)
+          const platform = (l.platform || '').toLowerCase()
+          const source = (platform === 'ig' || platform === 'instagram') ? 'instagram' : 'facebook'
+          const leadDate = l.created_time ? new Date(l.created_time).toISOString() : new Date().toISOString()
 
           if (fullName && phone) {
             const cleanPhone = phone.replace(/[^0-9+]/g, '')
             const { data: existing } = await supabase
               .from('leads')
-              .select('id')
+              .select('id, source, city, class_year, tap_date')
               .eq('mobile', cleanPhone)
               .maybeSingle()
 
@@ -245,12 +272,26 @@ export function AdSyncCard() {
                 full_name: fullName,
                 mobile: cleanPhone,
                 email: email || null,
-                source: 'facebook',
+                source: source,
+                city: city || null,
+                class_year: finalQual || null,
+                lead_date: leadDate,
+                tap_date: leadDate,
                 source_sheet: `Meta Form: ${f.name}`,
                 status: 'new',
-                notes: `Imported from Meta Lead Form "${f.name}" (ID: ${f.id})`,
+                notes: `Imported from Meta Lead Form "${f.name}" (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${l.id})`,
               })
               imported++
+            } else {
+              const updates: any = {}
+              if (!existing.city && city) updates.city = city
+              if (!existing.class_year && finalQual) updates.class_year = finalQual
+              if (existing.source !== source) updates.source = source
+              if (!existing.tap_date) updates.tap_date = leadDate
+              if (Object.keys(updates).length > 0) {
+                await supabase.from('leads').update(updates).eq('id', existing.id)
+                updatedCount++
+              }
             }
           }
         }

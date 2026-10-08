@@ -134,10 +134,15 @@ serve(async (req) => {
               let fullName = 'Meta Lead'
               let rawPhone = ''
               let email: string | null = null
+              let city: string | null = null
+              let qual: string | null = null
+              let isStudent = false
+              let isParent = false
+              let commerce = ''
 
               for (const field of fieldData) {
                 const name = (field.name ?? '').toLowerCase()
-                const val = Array.isArray(field.values) ? field.values[0] : field.values
+                const val = (Array.isArray(field.values) ? field.values[0] : field.values) || ''
 
                 if (name.includes('full_name') || name.includes('name')) {
                   fullName = val
@@ -145,11 +150,30 @@ serve(async (req) => {
                   rawPhone = val
                 } else if (name.includes('email')) {
                   email = val
+                } else if (name.includes('city')) {
+                  city = val
+                } else if (name.includes('qualification')) {
+                  const s = val.toLowerCase()
+                  if (s.includes('class_12') || s.includes('12th')) qual = 'Class 12 (Commerce + Arts)'
+                  else if (s.includes('class_11') || s.includes('11th')) qual = 'Class 11 (Commerce)'
+                  else if (s.includes('b.com') || s.includes('bcom')) qual = 'B.Com'
+                  else if (s.includes('bba')) qual = 'BBA'
+                  else qual = val.replace(/_/g, ' ')
+                } else if (name.includes('student') || name.includes('parent')) {
+                  if (val.toLowerCase().includes('student')) isStudent = true
+                  if (val.toLowerCase().includes('parent')) isParent = true
+                } else if (name.includes('commerce')) {
+                  if (val.toLowerCase().includes('yes')) commerce = 'Commerce'
+                  else if (val.toLowerCase().includes('no')) commerce = 'Non-Commerce'
                 }
               }
 
+              const roleSuffix = isStudent ? ' (Student)' : isParent ? ' (Parent)' : ''
+              const finalQual = qual || (commerce ? `${commerce}${roleSuffix}` : null)
               const mobile = normalizePhone(rawPhone) || rawPhone || `meta_${leadgenId}`
-              const source = (leadData.platform ?? 'facebook').toLowerCase() === 'instagram' ? 'instagram' : 'facebook'
+              const rawPlatform = (leadData.platform ?? '').toLowerCase()
+              const source = (rawPlatform === 'ig' || rawPlatform === 'instagram') ? 'instagram' : 'facebook'
+              const leadDate = leadData.created_time ? new Date(leadData.created_time).toISOString() : new Date().toISOString()
 
               // Insert Lead directly into DB
               const { error: insertErr } = await supabase.from('leads').insert({
@@ -157,9 +181,13 @@ serve(async (req) => {
                 mobile,
                 email,
                 source,
+                city,
+                class_year: finalQual,
+                lead_date: leadDate,
+                tap_date: leadDate,
                 source_sheet: 'Meta Lead Ads',
                 status: 'new',
-                notes: `Auto-populated from Meta Lead Ad (Form ID: ${change.value?.form_id ?? 'N/A'}, Lead ID: ${leadgenId})`,
+                notes: `Auto-populated from Meta Lead Ad (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Form ID: ${change.value?.form_id ?? 'N/A'}, Lead ID: ${leadgenId})`,
               })
 
               if (!insertErr) {

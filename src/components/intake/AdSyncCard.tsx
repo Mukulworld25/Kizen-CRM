@@ -85,25 +85,43 @@ export function AdSyncCard() {
         return
       }
 
-      // 2. Check /me/permissions
-      const permRes = await fetch(`https://graph.facebook.com/v19.0/me/permissions?access_token=${token}`)
-      const permData = await permRes.json()
-      const perms: string[] = (permData.data || [])
-        .filter((p: any) => p.status === 'granted')
-        .map((p: any) => p.permission)
-
-      const hasLeadsRetrieval = perms.includes('leads_retrieval')
-      const missing: string[] = []
-      if (!hasLeadsRetrieval) missing.push('leads_retrieval')
+      // 2. Check permissions edge (for user tokens)
+      let hasLeadsRetrieval = false
+      try {
+        const permRes = await fetch(`https://graph.facebook.com/v19.0/me/permissions?access_token=${token}`)
+        const permData = await permRes.json()
+        const perms: string[] = (permData.data || [])
+          .filter((p: any) => p.status === 'granted')
+          .map((p: any) => p.permission)
+        if (perms.includes('leads_retrieval')) {
+          hasLeadsRetrieval = true
+        }
+      } catch {
+        // Ignored
+      }
 
       // 3. Check App Info
-      const appRes = await fetch(`https://graph.facebook.com/v19.0/app?access_token=${token}`)
-      const appData = await appRes.json()
+      let appName = 'Kizen CRM Integration'
+      let appId = '1691860812502526'
+      try {
+        const appRes = await fetch(`https://graph.facebook.com/v19.0/app?access_token=${token}`)
+        const appData = await appRes.json()
+        if (appData.name) appName = appData.name
+        if (appData.id) appId = appData.id
+      } catch {
+        // Ignored
+      }
 
       // 4. Check Page Info & Lead Forms
       const pageId = '814560305083276'
-      const pageRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=id,name&access_token=${token}`)
-      const pageData = await pageRes.json()
+      let pageName = 'Kizen Education'
+      try {
+        const pageRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=id,name&access_token=${token}`)
+        const pageData = await pageRes.json()
+        if (pageData.name) pageName = pageData.name
+      } catch {
+        // Ignored
+      }
 
       let forms: any[] = []
       try {
@@ -114,18 +132,31 @@ export function AdSyncCard() {
         // Ignored
       }
 
+      // 5. Test real lead retrieval capability on form
+      if (!hasLeadsRetrieval && forms.length > 0) {
+        try {
+          const testLeadRes = await fetch(`https://graph.facebook.com/v19.0/${forms[0].id}/leads?access_token=${token}&limit=1`)
+          const testLeadData = await testLeadRes.json()
+          if (!testLeadData.error) {
+            hasLeadsRetrieval = true
+          }
+        } catch {
+          // Ignored
+        }
+      }
+
       setMetaDiag({
         tested: true,
         valid: true,
-        pageName: pageData.name || 'Kizen Education',
-        pageId: pageData.id || pageId,
-        appName: appData.name || 'Kizen CRM Integration',
-        appId: appData.id || '1691860812502526',
+        pageName,
+        pageId,
+        appName,
+        appId,
         systemUserName: meData.name || 'Kizen CRM sync',
         activeFormsCount: forms.length,
         forms: forms.slice(0, 8),
         hasLeadsRetrieval,
-        missingPermissions: missing,
+        missingPermissions: hasLeadsRetrieval ? [] : ['leads_retrieval'],
       })
     } catch (err: any) {
       setMetaDiag({

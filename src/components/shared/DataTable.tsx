@@ -303,7 +303,7 @@ export function DataTable<T>({
       ) : (
         <>
           <div className="rounded-xl border border-border shadow-sm overflow-hidden" style={{ background: 'var(--card)' }}>
-            <Table containerClassName="max-h-[calc(100vh-270px)] min-h-[380px] overflow-auto">
+            <Table containerClassName="min-h-[520px] max-h-[calc(100vh-210px)] overflow-auto">
               <TableHeader className="sticky top-0 z-20 bg-slate-50 dark:bg-[#162338]">
                 <TableRow>
                   {selectable && (

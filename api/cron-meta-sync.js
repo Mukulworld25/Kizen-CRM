@@ -4,12 +4,12 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://bumjiykhgkgmqyynw
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_WvTe_Y2WcJay9k3aeDc8sQ_0W2--LjH';
 
 function normalizePhone(raw) {
-  if (!raw) return '';
+  if (!raw) return { full: '', last10: '' };
   const digits = raw.replace(/[^0-9]/g, '');
-  if (!digits) return '';
-  if (digits.length === 10) return '+91' + digits;
-  if (digits.length === 12 && digits.startsWith('91')) return '+' + digits;
-  return digits.startsWith('+') ? digits : '+' + digits;
+  if (!digits) return { full: '', last10: '' };
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const full = last10.length === 10 ? '+91' + last10 : '+' + digits;
+  return { full, last10 };
 }
 
 function isDummyTestLead(fullName, phone, email) {
@@ -55,15 +55,24 @@ export default async function handler(req, res) {
     const formsData = await formsRes.json();
     const forms = formsData.data || [];
 
-    let imported = 0;
-    let updated = 0;
+    // 4. Fetch leads from all forms in parallel for sub-5s execution
+    const formLeadBatches = await Promise.all(
+      forms.map(async (f) => {
+        try {
+          const leadsRes = await fetch(`https://graph.facebook.com/v19.0/${f.id}/leads?fields=id,created_time,field_data,platform,campaign_name&access_token=${token}&limit=100`);
+          const leadsData = await leadsRes.json();
+          return { form: f, leads: leadsData.data || [] };
+        } catch {
+          return { form: f, leads: [] };
+        }
+      })
+    );
 
-    for (const f of forms) {
-      const leadsRes = await fetch(`https://graph.facebook.com/v19.0/${f.id}/leads?fields=id,created_time,field_data,platform,campaign_name&access_token=${token}&limit=100`);
-      const leadsData = await leadsRes.json();
-      const leads = leadsData.data || [];
+    const candidates = [];
 
-      for (const l of leads) {
+    for (const batch of formLeadBatches) {
+      const f = batch.form;
+      for (const l of batch.leads) {
         const fields = l.field_data || [];
         let fullName = '';
         let phone = '';
@@ -97,52 +106,105 @@ export default async function handler(req, res) {
           }
         }
 
-        // Skip test leads
+        // Discard Meta Test tool leads and dummy data
         if (isDummyTestLead(fullName, phone, email)) {
           continue;
         }
 
-        const cleanPhone = normalizePhone(phone);
+        const { full: cleanPhone, last10 } = normalizePhone(phone);
+        if (!fullName || !last10) continue;
+
         const roleSuffix = isStudent ? ' (Student)' : isParent ? ' (Parent)' : '';
         const finalQual = qual || (commerce ? `${commerce}${roleSuffix}` : null);
         const platform = (l.platform || '').toLowerCase();
         const source = (platform === 'ig' || platform === 'instagram') ? 'instagram' : 'facebook';
         const leadDate = l.created_time ? new Date(l.created_time).toISOString() : new Date().toISOString();
 
-        if (fullName && cleanPhone) {
-          const { data: existing } = await supabase
-            .from('leads')
-            .select('id, city, class_year, tap_date, lead_date')
-            .eq('mobile', cleanPhone)
-            .maybeSingle();
+        candidates.push({
+          fullName,
+          cleanPhone,
+          last10,
+          email: email || null,
+          city: city || null,
+          finalQual: finalQual || null,
+          source,
+          leadDate,
+          formName: f.name,
+          leadId: l.id
+        });
+      }
+    }
 
-          if (!existing) {
-            await supabase.from('leads').insert({
-              full_name: fullName,
-              mobile: cleanPhone,
-              email: email || null,
-              source,
-              city: city || null,
-              class_year: finalQual || null,
-              lead_date: leadDate,
-              tap_date: leadDate,
-              source_sheet: `Meta Form: ${f.name}`,
-              status: 'new_lead',
-              notes: `Imported from Meta Lead Form "${f.name}" (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${l.id})`
-            });
-            imported++;
-          } else {
-            const updates = {};
-            if (!existing.city && city) updates.city = city;
-            if (!existing.class_year && finalQual) updates.class_year = finalQual;
-            if (!existing.tap_date) updates.tap_date = leadDate;
-            if (!existing.lead_date) updates.lead_date = leadDate;
-            if (Object.keys(updates).length > 0) {
-              await supabase.from('leads').update(updates).eq('id', existing.id);
-              updated++;
-            }
-          }
+    // Deduplicate candidates in memory by 10-digit phone
+    const uniqueCandidates = new Map();
+    for (const c of candidates) {
+      if (!uniqueCandidates.has(c.last10)) {
+        uniqueCandidates.set(c.last10, c);
+      }
+    }
+
+    // Prepare phone patterns for database check (both with +91 and 10 digits)
+    const phoneQuerySet = new Set();
+    for (const c of uniqueCandidates.values()) {
+      phoneQuerySet.add(c.cleanPhone);
+      phoneQuerySet.add(c.last10);
+    }
+
+    const phoneQueryArray = Array.from(phoneQuerySet);
+    const { data: existingList, error: qErr } = await supabase
+      .from('leads')
+      .select('id, mobile, city, class_year, tap_date, lead_date')
+      .in('mobile', phoneQueryArray);
+
+    if (qErr) throw qErr;
+
+    const existingMap = new Map();
+    for (const row of existingList || []) {
+      existingMap.set(row.mobile, row);
+      const row10 = (row.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+      if (row10) existingMap.set(row10, row);
+    }
+
+    const toInsert = [];
+    let updatedCount = 0;
+
+    for (const c of uniqueCandidates.values()) {
+      const existing = existingMap.get(c.cleanPhone) || existingMap.get(c.last10);
+
+      if (!existing) {
+        toInsert.push({
+          full_name: c.fullName,
+          mobile: c.cleanPhone,
+          email: c.email,
+          source: c.source,
+          city: c.city,
+          class_year: c.finalQual,
+          lead_date: c.leadDate,
+          tap_date: c.leadDate,
+          source_sheet: `Meta Form: ${c.formName}`,
+          status: 'new_lead',
+          notes: `Imported from Meta Lead Form "${c.formName}" (Platform: ${c.source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${c.leadId})`
+        });
+      } else {
+        const updates = {};
+        if (!existing.city && c.city) updates.city = c.city;
+        if (!existing.class_year && c.finalQual) updates.class_year = c.finalQual;
+        if (!existing.tap_date) updates.tap_date = c.leadDate;
+        if (!existing.lead_date) updates.lead_date = c.leadDate;
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('leads').update(updates).eq('id', existing.id);
+          updatedCount++;
         }
+      }
+    }
+
+    let imported = 0;
+    if (toInsert.length > 0) {
+      // Insert in chunks of 50
+      for (let i = 0; i < toInsert.length; i += 50) {
+        const chunk = toInsert.slice(i, i + 50);
+        const { error: insErr } = await supabase.from('leads').insert(chunk);
+        if (!insErr) imported += chunk.length;
       }
     }
 
@@ -154,9 +216,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `Meta daily 9:00 AM IST sync completed successfully. Imported: ${imported}, Updated: ${updated}`,
+      message: `Meta daily 9:00 AM IST sync completed successfully. Imported: ${imported}, Updated: ${updatedCount}`,
       imported,
-      updated,
+      updated: updatedCount,
       lastSyncedAt: nowIso
     });
   } catch (err) {

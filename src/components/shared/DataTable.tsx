@@ -61,6 +61,12 @@ interface DataTableProps<T> {
   onPageSizeChange?: (pageSize: number) => void
   /** Available page size options */
   pageSizeOptions?: number[]
+  /** Controlled / server-side sort column key */
+  sortBy?: string
+  /** Controlled / server-side sort direction */
+  sortDir?: 'asc' | 'desc'
+  /** Callback for sort column / direction change */
+  onSortChange?: (key: string, dir: 'asc' | 'desc') => void
 }
 
 const VISIBILITY_STORAGE_KEY = 'kizen-column-visibility'
@@ -101,12 +107,18 @@ export function DataTable<T>({
   onSearch,
   onPageSizeChange,
   pageSizeOptions,
+  sortBy: controlledSortBy,
+  sortDir: controlledSortDir,
+  onSortChange,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [clientPage, setClientPage] = useState(1)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  const effectiveSortKey = controlledSortBy !== undefined ? controlledSortBy : sortKey
+  const effectiveSortDir = controlledSortDir !== undefined ? controlledSortDir : sortDir
 
   const isServerPagination = totalCount !== undefined && onPageChange !== undefined
   const activePage = isServerPagination ? (serverPage ?? 1) : clientPage
@@ -151,24 +163,28 @@ export function DataTable<T>({
         })
       )
     }
-    if (sortKey && !isServerPagination) {
+    if (effectiveSortKey && !isServerPagination) {
       result.sort((a, b) => {
-        const av = (a as Record<string, unknown>)[sortKey]
-        const bv = (b as Record<string, unknown>)[sortKey]
+        const av = (a as Record<string, unknown>)[effectiveSortKey]
+        const bv = (b as Record<string, unknown>)[effectiveSortKey]
         const cmp = String(av ?? '').localeCompare(String(bv ?? ''))
-        return sortDir === 'asc' ? cmp : -cmp
+        return effectiveSortDir === 'asc' ? cmp : -cmp
       })
     }
     return result
-  }, [data, search, sortKey, sortDir, visibleColumns, isServerPagination])
+  }, [data, search, effectiveSortKey, effectiveSortDir, visibleColumns, isServerPagination])
 
   const effectiveTotal = isServerPagination ? (totalCount ?? 0) : filtered.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotal / pageSize))
   const paginated = isServerPagination ? data : filtered.slice((clientPage - 1) * pageSize, clientPage * pageSize)
 
   const handleSort = (key: string) => {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setSortKey(key); setSortDir('asc') }
+    const nextDir = effectiveSortKey === key ? (effectiveSortDir === 'asc' ? 'desc' : 'asc') : 'desc'
+    setSortKey(key)
+    setSortDir(nextDir)
+    if (onSortChange) {
+      onSortChange(key, nextDir)
+    }
   }
 
   const handleExport = async () => {
@@ -386,9 +402,9 @@ export function DataTable<T>({
                         )}
                         <div className={cn("inline-flex items-center gap-1.5 whitespace-nowrap group/th", isEditing && "opacity-20")}>
                           <span className="font-semibold text-xs tracking-tight">{displayHeader}</span>
-                          {sortKey === col.key && (
+                          {effectiveSortKey === col.key && (
                             <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                              {sortDir === 'asc' ? '↑' : '↓'}
+                              {effectiveSortDir === 'asc' ? '↑' : '↓'}
                             </span>
                           )}
                           {isEditable && (

@@ -30,7 +30,7 @@ export default function LeadList() {
   const [searchParams] = useSearchParams()
   const { can, isOwner, profile, canElevatedLeads } = useAuth()
   const isPrivileged = isOwner || profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'reception' || canElevatedLeads
-  const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 50 })
+  const [filters, setFilters] = useState<LeadFilters>({ page: 1, pageSize: 50, sortBy: 'lead_date', sortOrder: 'desc' })
   const [addOpen, setAddOpen] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -500,11 +500,14 @@ export default function LeadList() {
         onExport={handleExport}
         exportFilename="kizen-leads"
         totalCount={data?.total}
+        pageSizeOptions={[15, 25, 50, 100]}
         page={filters.page ?? 1}
         pageSize={filters.pageSize ?? 50}
         onPageSizeChange={(sz) => setFilters((f) => ({ ...f, pageSize: sz, page: 1 }))}
-        pageSizeOptions={[15, 25, 50, 100]}
         onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
+        sortBy={filters.sortBy ?? 'lead_date'}
+        sortDir={filters.sortOrder ?? 'desc'}
+        onSortChange={(key, dir) => setFilters((f) => ({ ...f, sortBy: key, sortOrder: dir, page: 1 }))}
         onSearch={(s) => setFilters((f) => ({ ...f, search: s || undefined, page: 1 }))}
         rowKey={(r) => r.id}
         onRowClick={(r) => navigate(`/leads/${r.id}`)}

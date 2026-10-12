@@ -406,6 +406,8 @@ export interface LeadFilters {
   dynamicRules?: import('@/components/shared/DynamicFilterBuilder').DynamicFilterRule[]
   page?: number
   pageSize?: number
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export const LEAD_STATUSES: LeadStatus[] = [

@@ -1,10 +1,11 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/hooks/useAuth'
 import { ProtectedRoute, RoleGuard } from '@/components/auth/ProtectedRoute'
 import { Layout } from '@/components/layout/Layout'
+import { initAutoSyncScheduler } from '@/services/autoSyncScheduler'
 import Login from '@/pages/auth/Login'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import LeadList from '@/pages/leads/LeadList'
@@ -43,6 +44,13 @@ const queryClient = new QueryClient({
 })
 
 function AppContent() {
+  useEffect(() => {
+    const cleanup = initAutoSyncScheduler(() => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    })
+    return cleanup
+  }, [])
+
   return (
     <>
       <BrowserRouter>

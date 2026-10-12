@@ -1,6 +1,16 @@
 {
   "installCommand": "npm ci",
+  "crons": [
+    {
+      "path": "/api/cron-meta-sync",
+      "schedule": "30 3 * * *"
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

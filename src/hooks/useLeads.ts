@@ -48,12 +48,23 @@ export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: ['leads', filters, profile?.id],
     queryFn: async () => {
+      const sortBy = filters.sortBy || 'lead_date'
+      const sortAscending = filters.sortOrder === 'asc'
+
       let query = supabase
         .from('leads')
         .select('*, course:courses(*), counselor:users!leads_assigned_counselor_id_fkey(id, name)', { count: 'exact' })
         .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .range((page - 1) * pageSize, page * pageSize - 1)
+
+      if (sortBy === 'lead_date') {
+        query = query
+          .order('lead_date', { ascending: sortAscending, nullsFirst: false })
+          .order('created_at', { ascending: false })
+      } else {
+        query = query.order(sortBy, { ascending: sortAscending, nullsFirst: false })
+      }
+
+      query = query.range((page - 1) * pageSize, page * pageSize - 1)
 
       if (filters.status) query = query.eq('status', filters.status)
       if (filters.source) query = query.eq('source', filters.source)

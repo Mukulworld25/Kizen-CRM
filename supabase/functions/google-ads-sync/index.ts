@@ -80,6 +80,7 @@ serve(async (req) => {
     const campaignId = body.campaign_id ?? 'N/A'
     const formId = body.form_id ?? 'N/A'
 
+    const nowIso = new Date().toISOString()
     const { data: insertedLead, error: insertErr } = await supabase
       .from('leads')
       .insert({
@@ -88,7 +89,9 @@ serve(async (req) => {
         email: email || null,
         source: 'google_ads',
         source_sheet: 'Google Ads Lead Form',
-        status: 'new',
+        status: 'new_lead',
+        lead_date: nowIso,
+        tap_date: nowIso,
         notes: `Auto-populated from Google Ads Lead Form (Form ID: ${formId}, Campaign ID: ${campaignId}, Lead ID: ${leadId})`,
       })
       .select()

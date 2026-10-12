@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { syncMetaLeads } from '@/services/metaLeadSync'
 import toast from 'react-hot-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -204,106 +205,13 @@ export function AdSyncCard() {
     setSyncingMeta(true)
     try {
       toast.loading('Syncing leads from Meta Lead Ads...', { id: 'meta-sync' })
-      const formsRes = await fetch(
-        `https://graph.facebook.com/v19.0/${metaDiag.pageId}/leadgen_forms?access_token=${metaConn.access_token}&limit=25`
-      )
-      const formsData = await formsRes.json()
-      const forms = formsData.data || []
-
-      let imported = 0
-      let updatedCount = 0
-      for (const f of forms) {
-        const leadsRes = await fetch(
-          `https://graph.facebook.com/v19.0/${f.id}/leads?fields=id,created_time,field_data,platform,campaign_name&access_token=${metaConn.access_token}&limit=100`
-        )
-        const leadsData = await leadsRes.json()
-        const leads = leadsData.data || []
-
-        for (const l of leads) {
-          const fields = l.field_data || []
-          let fullName = ''
-          let phone = ''
-          let email = ''
-          let city = ''
-          let qual = ''
-          let isStudent = false
-          let isParent = false
-          let commerce = ''
-
-          for (const fld of fields) {
-            const name = (fld.name || '').toLowerCase()
-            const val = (Array.isArray(fld.values) ? fld.values[0] : fld.values) || ''
-            if (name.includes('full_name') || name.includes('name')) fullName = val
-            else if (name.includes('phone') || name.includes('mobile')) phone = val
-            else if (name.includes('email')) email = val
-            else if (name.includes('city')) city = val
-            else if (name.includes('qualification')) {
-              const s = val.toLowerCase()
-              if (s.includes('class_12') || s.includes('12th')) qual = 'Class 12 (Commerce + Arts)'
-              else if (s.includes('class_11') || s.includes('11th')) qual = 'Class 11 (Commerce)'
-              else if (s.includes('b.com') || s.includes('bcom')) qual = 'B.Com'
-              else if (s.includes('bba')) qual = 'BBA'
-              else qual = val.replace(/_/g, ' ')
-            } else if (name.includes('student') || name.includes('parent')) {
-              if (val.toLowerCase().includes('student')) isStudent = true
-              if (val.toLowerCase().includes('parent')) isParent = true
-            } else if (name.includes('commerce')) {
-              if (val.toLowerCase().includes('yes')) commerce = 'Commerce'
-              else if (val.toLowerCase().includes('no')) commerce = 'Non-Commerce'
-            }
-          }
-
-          const roleSuffix = isStudent ? ' (Student)' : isParent ? ' (Parent)' : ''
-          const finalQual = qual || (commerce ? `${commerce}${roleSuffix}` : null)
-          const platform = (l.platform || '').toLowerCase()
-          const source = (platform === 'ig' || platform === 'instagram') ? 'instagram' : 'facebook'
-          const leadDate = l.created_time ? new Date(l.created_time).toISOString() : new Date().toISOString()
-
-          if (fullName && phone) {
-            const cleanPhone = phone.replace(/[^0-9+]/g, '')
-            const { data: existing } = await supabase
-              .from('leads')
-              .select('id, source, city, class_year, tap_date')
-              .eq('mobile', cleanPhone)
-              .maybeSingle()
-
-            if (!existing) {
-              await supabase.from('leads').insert({
-                full_name: fullName,
-                mobile: cleanPhone,
-                email: email || null,
-                source: source,
-                city: city || null,
-                class_year: finalQual || null,
-                lead_date: leadDate,
-                tap_date: leadDate,
-                source_sheet: `Meta Form: ${f.name}`,
-                status: 'new',
-                notes: `Imported from Meta Lead Form "${f.name}" (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${l.id})`,
-              })
-              imported++
-            } else {
-              const updates: any = {}
-              if (!existing.city && city) updates.city = city
-              if (!existing.class_year && finalQual) updates.class_year = finalQual
-              if (existing.source !== source) updates.source = source
-              if (!existing.tap_date) updates.tap_date = leadDate
-              if (Object.keys(updates).length > 0) {
-                await supabase.from('leads').update(updates).eq('id', existing.id)
-                updatedCount++
-              }
-            }
-          }
-        }
+      const res = await syncMetaLeads({ pageId: metaDiag.pageId })
+      if (!res.success) {
+        toast.error(`Sync failed: ${res.error || 'Unknown error'}`, { id: 'meta-sync' })
+      } else {
+        toast.success(`Sync complete! ${res.imported} new lead(s) imported, ${res.updated} updated.`, { id: 'meta-sync' })
+        fetchConnections()
       }
-
-      await supabase
-        .from('ad_sync_connections')
-        .update({ last_synced_at: new Date().toISOString() })
-        .eq('id', metaConn.id)
-
-      toast.success(`Successfully imported ${imported} new lead(s) from Meta Ads!`, { id: 'meta-sync' })
-      fetchConnections()
     } catch (err: any) {
       toast.error(`Sync failed: ${err.message}`, { id: 'meta-sync' })
     } finally {
@@ -402,15 +310,15 @@ export function AdSyncCard() {
                   </div>
                 </div>
               ) : metaDiag.hasLeadsRetrieval ? (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs flex items-center justify-between">
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                    <span>All Meta permissions granted (<code className="font-mono">leads_retrieval</code> active). Ready for real-time leads.</span>
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>All Meta permissions granted (<code className="font-mono">leads_retrieval</code> active). Auto-syncs daily at 9:00 AM IST.</span>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-xs bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white"
+                    className="h-7 text-xs bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white shrink-0"
                     onClick={handleSyncMetaLeads}
                     disabled={syncingMeta}
                   >
@@ -440,14 +348,21 @@ export function AdSyncCard() {
               )}
 
               {/* Action buttons */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="text-[11px] text-muted-foreground">
-                  System User: <span className="font-mono font-medium text-foreground">{metaDiag.systemUserName || 'Kizen CRM sync'}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 gap-2">
+                <div className="text-[11px] text-muted-foreground space-y-0.5">
+                  <div>
+                    System User: <span className="font-mono font-medium text-foreground">{metaDiag.systemUserName || 'Kizen CRM sync'}</span>
+                  </div>
+                  {metaConn?.last_synced_at && (
+                    <div className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      Last Synced: {new Date(metaConn.last_synced_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (IST) • Auto-sync active daily at 9:00 AM
+                    </div>
+                  )}
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 self-start sm:self-auto"
                   onClick={() => metaConn?.access_token && runMetaDiagnostics(metaConn.access_token)}
                   disabled={loading}
                 >

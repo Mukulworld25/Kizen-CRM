@@ -112,7 +112,7 @@ export function DataTable<T>({
   onSortChange,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<string | null>('created_at')
+  const [sortKey, setSortKey] = useState<string | null>('lead_date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [clientPage, setClientPage] = useState(1)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())

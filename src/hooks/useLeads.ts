@@ -48,7 +48,7 @@ export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: ['leads', filters, profile?.id],
     queryFn: async () => {
-      const sortBy = filters.sortBy || 'lead_date'
+      const sortBy = (filters.sortBy && filters.sortBy !== 'created_at') ? filters.sortBy : 'lead_date'
       const sortAscending = filters.sortOrder === 'asc'
 
       let query = supabase
@@ -61,7 +61,9 @@ export function useLeads(filters: LeadFilters = {}) {
           .order('lead_date', { ascending: sortAscending, nullsFirst: false })
           .order('created_at', { ascending: false })
       } else {
-        query = query.order(sortBy, { ascending: sortAscending, nullsFirst: false })
+        query = query
+          .order(sortBy, { ascending: sortAscending, nullsFirst: false })
+          .order('lead_date', { ascending: false, nullsFirst: false })
       }
 
       query = query.range((page - 1) * pageSize, page * pageSize - 1)

@@ -1,25 +1,56 @@
-import pg from 'pg';
-const { Client } = pg;
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://bumjiykhgkgmqyynwtuh.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_WvTe_Y2WcJay9k3aeDc8sQ_0W2--LjH';
+
+function normalizePhone(raw) {
+  if (!raw) return '';
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) return '+91' + digits;
+  if (digits.length === 12 && digits.startsWith('91')) return '+' + digits;
+  return digits.startsWith('+') ? digits : '+' + digits;
+}
+
+function isDummyTestLead(fullName, phone, email) {
+  const fn = (fullName || '').toLowerCase();
+  const ph = (phone || '').toLowerCase();
+  const em = (email || '').toLowerCase();
+  if (fn.includes('<test lead') || fn.includes('dummy data') || fn.includes('test - ignore')) return true;
+  if (ph.includes('<test lead') || ph.includes('dummy data')) return true;
+  if (em.includes('@meta.com') && fn.includes('test')) return true;
+  return false;
+}
 
 export default async function handler(req, res) {
-  const CRM_DB_URL = process.env.DATABASE_URL || 'postgres://postgres:tkrxsGLSiBs6PVls@db.bumjiykhgkgmqyynwtuh.supabase.co:5432/postgres';
-  const client = new Client({ connectionString: CRM_DB_URL, ssl: { rejectUnauthorized: false } });
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   try {
-    await client.connect();
+    // 1. Authenticate system owner session
+    const { error: authErr } = await supabase.auth.signInWithPassword({
+      email: 'sagedo.test@kizen.edu',
+      password: 'Shivam@123'
+    });
 
-    // 1. Get Meta connection
-    const connRes = await client.query("SELECT * FROM ad_sync_connections WHERE platform = 'meta' AND is_active = true LIMIT 1;");
-    if (connRes.rowCount === 0 || !connRes.rows[0].access_token) {
-      await client.end();
+    if (authErr) {
+      return res.status(500).json({ success: false, error: 'Auth failed: ' + authErr.message });
+    }
+
+    // 2. Retrieve active Meta connection
+    const { data: metaConn, error: connErr } = await supabase
+      .from('ad_sync_connections')
+      .select('*')
+      .eq('platform', 'meta')
+      .maybeSingle();
+
+    if (connErr || !metaConn?.access_token) {
       return res.status(200).json({ success: false, message: 'No active Meta connection or access token configured' });
     }
 
-    const metaConn = connRes.rows[0];
     const token = metaConn.access_token;
     const pageId = metaConn.account_id || '814560305083276';
 
-    // 2. Fetch forms
+    // 3. Fetch lead forms
     const formsRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/leadgen_forms?access_token=${token}&limit=100`);
     const formsData = await formsRes.json();
     const forms = formsData.data || [];
@@ -66,18 +97,12 @@ export default async function handler(req, res) {
           }
         }
 
-        // Test Lead Filter
-        const fn = fullName.toLowerCase();
-        const ph = phone.toLowerCase();
-        if (fn.includes('<test lead') || fn.includes('dummy data') || fn.includes('test - ignore') || ph.includes('<test lead')) {
+        // Skip test leads
+        if (isDummyTestLead(fullName, phone, email)) {
           continue;
         }
 
-        let cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (cleanPhone.length === 10) cleanPhone = '+91' + cleanPhone;
-        else if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = '+' + cleanPhone;
-        else if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
-
+        const cleanPhone = normalizePhone(phone);
         const roleSuffix = isStudent ? ' (Student)' : isParent ? ' (Parent)' : '';
         const finalQual = qual || (commerce ? `${commerce}${roleSuffix}` : null);
         const platform = (l.platform || '').toLowerCase();
@@ -85,37 +110,35 @@ export default async function handler(req, res) {
         const leadDate = l.created_time ? new Date(l.created_time).toISOString() : new Date().toISOString();
 
         if (fullName && cleanPhone) {
-          const existingRes = await client.query('SELECT id, city, class_year, tap_date, lead_date FROM leads WHERE mobile = $1 LIMIT 1;', [cleanPhone]);
-          if (existingRes.rowCount === 0) {
-            await client.query(`
-              INSERT INTO leads (full_name, mobile, email, source, city, class_year, lead_date, tap_date, source_sheet, status, notes)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
-            `, [
-              fullName,
-              cleanPhone,
-              email || null,
+          const { data: existing } = await supabase
+            .from('leads')
+            .select('id, city, class_year, tap_date, lead_date')
+            .eq('mobile', cleanPhone)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase.from('leads').insert({
+              full_name: fullName,
+              mobile: cleanPhone,
+              email: email || null,
               source,
-              city || null,
-              finalQual || null,
-              leadDate,
-              leadDate,
-              `Meta Form: ${f.name}`,
-              'new_lead',
-              `Imported from Meta Lead Form "${f.name}" (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${l.id})`
-            ]);
+              city: city || null,
+              class_year: finalQual || null,
+              lead_date: leadDate,
+              tap_date: leadDate,
+              source_sheet: `Meta Form: ${f.name}`,
+              status: 'new_lead',
+              notes: `Imported from Meta Lead Form "${f.name}" (Platform: ${source === 'instagram' ? 'Instagram' : 'Facebook'}, Lead ID: ${l.id})`
+            });
             imported++;
           } else {
-            const row = existingRes.rows[0];
-            const updates = [];
-            const vals = [];
-            let idx = 1;
-            if (!row.city && city) { updates.push(`city = $${idx++}`); vals.push(city); }
-            if (!row.class_year && finalQual) { updates.push(`class_year = $${idx++}`); vals.push(finalQual); }
-            if (!row.tap_date) { updates.push(`tap_date = $${idx++}`); vals.push(leadDate); }
-            if (!row.lead_date) { updates.push(`lead_date = $${idx++}`); vals.push(leadDate); }
-            if (updates.length > 0) {
-              vals.push(row.id);
-              await client.query(`UPDATE leads SET ${updates.join(', ')} WHERE id = $${idx};`, vals);
+            const updates = {};
+            if (!existing.city && city) updates.city = city;
+            if (!existing.class_year && finalQual) updates.class_year = finalQual;
+            if (!existing.tap_date) updates.tap_date = leadDate;
+            if (!existing.lead_date) updates.lead_date = leadDate;
+            if (Object.keys(updates).length > 0) {
+              await supabase.from('leads').update(updates).eq('id', existing.id);
               updated++;
             }
           }
@@ -124,18 +147,19 @@ export default async function handler(req, res) {
     }
 
     const nowIso = new Date().toISOString();
-    await client.query('UPDATE ad_sync_connections SET last_synced_at = $1, sync_status = $2 WHERE id = $3;', [nowIso, 'active', metaConn.id]);
-    await client.end();
+    await supabase
+      .from('ad_sync_connections')
+      .update({ last_synced_at: nowIso, sync_status: 'active' })
+      .eq('id', metaConn.id);
 
     return res.status(200).json({
       success: true,
-      message: `Meta sync completed successfully. Imported: ${imported}, Updated: ${updated}`,
+      message: `Meta daily 9:00 AM IST sync completed successfully. Imported: ${imported}, Updated: ${updated}`,
       imported,
       updated,
       lastSyncedAt: nowIso
     });
   } catch (err) {
-    if (client) await client.end().catch(() => {});
     return res.status(500).json({ success: false, error: err.message });
   }
 }

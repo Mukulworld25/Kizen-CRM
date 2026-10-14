@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
-import { isSupabaseConfigured } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import kizenLotus from '@/assets/kizen-lotus.png'
 import sagedoLogo from '@/assets/sagedo_logo_final_circle.png'
 import {
@@ -23,8 +23,8 @@ import {
 } from 'lucide-react'
 
 const schema = z.object({
-  email: z.string().email('Please enter a valid institutional email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().min(1, 'Please enter your username or email'),
+  password: z.string().min(1, 'Please enter your password'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -35,6 +35,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+  const [authError, setAuthError] = useState<{ field: 'email' | 'password'; message: string } | null>(null)
 
   const {
     register,
@@ -49,12 +50,55 @@ export default function Login() {
   })
 
   const onSubmit = async (data: FormData) => {
+    setAuthError(null)
+    const rawInput = data.email.trim()
+    const password = data.password.trim()
+
     try {
-      await signIn(data.email, data.password)
+      // 1. Check user existence and status via public RPC
+      const { data: statusRes, error: statusErr } = await supabase.rpc('check_user_login_status', {
+        p_identifier: rawInput,
+      })
+
+      if (statusErr) {
+        console.warn('Status check warning:', statusErr)
+      } else if (statusRes) {
+        if (!statusRes.exists) {
+          const msg = 'Username incorrect'
+          setAuthError({ field: 'email', message: msg })
+          toast.error(msg)
+          return
+        }
+        if (statusRes.is_active === false) {
+          const msg = 'Account is deactivated'
+          setAuthError({ field: 'email', message: msg })
+          toast.error(msg)
+          return
+        }
+      }
+
+      // 2. Resolve email (supports entering 'reception' or 'reception@kizen.edu')
+      const resolvedEmail = statusRes?.resolved_email || (rawInput.includes('@') ? rawInput.toLowerCase() : `${rawInput.toLowerCase()}@kizen.edu`)
+
+      // 3. Attempt sign in
+      await signIn(resolvedEmail, password)
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Invalid credentials. Please verify and retry.')
+    } catch (err: any) {
+      console.error('Sign-in error:', err)
+      const errMsg = err?.message || ''
+      if (
+        errMsg.toLowerCase().includes('invalid login credentials') ||
+        errMsg.toLowerCase().includes('invalid credentials')
+      ) {
+        const msg = 'Password incorrect'
+        setAuthError({ field: 'password', message: msg })
+        toast.error(msg)
+      } else {
+        const msg = 'Password incorrect'
+        setAuthError({ field: 'password', message: msg })
+        toast.error(msg)
+      }
     }
   }
 
@@ -217,24 +261,37 @@ export default function Login() {
 
             {/* Login Form */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
-              {/* Email Field */}
+              {authError && (
+                <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-2.5 text-xs text-rose-300 flex items-center gap-2 animate-shake">
+                  <X className="h-4 w-4 text-rose-400 shrink-0" />
+                  <span className="font-semibold">{authError.message}</span>
+                </div>
+              )}
+
+              {/* Email / Username Field */}
               <div className="space-y-1 text-left">
                 <Label htmlFor="email" className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider pl-0.5">
-                  Institutional Email
+                  Username or Institutional Email
                 </Label>
                 <div className="relative group">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-amber-400 transition-colors" />
                   <Input
                     id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="name@kizen.edu"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="e.g. reception or reception@kizen.edu"
                     {...register('email')}
-                    className="pl-10 h-10 bg-[#070B16] border-white/[0.08] hover:border-white/[0.15] text-white placeholder:text-slate-600 focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/40 rounded-xl transition-all text-xs"
+                    className={`pl-10 h-10 bg-[#070B16] text-white placeholder:text-slate-600 rounded-xl transition-all text-xs ${
+                      authError?.field === 'email' || errors.email
+                        ? 'border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40'
+                        : 'border-white/[0.08] hover:border-white/[0.15] focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/40'
+                    }`}
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-[11px] text-rose-400 font-medium pl-1 pt-0.5">{errors.email.message}</p>
+                {(authError?.field === 'email' || errors.email) && (
+                  <p className="text-[11px] text-rose-400 font-semibold pl-1 pt-0.5">
+                    {authError?.field === 'email' ? authError.message : errors.email?.message}
+                  </p>
                 )}
               </div>
 
@@ -260,7 +317,11 @@ export default function Login() {
                     autoComplete="current-password"
                     placeholder="••••••••••••"
                     {...register('password')}
-                    className="pl-10 pr-10 h-10 bg-[#070B16] border-white/[0.08] hover:border-white/[0.15] text-white placeholder:text-slate-600 focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/40 rounded-xl transition-all text-xs"
+                    className={`pl-10 pr-10 h-10 bg-[#070B16] text-white placeholder:text-slate-600 rounded-xl transition-all text-xs ${
+                      authError?.field === 'password' || errors.password
+                        ? 'border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40'
+                        : 'border-white/[0.08] hover:border-white/[0.15] focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/40'
+                    }`}
                   />
                   <button
                     type="button"
@@ -272,8 +333,10 @@ export default function Login() {
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-[11px] text-rose-400 font-medium pl-1 pt-0.5">{errors.password.message}</p>
+                {(authError?.field === 'password' || errors.password) && (
+                  <p className="text-[11px] text-rose-400 font-semibold pl-1 pt-0.5">
+                    {authError?.field === 'password' ? authError.message : errors.password?.message}
+                  </p>
                 )}
               </div>
 

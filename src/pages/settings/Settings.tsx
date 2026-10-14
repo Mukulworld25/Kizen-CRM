@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Plus, Download, Trash2, Loader2, Database, Pencil, Key, ShieldCheck } from 'lucide-react'
+import { Plus, Download, Trash2, Loader2, Database, Pencil, Key, ShieldCheck, CheckCircle2, Copy, Sparkles, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
@@ -36,9 +36,10 @@ import type { User, UserRole, Course, Batch } from '@/types'
 const ALL_ROLES = ['counselor', 'faculty', 'accounts', 'reception', 'bdm'] as const
 
 const inviteSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
   role: z.enum(ALL_ROLES),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
 })
 
 type InviteForm = z.infer<typeof inviteSchema>
@@ -138,9 +139,12 @@ export default function Settings() {
     }
   }
 
+  const [createdUserCredentials, setCreatedUserCredentials] = useState<{ name: string; email: string; password?: string; role: string } | null>(null)
+  const [copiedCreated, setCopiedCreated] = useState(false)
+
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<InviteForm>({
     resolver: zodResolver(inviteSchema),
-    defaultValues: { role: 'counselor' },
+    defaultValues: { role: 'counselor', password: 'Kizen@' + Math.floor(1000 + Math.random() * 9000) },
   })
 
   const userCount = users.length
@@ -148,23 +152,51 @@ export default function Settings() {
 
   const handleInvite = async (data: InviteForm) => {
     try {
-      // Must go through the invite-user Edge Function. Inserting straight into
-      // public.users creates a profile with no auth.users row, so the person
-      // could never sign in, while still consuming one of the 15 user slots.
-      const { data: result, error } = await supabase.functions.invoke('invite-user', {
-        body: { name: data.name, email: data.email, role: data.role },
-      })
-      if (error) throw error
-      const apiError = (result as { error?: string } | null)?.error
-      if (apiError) throw new Error(apiError)
+      if (data.password && data.password.trim().length >= 6) {
+        // Direct Account Creation with immediate password & confirmed email
+        const { data: result, error } = await supabase.rpc('admin_create_user', {
+          new_name: data.name.trim(),
+          new_email: data.email.trim().toLowerCase(),
+          new_role: data.role,
+          initial_password: data.password.trim(),
+        })
 
-      toast.success(`Invitation sent to ${data.email}`)
-      reset()
-      setInviteOpen(false)
-      refetchUsers()
+        if (error) throw error
+
+        toast.success(`Staff account for ${data.name} created successfully!`)
+        setCreatedUserCredentials({
+          name: data.name.trim(),
+          email: data.email.trim().toLowerCase(),
+          password: data.password.trim(),
+          role: data.role,
+        })
+        refetchUsers()
+      } else {
+        // Fallback: Invite via email Edge Function
+        const { data: result, error } = await supabase.functions.invoke('invite-user', {
+          body: { name: data.name, email: data.email, role: data.role },
+        })
+        if (error) throw error
+        const apiError = (result as { error?: string } | null)?.error
+        if (apiError) throw new Error(apiError)
+
+        toast.success(`Invitation sent to ${data.email}`)
+        reset({ role: 'counselor', name: '', email: '', password: '' })
+        setInviteOpen(false)
+        refetchUsers()
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add user')
     }
+  }
+
+  const handleCopyNewCredentials = () => {
+    if (!createdUserCredentials) return
+    const text = `Kizen Education CRM - Staff Login Credentials\nLogin URL: ${window.location.origin}/login\nEmail: ${createdUserCredentials.email}\nPassword: ${createdUserCredentials.password}\nRole: ${roleLabels[createdUserCredentials.role as UserRole] || createdUserCredentials.role}`
+    navigator.clipboard.writeText(text)
+    setCopiedCreated(true)
+    toast.success('Login credentials copied to clipboard!')
+    setTimeout(() => setCopiedCreated(false), 2000)
   }
 
   const handleDeleteUser = async (userId: string, userName: string) => {
@@ -787,34 +819,167 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Invite User</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit(handleInvite)} className="space-y-4">
-            <div>
-              <Label>Name</Label>
-              <Input {...register('name')} />
+      <Dialog open={inviteOpen} onOpenChange={(o) => {
+        if (!o) {
+          setCreatedUserCredentials(null)
+          reset({ role: 'counselor', name: '', email: '', password: 'Kizen@' + Math.floor(1000 + Math.random() * 9000) })
+        }
+        setInviteOpen(o)
+      }}>
+        <DialogContent className="max-w-md rounded-2xl border border-border shadow-2xl">
+          {createdUserCredentials ? (
+            <div className="space-y-4 py-2">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <div className="text-center space-y-1">
+                <DialogTitle className="text-lg font-bold text-slate-900">Staff Account Created!</DialogTitle>
+                <p className="text-xs text-muted-foreground">
+                  The account has been created and activated in the CRM database.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-border bg-slate-50 p-4 space-y-2.5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Name:</span>
+                  <span className="font-semibold text-slate-800">{createdUserCredentials.name}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Email (Login):</span>
+                  <span className="font-semibold text-slate-800">{createdUserCredentials.email}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Role:</span>
+                  <Badge variant="outline" className="font-medium capitalize text-[11px]">
+                    {roleLabels[createdUserCredentials.role as UserRole] || createdUserCredentials.role}
+                  </Badge>
+                </div>
+                {createdUserCredentials.password && (
+                  <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200">
+                    <span className="text-muted-foreground">Initial Password:</span>
+                    <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {createdUserCredentials.password}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                {createdUserCredentials.password && (
+                  <Button
+                    type="button"
+                    onClick={handleCopyNewCredentials}
+                    className="w-full rounded-xl gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold"
+                  >
+                    {copiedCreated ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedCreated ? 'Copied to Clipboard!' : 'Copy Login Credentials'}
+                  </Button>
+                )}
+
+                {createdUserCredentials.password && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const text = encodeURIComponent(`Kizen Education CRM - Staff Login Credentials\nLogin URL: ${window.location.origin}/login\nEmail: ${createdUserCredentials.email}\nPassword: ${createdUserCredentials.password}\nRole: ${roleLabels[createdUserCredentials.role as UserRole] || createdUserCredentials.role}`)
+                      window.open(`https://wa.me/?text=${text}`, '_blank')
+                    }}
+                    className="w-full rounded-xl gap-2 text-xs"
+                  >
+                    Share via WhatsApp
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setCreatedUserCredentials(null)
+                    setInviteOpen(false)
+                  }}
+                  className="w-full text-xs text-muted-foreground"
+                >
+                  Done
+                </Button>
+              </div>
             </div>
-            <div>
-              <Label>Email</Label>
-              <Input type="email" {...register('email')} />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Select value={watch('role')} onValueChange={(v) => setValue('role', v as InviteForm['role'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ALL_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending...' : 'Send Invite'}</Button>
-            </DialogFooter>
-          </form>
+          ) : (
+            <>
+              <DialogHeader className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                    <UserPlus className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base font-bold">Add Staff Account</DialogTitle>
+                    <p className="text-xs text-muted-foreground">Create direct login credentials or send an invitation.</p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <form onSubmit={handleSubmit(handleInvite)} className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="staff_name" className="text-xs font-medium">Full Name</Label>
+                  <Input id="staff_name" placeholder="e.g. Shruthi Sharma" {...register('name')} className="rounded-xl text-sm" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="staff_email" className="text-xs font-medium">Email Address</Label>
+                  <Input id="staff_email" type="email" placeholder="e.g. shruthi.sharma@kizen.edu" {...register('email')} className="rounded-xl text-sm" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Staff Role</Label>
+                  <Select value={watch('role')} onValueChange={(v) => setValue('role', v as InviteForm['role'])}>
+                    <SelectTrigger className="rounded-xl text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ALL_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="staff_pwd" className="text-xs font-medium flex items-center gap-1.5">
+                      <Key className="h-3.5 w-3.5 text-amber-500" /> Initial Password
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const random = Math.floor(1000 + Math.random() * 9000)
+                        setValue('password', `Kizen@${random}`)
+                      }}
+                      className="text-[11px] text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="h-3 w-3" /> Generate Password
+                    </button>
+                  </div>
+                  <Input
+                    id="staff_pwd"
+                    type="text"
+                    placeholder="e.g. Kizen@2026 (or leave blank to invite via email)"
+                    {...register('password')}
+                    className="rounded-xl text-sm font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Setting a password creates the account immediately. The staff member can log in right away with zero email delays.
+                  </p>
+                </div>
+
+                <DialogFooter className="gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setInviteOpen(false)} className="rounded-xl">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting} className="rounded-xl gap-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold">
+                    <UserPlus className="h-4 w-4" />
+                    {isSubmitting ? 'Creating...' : 'Create Account'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

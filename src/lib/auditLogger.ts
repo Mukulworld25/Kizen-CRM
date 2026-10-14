@@ -20,7 +20,15 @@ export async function logAuditEvent(options: AuditLogOptions): Promise<void> {
     let resolvedUserId = options.userId
     if (!resolvedUserId) {
       const { data: { session } } = await supabase.auth.getSession()
-      resolvedUserId = session?.user?.id || null
+      const authId = session?.user?.id
+      if (authId) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id')
+          .or(`auth_id.eq.${authId},id.eq.${authId}`)
+          .maybeSingle()
+        resolvedUserId = userRow?.id || authId
+      }
     }
 
     const payloadNewData = {

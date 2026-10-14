@@ -35,20 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
 
       if (!data) {
-        // Fallback: match by current session user email if auth_id isn't linked yet
-        const { data: userData } = await supabase.auth.getUser()
-        const userEmail = userData?.user?.email
-        if (userEmail) {
-          const { data: byEmail } = await supabase
-            .from('users')
-            .select('*')
-            .ilike('email', userEmail)
-            .maybeSingle()
+        // Automatically sync & link auth_id via SECURITY DEFINER RPC
+        const { data: syncRes } = await supabase.rpc('sync_current_user_auth_id')
+        if (syncRes?.user) {
+          data = syncRes.user
+        } else {
+          const { data: userData } = await supabase.auth.getUser()
+          const userEmail = userData?.user?.email
+          if (userEmail) {
+            const { data: byEmail } = await supabase
+              .from('users')
+              .select('*')
+              .ilike('email', userEmail)
+              .maybeSingle()
 
-          if (byEmail) {
-            // Auto-link auth_id so future queries hit index directly
-            await supabase.from('users').update({ auth_id: authId }).eq('id', byEmail.id)
-            data = { ...byEmail, auth_id: authId }
+            if (byEmail) {
+              data = { ...byEmail, auth_id: authId }
+            }
           }
         }
       }

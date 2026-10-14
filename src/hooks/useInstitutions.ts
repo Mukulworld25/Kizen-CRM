@@ -222,21 +222,32 @@ export function useBdmDashboardStats() {
         .from('institutions').select('*', { count: 'exact', head: true })
         .eq('mou_status', 'in_discussion')
 
-      let meetingsQuery = supabase.from('institution_meetings').select('*', { count: 'exact', head: true })
-      if (!isOwner) {
-        meetingsQuery = meetingsQuery
-          .filter('institution_id', 'in',
-            supabase.from('institutions').select('id').eq('assigned_bdm_id', profile?.id))
+      let bdmInstIds: string[] = []
+      if (!isOwner && profile?.id) {
+        const { data: myInsts } = await supabase.from('institutions').select('id').eq('assigned_bdm_id', profile.id)
+        bdmInstIds = (myInsts ?? []).map((i) => i.id)
       }
-      const { count: totalMeetings } = await meetingsQuery
 
-      let fuQuery = supabase.from('institution_follow_ups').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-      if (!isOwner) {
-        fuQuery = fuQuery.eq('assigned_to', profile?.id)
+      let totalMeetings = 0
+      let pendingFus = 0
+
+      if (isOwner || bdmInstIds.length > 0) {
+        let meetingsQuery = supabase.from('institution_meetings').select('*', { count: 'exact', head: true })
+        if (!isOwner) {
+          meetingsQuery = meetingsQuery.in('institution_id', bdmInstIds)
+        }
+        const { count: mCount } = await meetingsQuery
+        totalMeetings = mCount ?? 0
+
+        let fuQuery = supabase.from('institution_follow_ups').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+        if (!isOwner) {
+          fuQuery = fuQuery.eq('assigned_to', profile?.id)
+        }
+        const { count: fuCount } = await fuQuery
+        pendingFus = fuCount ?? 0
       }
-      const { count: pendingFus } = await fuQuery
 
-      return { totalInstitutions: totalInstitutions ?? 0, signedMou: signedMou ?? 0, inDiscussion: inDiscussion ?? 0, totalMeetings: totalMeetings ?? 0, pendingFus: pendingFus ?? 0 }
+      return { totalInstitutions: totalInstitutions ?? 0, signedMou: signedMou ?? 0, inDiscussion: inDiscussion ?? 0, totalMeetings, pendingFus }
     },
     enabled: !!profile,
   })
@@ -247,16 +258,24 @@ export function useUpcomingInstitutionMeetings() {
   return useQuery({
     queryKey: ['upcoming-inst-meetings', profile?.id],
     queryFn: async () => {
+      let bdmInstIds: string[] = []
+      if (!profile?.is_owner && profile?.id) {
+        const { data: myInsts } = await supabase.from('institutions').select('id').eq('assigned_bdm_id', profile.id)
+        bdmInstIds = (myInsts ?? []).map((i) => i.id)
+        if (bdmInstIds.length === 0) return []
+      }
+
       let query = supabase
         .from('institution_meetings')
         .select('*, institution:institutions(id, name)')
         .gte('meeting_date', new Date().toISOString().split('T')[0])
         .order('meeting_date', { ascending: true })
         .limit(10)
-      if (!profile?.is_owner) {
-        query = query.filter('institution_id', 'in',
-          supabase.from('institutions').select('id').eq('assigned_bdm_id', profile?.id))
+
+      if (!profile?.is_owner && bdmInstIds.length > 0) {
+        query = query.in('institution_id', bdmInstIds)
       }
+
       const { data, error } = await query
       if (error) throw error
       return data ?? []

@@ -271,13 +271,19 @@ export function useCreateLead() {
         .single()
       if (error) throw error
 
-      await supabase.from('audit_logs').insert({
-        user_id: profile?.id,
-        action: 'create_lead',
-        entity_type: 'lead',
-        entity_id: data.id,
-        new_data: data,
-      })
+      try {
+        if (profile?.id) {
+          await supabase.from('audit_logs').insert({
+            user_id: profile.id,
+            action: 'create_lead',
+            entity_type: 'lead',
+            entity_id: data.id,
+            new_data: data,
+          })
+        }
+      } catch (auditErr) {
+        console.warn('Lead audit log non-fatal error:', auditErr)
+      }
 
       return data
     },

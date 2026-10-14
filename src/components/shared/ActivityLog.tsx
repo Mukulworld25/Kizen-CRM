@@ -109,7 +109,7 @@ export default function ActivityLog() {
 
       if (categoryFilter !== 'all') {
         if (categoryFilter === 'auth') {
-          query = query.or('action.eq.user_login,entity_type.eq.auth')
+          query = query.or('action.eq.user_login,action.ilike.%password%,action.ilike.%unauthorized%,entity_type.eq.auth')
         } else if (categoryFilter === 'fee') {
           query = query.or('action.ilike.%payment%,entity_type.eq.fee')
         } else if (categoryFilter === 'expense') {
@@ -215,6 +215,20 @@ export default function ActivityLog() {
     const act = (action || '').toLowerCase()
     const ent = (entityType || '').toLowerCase()
 
+    if (act.includes('unauthorized')) {
+      return (
+        <Badge className="bg-rose-100 text-rose-900 border-rose-300 font-semibold gap-1 text-[11px]">
+          <Shield className="w-3 h-3 text-rose-600" /> Unauthorized Attempt
+        </Badge>
+      )
+    }
+    if (act.includes('password')) {
+      return (
+        <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-semibold gap-1 text-[11px]">
+          <Key className="w-3 h-3 text-amber-700" /> {act.includes('admin') ? 'Password Reset (Admin)' : 'Password Changed'}
+        </Badge>
+      )
+    }
     if (act.includes('login') || ent === 'auth') {
       return (
         <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold gap-1 text-[11px]">
@@ -274,6 +288,8 @@ export default function ActivityLog() {
 
   // Helper to extract human-readable entity name
   const getEntityName = (log: AuditRecord) => {
+    if (log.new_data?.message) return log.new_data.message
+    if (log.new_data?.target_email) return log.new_data.target_email
     if (log.new_data?.entity_name) return log.new_data.entity_name
     if (log.new_data?.student_name) return log.new_data.student_name
     if (log.new_data?.title) return log.new_data.title
@@ -285,6 +301,15 @@ export default function ActivityLog() {
   // Helper to extract human-readable log details
   const getLogDetails = (log: AuditRecord) => {
     if (log.new_data?.details) return log.new_data.details
+    if (log.action === 'password_change') {
+      return log.new_data?.message || `User changed password for ${log.new_data?.email || log.user?.email || 'account'}`
+    }
+    if (log.action === 'password_reset_admin') {
+      return `Owner updated password for ${log.new_data?.target_email || log.new_data?.target_name || 'user'}`
+    }
+    if (log.action === 'unauthorized_attempt') {
+      return `Access blocked: ${log.new_data?.message || 'Unauthorized attempt detected'}`
+    }
     if (log.action === 'user_login') {
       return `Successful login to Kizen CRM (${log.new_data?.role || log.user?.role || 'Staff'})`
     }

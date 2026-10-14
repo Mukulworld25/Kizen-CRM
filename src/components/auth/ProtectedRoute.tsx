@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { canAccessRoute, getDefaultRoute } from '@/lib/permissions'
 import type { Permission } from '@/lib/permissions'
@@ -41,12 +42,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const featureKey = routeToFeature[base]
   if (featureKey && !profile.is_owner && profile.role !== 'owner') {
     if (!canViewFeature(featureKey)) {
+      toast.error('Access Restricted: You do not have permission to access that section.', { id: 'unauthorized-nav' })
       return <Navigate to={getDefaultRoute(profile.role)} replace />
     }
     return <>{children}</>
   }
 
   if (!canAccessRoute(profile.role, location.pathname, profile.is_owner, profile)) {
+    toast.error('Access Restricted: You do not have permission to access that section.', { id: 'unauthorized-nav' })
     return <Navigate to={getDefaultRoute(profile.role)} replace />
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, LogOut, Menu, Sun, Moon } from 'lucide-react'
+import { Bell, LogOut, Menu, Sun, Moon, Key } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useStudents'
@@ -13,6 +13,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { roleLabels } from '@/lib/permissions'
+import { ChangePasswordModal } from '@/components/shared/ChangePasswordModal'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -24,6 +25,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: notifications = [] } = useNotifications()
   const markRead = useMarkNotificationRead()
   const unreadCount = notifications.filter((n) => !n.is_read).length
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
 
   // Dark/Light mode
   const [isDark, setIsDark] = useState(() => {
@@ -136,12 +138,18 @@ export function Header({ onMenuClick }: HeaderProps) {
           <DropdownMenuContent align="end" className="rounded-xl border-border shadow-lg">
             <DropdownMenuLabel className="text-primary">{profile?.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setChangePasswordOpen(true)} className="cursor-pointer">
+              <Key className="mr-2 h-4 w-4 text-amber-500" /> Change Password
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <ChangePasswordModal open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
     </header>
   )
 }
